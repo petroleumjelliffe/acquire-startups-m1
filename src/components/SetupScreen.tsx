@@ -1,1 +1,57 @@
-import React,{useState} from 'react';export function SetupScreen({defaultSeed,defaultPlayers,onStart}:{defaultSeed:string,defaultPlayers:string,onStart:(seed:string,playerNames:string[])=>void}){const[seed,setSeed]=useState(defaultSeed);const[players,setPlayers]=useState(defaultPlayers);const start=()=>{const names=players.split(',').map(s=>s.trim()).filter(Boolean);if(names.length<2){alert('At least two players required.');return;}onStart(seed,names);};return(<div className='max-w-md mx-auto space-y-4'><h1 className='text-xl font-bold'>Project Saffold</h1><p className='text-gray-600'>A modern take on <i>Acquire</i> — Startups Edition</p><div><label className='block text-sm font-medium'>Seed</label><input value={seed} onChange={e=>setSeed(e.target.value)} className='border rounded w-full p-2'/></div><div><label className='block text-sm font-medium'>Players (comma-separated)</label><input value={players} onChange={e=>setPlayers(e.target.value)} className='border rounded w-full p-2' placeholder='e.g., Ava,Ben,Chris'/></div><button onClick={start} className='bg-black text-white rounded px-4 py-2 w-full'>Start Game</button></div>);}
+import React, { useState } from "react";
+export function SetupScreen({
+  defaultSeed,
+  defaultPlayers,
+  onStart,
+}: {
+  defaultSeed: string;
+  defaultPlayers: string;
+  onStart: (seed: string, playerNames: string[]) => void;
+}) {
+  const [seed, setSeed] = useState(defaultSeed);
+  const [players, setPlayers] = useState(defaultPlayers);
+  const start = () => {
+    const names = players
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (names.length < 2) {
+      alert("At least two players required.");
+      return;
+    }
+    onStart(seed, names);
+  };
+  return (
+    <div className="max-w-md mx-auto space-y-4">
+      <h1 className="text-xl font-bold">Project Saffold</h1>
+      <p className="text-gray-600">
+        A modern take on <i>Acquire</i> — Startups Edition
+      </p>
+      <div>
+        <label className="block text-sm font-medium">Seed</label>
+        <input
+          value={seed}
+          onChange={(e) => setSeed(e.target.value)}
+          className="border rounded w-full p-2"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium">
+          Players (comma-separated)
+        </label>
+        <input
+          value={players}
+          onChange={(e) => setPlayers(e.target.value)}
+          className="border rounded w-full p-2"
+          placeholder="e.g., Ava,Ben,Chris"
+        />
+      </div>
+      <button
+        onClick={start}
+        className="bg-black text-white rounded px-4 py-2 w-full"
+      >
+        Start Game
+      </button>
+    </div>
+  );
+}
