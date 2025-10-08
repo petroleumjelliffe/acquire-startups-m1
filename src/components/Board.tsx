@@ -12,7 +12,7 @@ export function Board({
   board: Record<Coord, TileCell>;
   onPlace: (c: Coord) => void;
   currentHand: Coord[];
-  startups: Record<string, Startup>;   
+  startups: Record<string, Startup>;
 }) {
   const rows = "ABCDEFGHI".split("");
   const cols = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -65,10 +65,9 @@ export function Board({
                     {c}
                   </span>
                 )}
-
                 {/* Startup overlay label on founding tile */}
                 {cell.startupId &&
-                  cell.startupId === startups[cell.startupId]?.foundingTile && (
+                  id === startups[cell.startupId]?.foundingTile && (
                     <div className="startup-label">{cell.startupId}</div>
                   )}
               </button>

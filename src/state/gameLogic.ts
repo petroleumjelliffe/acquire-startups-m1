@@ -141,7 +141,10 @@ export function assignTilesToStartup(
   tiles: Coord[]
 ) {
   if (!state.startups[id]) {
+    //foundingTile must be one of the coords in the list
     state.startups[id] = { id, tiles: [], foundingTile: tiles[0] };
+    console.log("New startup founded:", id, "at", tiles[0]);
+
   }
 
   const s = state.startups[id];
