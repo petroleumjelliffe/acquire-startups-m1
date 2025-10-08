@@ -7,6 +7,7 @@ import { PlayerHand } from "./components/PlayerHand";
 import { GameLog } from "./components/GameLog";
 import { Coord } from "./utils/gameHelpers";
 import { DrawModal } from "./components/DrawModal";
+
 export function Game({
   seed,
   playerNames,
@@ -26,7 +27,12 @@ export function Game({
   return (
     <div className="space-y-4">
       <h2 className="font-semibold">Current: {cur.name}</h2>
-      <Board board={state.board} onPlace={placeTile}   currentHand={cur.hand} />  // 👈 NEW PROP 
+      <Board
+        board={state.board}
+        onPlace={placeTile}
+        startups={state.startups}
+        currentHand={cur.hand}
+      />
       <PlayerHand name={cur.name} hand={cur.hand} onPlace={placeTile} />
       <GameLog entries={state.log} />
       {state.stage === "draw" && (

@@ -10,13 +10,22 @@ export interface Player {
   cash: number;
   hand: Coord[];
 }
+export interface Startup {
+  id: string;
+  color?: string;
+  tiles: Coord[];
+  foundingTile: Coord;
+}
+
 export interface GameState {
+    // color?: string;
   seed: string;
   stage: Stage;
   players: Player[];
   turnIndex: number;
   board: Record<Coord, TileCell>;
   bag: Coord[];
-  startups: Record<string, Coord[]>;
   log: string[];
+  //   startups: Record<string, Startup>;
+  startups: Record<string, Startup >;
 }
