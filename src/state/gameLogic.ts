@@ -11,12 +11,13 @@ import {
 //----------------------------------------------------
 
 const AVAILABLE_STARTUPS = [
-  { id: "Goober", color: "bg-red-200" },
-  { id: "FruitBox", color: "bg-green-200" },
-  { id: "Byte.ly", color: "bg-blue-200" },
-  { id: "FaceHub", color: "bg-purple-200" },
-  { id: "Orbital", color: "bg-yellow-200" },
-  { id: "MicroBros", color: "bg-orange-200" },
+  { id: "Gobble" },
+  { id: "Scrapple"},
+  { id: "PaperfulPost" },
+  { id: "CamCrooned" },
+  { id: "Messla" },
+  { id: "ZuckFace" },
+  { id: "WrecksonMobil" },
 ];
 
 //----------------------------------------------------
@@ -95,6 +96,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       // Found new startup
       const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
       const startup = AVAILABLE_STARTUPS.shift();
+      console.log(AVAILABLE_STARTUPS, "remaining startups");
       if (startup) {
         assignTilesToStartup(state, startup.id, group);
         state.log.push(
@@ -144,7 +146,6 @@ export function assignTilesToStartup(
     //foundingTile must be one of the coords in the list
     state.startups[id] = { id, tiles: [], foundingTile: tiles[0] };
     console.log("New startup founded:", id, "at", tiles[0]);
-
   }
 
   const s = state.startups[id];
