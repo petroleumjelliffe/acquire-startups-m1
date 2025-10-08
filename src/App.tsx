@@ -10,8 +10,8 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 p-6">
       {!config ? (
         <SetupScreen
-          defaultSeed="saffold-seed"
-          defaultPlayers="Ava,Ben"
+          defaultSeed="scaffold-seed"
+          defaultPlayers="Ava, Ben, Carly"
           onStart={(seed, names) => setConfig({ seed, names })}
         />
       ) : (
