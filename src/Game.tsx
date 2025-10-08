@@ -26,7 +26,7 @@ export function Game({
   return (
     <div className="space-y-4">
       <h2 className="font-semibold">Current: {cur.name}</h2>
-      <Board board={state.board} onPlace={placeTile} />
+      <Board board={state.board} onPlace={placeTile}   currentHand={cur.hand} />  // 👈 NEW PROP 
       <PlayerHand name={cur.name} hand={cur.hand} onPlace={placeTile} />
       <GameLog entries={state.log} />
       {state.stage === "draw" && (

@@ -1,1 +1,22 @@
-import type { Coord } from '../utils/gameHelpers';export type Stage='setup'|'draw'|'dealHands'|'play'|'merger'|'end';export interface TileCell{placed:boolean;startupId?:string;}export interface Player{id:string;name:string;cash:number;hand:Coord[];}export interface GameState{seed:string;stage:Stage;players:Player[];turnIndex:number;board:Record<Coord,TileCell>;bag:Coord[];startups:Record<string,Coord[]>;log:string[];}
+import type { Coord } from "../utils/gameHelpers";
+export type Stage = "setup" | "draw" | "dealHands" | "play" | "merger" | "end";
+export interface TileCell {
+  placed: boolean;
+  startupId?: string;
+}
+export interface Player {
+  id: string;
+  name: string;
+  cash: number;
+  hand: Coord[];
+}
+export interface GameState {
+  seed: string;
+  stage: Stage;
+  players: Player[];
+  turnIndex: number;
+  board: Record<Coord, TileCell>;
+  bag: Coord[];
+  startups: Record<string, Coord[]>;
+  log: string[];
+}
