@@ -10,7 +10,7 @@ import {
 // STARTUP CONFIG
 //----------------------------------------------------
 
-const AVAILABLE_STARTUPS = [
+export const AVAILABLE_STARTUPS = [
   { id: "Gobble" },
   { id: "Scrapple"},
   { id: "PaperfulPost" },
@@ -171,6 +171,8 @@ export function mergeStartups(
       state.board[t].startupId = survivorId;
       if (!survivor.tiles.includes(t)) survivor.tiles.push(t);
     }
+    //put the abosrbed one bak in the pile of available startups
+    AVAILABLE_STARTUPS.push({ id: absorbedId });
     delete state.startups[absorbedId];
   }
 }

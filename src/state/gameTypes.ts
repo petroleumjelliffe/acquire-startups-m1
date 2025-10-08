@@ -12,7 +12,7 @@ export interface Player {
 }
 export interface Startup {
   id: string;
-  color?: string;
+//   color?: string;
   tiles: Coord[];
   foundingTile: Coord;
 }
@@ -27,5 +27,6 @@ export interface GameState {
   bag: Coord[];
   log: string[];
   //   startups: Record<string, Startup>;
-  startups: Record<string, Startup >;
+  startups: Record<string, Startup >; //active only
+  availableStartups?: string[]; //available ids
 }
