@@ -1,0 +1,1 @@
+import React from 'react';export function GameLog({entries}:{entries:string[]}){return(<div><h3 className='font-semibold'>Log</h3><ul className='text-sm text-gray-700 max-h-40 overflow-auto'>{entries.slice().reverse().map((l,i)=>(<li key={i}>{l}</li>))}</ul></div>);}
