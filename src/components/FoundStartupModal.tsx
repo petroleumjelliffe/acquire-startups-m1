@@ -25,18 +25,18 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
     foundStartup(newState, startupId, foundingTile);
 
     //floodfill the unclaimed tiles connected to the founding tile
-    floodFillUnclaimed([foundingTile], newState.board);
+    // floodFillUnclaimed([foundingTile], newState.board);
 
     //grant a free share to the founder
-    grantFoundingShare(newState, currentPlayer.id, startupId);
+    // grantFoundingShare(newState, currentPlayer.id, startupId);
 
     //proceed to buy phase
-    newState.stage = "buy"; // proceed to buy phase
+    // newState.stage = "buy"; // proceed to buy phase
     onUpdate(newState);
   }
 
   // Group by tier for display
-  const tierGroups = [1, 2, 3].map((tier) => ({
+  const tierGroups = [0,1,2].map((tier) => ({
     tier,
     startups: available.filter((s) => s.tier === tier),
   }));
@@ -59,7 +59,7 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
                   <button
                     key={s.id}
                     onClick={() => handleSelect(s.id)}
-                    className="py-4 rounded-lg text-white font-semibold shadow hover:scale-105 transition-transform"
+                    className={`py-4 rounded-lg text-white font-semibold shadow hover:scale-105 transition-transform startup-${s.id}`}
                     // style={{ backgroundColor: s.color }}
                   >
                     {s.id}

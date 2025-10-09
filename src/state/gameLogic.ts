@@ -336,12 +336,15 @@ export function foundStartup(
   // state.availableStartups = state.availableStartups.filter((a) => a !== id);
   state.board[foundingTile].startupId = id;
 
+  floodFillUnclaimed([foundingTile], state.board);
+  
+
   
   //grant founding bondus
   grantFoundingShare(state, state.players[state.turnIndex].id, id);
   state.log.push(`${id} was founded at ${foundingTile}.`);
 
-  state.stage = "foundStartup";
+  state.stage = "buy";
   state.pendingFoundTile = foundingTile;
   return state
 }
