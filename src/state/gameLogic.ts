@@ -43,6 +43,13 @@ export const sharePrices = [
   },
 ];
 
+export interface BonusResult {
+  playerId: string;
+  playerName: string;
+  amount: number;
+  type: "majority" | "minority";
+}
+
 //----------------------------------------------------
 // INITIAL DRAW + DEALING
 //----------------------------------------------------
@@ -129,26 +136,34 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
   if (adjStartups.size === 0) {
     // Found new startup?
     if (adjUnclaimed.length > 0 && getAvailableStartups(state).length > 0) {
-      const brandChoices = getAvailableStartups(state).map((s) => s.id);
-      const chosen = window.prompt(
-        `Choose startup to found: ${brandChoices.join(", ")}`,
-        brandChoices[0]
-      );
-      const chosenId =
-        chosen && brandChoices.includes(chosen) ? chosen : brandChoices[0];
-        const tier = AVAILABLE_STARTUPS.find(s => s.id === chosenId)?.tier || 1;
-      foundStartup(state, chosenId, coord);
 
-      // Claim contiguous unclaimed group
-      const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
-      for (const g of group) state.board[g].startupId = chosenId;
+      //change state to found, in order to trigger the FoundStartupModal
+      state.stage = "foundStartup";
+      state.pendingFoundTile = coord;
 
-      state.log.push(
-        `${player.name} founded ${chosenId} with ${group.length} tiles.`
-      );
-      //enter buy stage
-  state.stage = "buy";
-  state.currentBuyCount = 0;
+      //move following game logic to the FoundStartupModal component
+    
+
+  //     const brandChoices = getAvailableStartups(state).map((s) => s.id);
+  //     const chosen = window.prompt(
+  //       `Choose startup to found: ${brandChoices.join(", ")}`,
+  //       brandChoices[0]
+  //     );
+  //     const chosenId =
+  //       chosen && brandChoices.includes(chosen) ? chosen : brandChoices[0];
+  //       const tier = AVAILABLE_STARTUPS.find(s => s.id === chosenId)?.tier || 1;
+  //     foundStartup(state, chosenId, coord);
+
+  //     // Claim contiguous unclaimed group
+  //     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
+  //     for (const g of group) state.board[g].startupId = chosenId;
+
+  //     state.log.push(
+  //       `${player.name} founded ${chosenId} with ${group.length} tiles.`
+  //     );
+  //     //enter buy stage
+  // state.stage = "buy";
+  // state.currentBuyCount = 0;
 
     } else {
       state.log.push(`${player.name} placed ${coord} (isolated).`);
@@ -203,6 +218,9 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     state.log.push(
       `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
     );
+
+    state.stage = "mergerPayout";
+    prepareMergerPayout(state, survivorId, absorbedIds);
   }
 
   // Draw next tile
@@ -210,7 +228,8 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
   const draw = state.bag.shift();
   if (draw) player.hand.push(draw);
 
-  state.turnIndex = (state.turnIndex + 1) % state.players.length;
+  //don't move to next player yet
+  // state.turnIndex = (state.turnIndex + 1) % state.players.length;
   return state;
 }
 
@@ -321,6 +340,10 @@ export function foundStartup(
   //grant founding bondus
   grantFoundingShare(state, state.players[state.turnIndex].id, id);
   state.log.push(`${id} was founded at ${foundingTile}.`);
+
+  state.stage = "foundStartup";
+  state.pendingFoundTile = foundingTile;
+  return state
 }
 
 /**
@@ -449,4 +472,95 @@ export function endBuyPhase(state: GameState) {
   state.stage = "play";
   state.turnIndex = (state.turnIndex + 1) % state.players.length;
   state.currentBuyCount = 0;
+  return state
+}
+export function prepareMergerPayout(state: GameState, survivorId: string, absorbedIds: string[]) {
+  const allBonuses: BonusResult[] = [];
+
+  for (const absorbedId of absorbedIds) {
+    const price = getSharePrice(state, absorbedId);
+
+    const holdings = state.players
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        shares: p.portfolio[absorbedId] || 0,
+      }))
+      .filter((h) => h.shares > 0)
+      .sort((a, b) => b.shares - a.shares);
+
+    if (holdings.length === 0) continue;
+
+    const majorityShares = holdings[0].shares;
+    const majorityHolders = holdings.filter((h) => h.shares === majorityShares);
+    const minorityShares = Math.max(
+      0,
+      ...holdings
+        .filter((h) => h.shares < majorityShares)
+        .map((h) => h.shares)
+    );
+    const minorityHolders = holdings.filter((h) => h.shares === minorityShares && h.shares < majorityShares);
+
+    const majBonus = price * 10;
+    const minBonus = price * 5;
+
+    if (majorityHolders.length > 1) {
+      const split = Math.floor((majBonus + minBonus) / majorityHolders.length);
+      for (const h of majorityHolders) {
+        allBonuses.push({ playerId: h.id, playerName: h.name, amount: split, type: "majority" });
+      }
+    } else {
+      for (const h of majorityHolders) {
+        allBonuses.push({ playerId: h.id, playerName: h.name, amount: majBonus, type: "majority" });
+      }
+      for (const h of minorityHolders) {
+        allBonuses.push({ playerId: h.id, playerName: h.name, amount: minBonus, type: "minority" });
+      }
+    }
+  }
+
+  // Store merger context for UI
+  state.merger = { survivorId, absorbedIds, resolved: false };
+  state.stage = "mergerPayout";
+
+  // Save the computed bonuses for the modal
+  (state as any).pendingBonuses = allBonuses;
+}
+
+export function finalizeMergerPayout(state: GameState) {
+  const bonuses: BonusResult[] = (state as any).pendingBonuses || [];
+  for (const b of bonuses) {
+    const player = state.players.find((p) => p.id === b.playerId);
+    if (player) {
+      player.cash += b.amount;
+      state.log.push(`${player.name} received $${b.amount} ${b.type} bonus.`);
+    }
+  }
+
+  // Auto-sell all absorbed shares at current share price
+  const absorbedIds = state.merger?.absorbedIds || [];
+  for (const p of state.players) {
+    for (const id of absorbedIds) {
+      const shares = p.portfolio[id] || 0;
+      if (shares > 0) {
+        const price = getSharePrice(state, id);
+        const proceeds = price * shares;
+        p.cash += proceeds;
+        p.portfolio[id] = 0;
+        state.log.push(`${p.name} sold ${shares} shares of ${id} for $${proceeds}`);
+      }
+    }
+  }
+
+  // Reset absorbed startups
+  for (const id of absorbedIds) {
+    const s = state.startups[id];
+    s.isFounded = false;
+    s.foundingTile = null;
+    s.availableShares = s.totalShares;
+  }
+
+  state.stage = "buy";
+  state.merger = undefined;
+  (state as any).pendingBonuses = undefined;
 }

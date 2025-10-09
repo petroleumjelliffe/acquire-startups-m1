@@ -8,6 +8,8 @@ import { GameLog } from "./components/GameLog";
 import { Coord } from "./utils/gameHelpers";
 import { DrawModal } from "./components/DrawModal";
 import { BuyModal } from "./components/BuyModal";
+import { MergerPayoutModal, FoundStartupModal } from "./components"; //barrelfile
+import { useEffect } from "react";
 
 export function Game({
   seed,
@@ -25,6 +27,11 @@ export function Game({
     const next = handleTilePlacement(state, coord);
     setState({ ...next });
   };
+
+  useEffect(() => {
+    console.log("Game state:", state.stage);
+  }, [state]);
+
   return (
     <div className="space-y-4">
       <h2 className="font-semibold">Current: {cur.name}</h2>
@@ -35,9 +42,19 @@ export function Game({
         currentHand={cur.hand}
       />
       <PlayerHand name={cur.name} hand={cur.hand} onPlace={placeTile} />
-      <GameLog entries={state.log} />
+      <GameLog state={state} />
       {state.stage === "draw" && (
         <DrawModal state={state} setState={setState} />
+      )}
+      {state.stage === "mergerPayout" && (
+        <MergerPayoutModal state={state} onUpdate={setState} />
+      )}
+      {state.stage === "foundStartup" && state.pendingFoundTile && (
+        <FoundStartupModal
+          state={state}
+          foundingTile={state.pendingFoundTile}
+          onUpdate={setState}
+        />
       )}
 
       {state.stage === "buy" && <BuyModal state={state} onUpdate={setState} />}

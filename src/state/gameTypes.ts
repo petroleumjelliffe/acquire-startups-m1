@@ -1,11 +1,17 @@
 import type { Coord } from "../utils/gameHelpers";
-export type Stage = "setup" | "draw" | "dealHands" | "play" | "buy" |  "merger" | "end";
+export type Stage = "setup" | "draw" | "dealHands" | "play" | "foundStartup" | "buy" |  "mergerPayout" | "end";
 export interface TileCell {
   placed: boolean;
   startupId?: string;
 }
 
 export type StartupId = "Gobble" | "Scrapple" | "PaperfulPost" | "CamCrooned" | "Messla" | "ZuckFace" | "WrecksonMobil";
+// src/state/gameTypes.ts
+export interface MergerContext {
+  survivorId: string;
+  absorbedIds: string[];
+  resolved: boolean;
+}
 
 export interface Player {
   id: string;
@@ -37,4 +43,6 @@ export interface GameState {
   startups: Record<string, Startup >; //all
   // availableStartups: string[]; //available ids
   currentBuyCount?:number; //how many shares bought this turn
+  merger?: MergerContext;
+  pendingFoundTile?: Coord; //when in foundStartup stage, which tile is being used to found
 }

@@ -57,7 +57,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate }) => {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-lg p-6 w-[500px] max-w-full">
-        <h2 className="text-lg font-semibold mb-4">Buy Shares</h2>
+        <h2 className="text-lg font-semibold mb-4">{player.name}: Buy Shares</h2>
         <div className="text-sm text-gray-700 mb-2">
           Cash: ${player.cash} | Shares remaining: {3 - totalShares}/3
         </div>
