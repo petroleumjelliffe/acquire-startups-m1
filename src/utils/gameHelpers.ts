@@ -71,24 +71,32 @@ export function getAdjacentCoords(c: Coord): Coord[] {
 //----------------------------------------------------
 // Flood fill to find connected unclaimed tiles
 //----------------------------------------------------
-
-export function floodFillUnclaimed(
-  start: Coord[],
-  board: Record<Coord, { placed: boolean; startupId?: string }>
-): Coord[] {
-  const queue = [...start];
+/**
+ * Collect all contiguous unclaimed (unbranded) tiles starting from a seed.
+ * This helps when determining new startup clusters.
+ */
+export function floodFillUnclaimed(startCoords: Coord[], board: Record<Coord, { placed: boolean; startupId?: string }>): Coord[] {
   const visited = new Set<Coord>();
-
-  while (queue.length > 0) {
-    const t = queue.pop()!;
-    if (visited.has(t)) continue;
-    visited.add(t);
-    for (const n of getAdjacentCoords(t)) {
-      const cell = board[n];
-      if (cell && cell.placed && !cell.startupId && !visited.has(n)) {
-        queue.push(n);
-      }
+  const stack = [...startCoords];
+  while (stack.length) {
+    const cur = stack.pop()!;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    const cell = board[cur];
+    if (!cell?.placed || cell.startupId) continue;
+    for (const adj of getAdjacentCoords(cur)) {
+      const n = board[adj];
+      if (n?.placed && !n.startupId) stack.push(adj);
     }
   }
-  return Array.from(visited);
+  return [...visited];
+}
+
+/**
+ * Convenience: compute all coords belonging to a startup (derived view).
+ */
+export function getTilesForStartup(board: Record<Coord, { placed: boolean; startupId?: string }>, id: string): Coord[] {
+  return Object.entries(board)
+    .filter(([_, cell]) => cell.startupId === id)
+    .map(([coord]) => coord as Coord);
 }

@@ -4,6 +4,7 @@ import {
   compareTiles,
   getAdjacentCoords,
   floodFillUnclaimed,
+  getTilesForStartup,
 } from "../utils/gameHelpers";
 
 //----------------------------------------------------
@@ -12,7 +13,7 @@ import {
 
 export const AVAILABLE_STARTUPS = [
   { id: "Gobble" },
-  { id: "Scrapple"},
+  { id: "Scrapple" },
   { id: "PaperfulPost" },
   { id: "CamCrooned" },
   { id: "Messla" },
@@ -68,18 +69,10 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
   const cell = state.board[coord];
   if (!player.hand.includes(coord) || cell.placed) return state;
 
-  // Place the tile
-  cell.placed = true;
-  player.hand = player.hand.filter((t) => t !== coord);
-  const newTile = state.bag.shift();
-  if (newTile) player.hand.push(newTile);
-
-  // Detect adjacency
   const adj = getAdjacentCoords(coord);
   const adjStartups = new Set<string>();
   const adjUnclaimed: Coord[] = [];
 
-  //loop through adjacent coords, check board state, record which startups are adjacent and which unclaimed tiles
   for (const n of adj) {
     const c = state.board[n];
     if (!c?.placed) continue;
@@ -87,49 +80,102 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     else adjUnclaimed.push(n);
   }
 
+  // Safe-chain rule
+  if (adjStartups.size >= 2) {
+    console.log(
+      "Touching startups:",
+      [...adjStartups].map((id) => `${id}(${getStartupSize(state, id)})`)
+    );
+
+    const touching = [...adjStartups];
+    const safeChains = touching.filter((id) => getStartupSize(state, id) >= 11);
+    if (safeChains.length > 0) {
+      state.log.push(
+        `${
+          player.name
+        } attempted illegal merge involving safe chain(s): ${safeChains.join(
+          ", "
+        )}`
+      );
+      return state; // 🚫 block placement
+    }
+  }
+
+  // Place tile
+  cell.placed = true;
+
   if (adjStartups.size === 0) {
-    // Found new startup or isolated tile
-    if (adjUnclaimed.length === 0) {
-      state.log.push(`${player.name} placed ${coord} (isolated).`);
-      console.log("Isolated tile placed, no action.");
-    } else {
-      // Found new startup
+    // Found new startup?
+    if (adjUnclaimed.length > 0 && state.availableStartups.length > 0) {
+      const brandChoices = state.availableStartups;
+      const chosen = window.prompt(
+        `Choose startup to found: ${brandChoices.join(", ")}`,
+        brandChoices[0]
+      );
+      const chosenId =
+        chosen && brandChoices.includes(chosen) ? chosen : brandChoices[0];
+      createStartup(state, chosenId, coord);
+
+      // Claim contiguous unclaimed group
       const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
-      const startup = AVAILABLE_STARTUPS.shift();
-      console.log(AVAILABLE_STARTUPS, "remaining startups");
-      if (startup) {
-        assignTilesToStartup(state, startup.id, group);
-        state.log.push(
-          `${player.name} founded ${startup.id} with ${group.length} tiles.`
-        );
-      } else {
-        state.log.push(
-          `${player.name} placed ${coord}, no startups available.`
-        );
-      }
+      for (const g of group) state.board[g].startupId = chosenId;
+
+      state.log.push(
+        `${player.name} founded ${chosenId} with ${group.length} tiles.`
+      );
+    } else {
+      state.log.push(`${player.name} placed ${coord} (isolated).`);
     }
   } else if (adjStartups.size === 1) {
-    // Expand existing startup + absorb adjacent unclaimed
-    const id = [...adjStartups][0];
+    // Expand existing startup
+    const [id] = [...adjStartups];
     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
-    assignTilesToStartup(state, id, group);
+    for (const g of group) state.board[g].startupId = id;
     state.log.push(
-      `${player.name} expanded ${id} to ${state.startups[id].tiles.length} tiles.`
+      `${player.name} expanded ${id} to ${
+        getTilesForStartup(state.board, id).length
+      } tiles.`
     );
-    console.log("Expanding existing startup", id);
-  } else if (adjStartups.size >= 2) {
-    // Merger detected
+  } else {
+    // Merge multiple startups
+    const touchingIds = [...adjStartups];
+    const sizes = touchingIds
+      .map((id) => ({
+        id,
+        size: getTilesForStartup(state.board, id).length,
+      }))
+      .sort((a, b) => b.size - a.size);
+
+    const top = sizes[0];
+    const next = sizes[1];
+    let survivorId = top.id;
+
+    if (next && top.size === next.size) {
+      const tied = sizes.filter((s) => s.size === top.size).map((s) => s.id);
+      const choice = window.prompt(
+        `Choose survivor: ${tied.join(", ")}`,
+        tied[0]
+      );
+      survivorId = tied.includes(choice || "") ? choice! : tied[0];
+    }
+
+    // Claim adjacent unclaimed before merging
     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
-    const surviving = [...adjStartups][0];
-    assignTilesToStartup(state, surviving, group);
-    const merging = [...adjStartups].slice(1);
-    mergeStartups(state, surviving, merging);
+    for (const g of group) state.board[g].startupId = survivorId;
+
+    const absorbedIds = touchingIds.filter((id) => id !== survivorId);
+    mergeStartups(state, survivorId, absorbedIds);
     state.log.push(
-      `${player.name} triggered merger: ${[surviving, ...merging].join(" + ")}`
+      `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
     );
   }
 
-  advanceTurn(state);
+  // Draw next tile
+  player.hand = player.hand.filter((t) => t !== coord);
+  const draw = state.bag.shift();
+  if (draw) player.hand.push(draw);
+
+  state.turnIndex = (state.turnIndex + 1) % state.players.length;
   return state;
 }
 
@@ -146,6 +192,8 @@ export function assignTilesToStartup(
     //foundingTile must be one of the coords in the list
     state.startups[id] = { id, tiles: [], foundingTile: tiles[0] };
     console.log("New startup founded:", id, "at", tiles[0]);
+    // remove brand from available pool if present
+    state.availableStartups = state.availableStartups.filter((a) => a !== id);
   }
 
   const s = state.startups[id];
@@ -155,26 +203,125 @@ export function assignTilesToStartup(
   }
 }
 
+export function returnBrandToAvailable(state: GameState, id: string) {
+  // Only return if not already available and not active
+  if (state.startups[id]) return; // still active
+  if (!state.availableStartups.includes(id)) {
+    state.availableStartups.push(id);
+  }
+}
+
+export function chooseFoundingBrand(
+  state: GameState,
+  playerName: string
+): string | null {
+  // TODO: replace with your modal; prompt is just a dev stub
+  const choices = state.availableStartups;
+  if (choices.length === 0) return null;
+  if (choices.length === 1) return choices[0];
+  const chosen = window.prompt(
+    `${playerName}: choose startup to found:\n${choices.join(", ")}`,
+    choices[0]
+  );
+  if (!chosen) return null;
+  return choices.includes(chosen) ? chosen : null;
+}
+
+export function pickMergeSurvivor(
+  state: GameState,
+  playersTurnName: string,
+  ids: string[]
+): string {
+  // survivor = largest; tie → prompt
+  const sizes = ids
+    .map((id) => ({ id, size: state.startups[id].tiles.length }))
+    .sort((a, b) => b.size - a.size);
+  const top = sizes[0];
+  const next = sizes[1];
+
+  if (!next || top.size > next.size) return top.id;
+
+  // tie among some
+  const tied = sizes.filter((s) => s.size === top.size).map((s) => s.id);
+  if (tied.length === 1) return tied[0];
+
+  // TODO: replace with modal; prompt is a dev stub
+  const chosen = window.prompt(
+    `${playersTurnName}: tie! choose survivor:\n${tied.join(", ")}`,
+    tied[0]
+  );
+  return tied.includes(chosen || "") ? (chosen as string) : tied[0];
+}
+
+/**
+ * Count how many tiles belong to each startup ID.
+ */
+function getStartupSize(state: GameState, id: string): number {
+  let count = 0;
+  for (const cell of Object.values(state.board)) {
+    if (cell.startupId === id) count++;
+  }
+  return count;
+}
+
+/**
+ * Returns true if ANY of the given startups are "safe" (>=11 tiles).
+ */
+function anySafe(ids: string[], state: GameState): boolean {
+  for (const id of ids) {
+    const size = getStartupSize(state, id);
+    if (size >= 11) return true;
+  }
+  return false;
+}
+
+/**
+ * Create a new startup on the board.
+ */
+export function createStartup(
+  state: GameState,
+  id: string,
+  foundingTile: Coord
+) {
+  state.startups[id] = { id, foundingTile, tiles: [] };
+  state.availableStartups = state.availableStartups.filter((a) => a !== id);
+  state.board[foundingTile].startupId = id;
+}
+
+/**
+ * Merge absorbed startups into a surviving one.
+ * Board is the source of truth — we just rewrite startupIds.
+ */
 export function mergeStartups(
   state: GameState,
   survivorId: string,
   absorbedIds: string[]
 ) {
-  const survivor = state.startups[survivorId];
-  if (!survivor) return;
-
-  for (const absorbedId of absorbedIds) {
-    const absorbed = state.startups[absorbedId];
-    if (!absorbed) continue;
-
-    for (const t of absorbed.tiles) {
-      state.board[t].startupId = survivorId;
-      if (!survivor.tiles.includes(t)) survivor.tiles.push(t);
+  for (const [coord, cell] of Object.entries(state.board)) {
+    if (absorbedIds.includes(cell.startupId || "")) {
+      cell.startupId = survivorId;
     }
-    //put the abosrbed one bak in the pile of available startups
-    AVAILABLE_STARTUPS.push({ id: absorbedId });
-    delete state.startups[absorbedId];
   }
+
+  // Return absorbed brands to available pool
+  for (const id of absorbedIds) {
+    delete state.startups[id];
+    if (!state.availableStartups.includes(id)) {
+      state.availableStartups.push(id);
+    }
+  }
+}
+
+/**
+ * Get all startup IDs adjacent to a given coordinate.
+ */
+function getTouchingStartups(state: GameState, coord: Coord): string[] {
+  const ids = new Set<string>();
+  for (const adj of getAdjacentCoords(coord)) {
+    const cell = state.board[adj];
+    if (cell?.startupId) ids.add(cell.startupId);
+  }
+  return [...ids];
 }
 
 //----------------------------------------------------

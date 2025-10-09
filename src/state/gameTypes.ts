@@ -28,5 +28,5 @@ export interface GameState {
   log: string[];
   //   startups: Record<string, Startup>;
   startups: Record<string, Startup >; //active only
-  availableStartups?: string[]; //available ids
+  availableStartups: string[]; //available ids
 }
