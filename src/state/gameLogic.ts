@@ -89,7 +89,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
 
     const touching = [...adjStartups];
     const safeChains = touching.filter((id) => getStartupSize(state, id) >= 11);
-    if (safeChains.length > 0) {
+    if (safeChains.length > 1) {
       state.log.push(
         `${
           player.name
