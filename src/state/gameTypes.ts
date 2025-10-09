@@ -1,5 +1,5 @@
 import type { Coord } from "../utils/gameHelpers";
-export type Stage = "setup" | "draw" | "dealHands" | "play" | "merger" | "end";
+export type Stage = "setup" | "draw" | "dealHands" | "play" | "buy" |  "merger" | "end";
 export interface TileCell {
   placed: boolean;
   startupId?: string;
@@ -36,4 +36,5 @@ export interface GameState {
   //   startups: Record<string, Startup>;
   startups: Record<string, Startup >; //all
   // availableStartups: string[]; //available ids
+  currentBuyCount?:number; //how many shares bought this turn
 }

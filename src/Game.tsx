@@ -7,6 +7,7 @@ import { PlayerHand } from "./components/PlayerHand";
 import { GameLog } from "./components/GameLog";
 import { Coord } from "./utils/gameHelpers";
 import { DrawModal } from "./components/DrawModal";
+import { BuyModal } from "./components/BuyModal";
 
 export function Game({
   seed,
@@ -38,6 +39,8 @@ export function Game({
       {state.stage === "draw" && (
         <DrawModal state={state} setState={setState} />
       )}
+
+      {state.stage === "buy" && <BuyModal state={state} onUpdate={setState} />}
     </div>
   );
 }

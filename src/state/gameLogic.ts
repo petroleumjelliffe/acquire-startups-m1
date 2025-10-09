@@ -146,8 +146,16 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       state.log.push(
         `${player.name} founded ${chosenId} with ${group.length} tiles.`
       );
+      //enter buy stage
+  state.stage = "buy";
+  state.currentBuyCount = 0;
+
     } else {
       state.log.push(`${player.name} placed ${coord} (isolated).`);
+      //enter buy stage
+  state.stage = "buy";
+  state.currentBuyCount = 0;
+
     }
   } else if (adjStartups.size === 1) {
     // Expand existing startup
@@ -159,6 +167,10 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
         getTilesForStartup(state.board, id).length
       } tiles.`
     );
+    //enter buy stage
+  state.stage = "buy";
+  state.currentBuyCount = 0;
+
   } else {
     // Merge multiple startups
     const touchingIds = [...adjStartups];
@@ -304,6 +316,10 @@ export function foundStartup(
   // state.startups[id] = { id, foundingTile, tiles: [], tier };
   // state.availableStartups = state.availableStartups.filter((a) => a !== id);
   state.board[foundingTile].startupId = id;
+
+  
+  //grant founding bondus
+  grantFoundingShare(state, state.players[state.turnIndex].id, id);
   state.log.push(`${id} was founded at ${foundingTile}.`);
 }
 
@@ -381,6 +397,56 @@ export const getAvailableStartups = function(state: GameState) {
   return Object.values(state.startups).filter((s) => !s.isFounded);
 }
 
-export const getActiveStartups = function(state: GameState) {
+export function getActiveStartups(state: GameState) {
   return Object.values(state.startups).filter((s) => s.isFounded);
+}
+
+export function getBuyableStartups(state: GameState) {
+  return Object.values(state.startups).filter((s) => s.isFounded && s.availableShares > 0)
+  .map(s => ({
+    id: s.id,
+    price: getSharePrice(state, s.id),
+    availableShares: s.availableShares, 
+    tier: s.tier,
+  }));
+}
+
+export function grantFoundingShare(state: GameState, playerId: string, startupId: string) {
+  const player = state.players.find((p) => p.id === playerId);
+  const startup = state.startups[startupId];
+  if (!player || !startup) return;
+
+  if (startup.availableShares > 0) {
+    startup.availableShares -= 1;
+    player.portfolio[startupId] = (player.portfolio[startupId] || 0) + 1;
+    state.log.push(`${player.name} received a free share of ${startupId} for founding it.`);
+  }
+}
+
+export function buyShares(state: GameState, playerId: string, startupId: string, count: number): boolean {
+  const player = state.players.find((p) => p.id === playerId);
+  const startup = state.startups[startupId];
+  if (!player || !startup || !startup.isFounded) return false;
+
+  const remainingAllowance = 3 - (state.currentBuyCount || 0);
+  const buyCount = Math.min(count, remainingAllowance, startup.availableShares);
+  if (buyCount <= 0) return false;
+
+  const price = getSharePrice(state, startupId);
+  const total = price * buyCount;
+  if (player.cash < total) return false;
+
+  player.cash -= total;
+  player.portfolio[startupId] = (player.portfolio[startupId] || 0) + buyCount;
+  startup.availableShares -= buyCount;
+  state.currentBuyCount = (state.currentBuyCount || 0) + buyCount;
+
+  state.log.push(`${player.name} bought ${buyCount} ${startupId} share(s) for $${total}.`);
+  return true;
+}
+
+export function endBuyPhase(state: GameState) {
+  state.stage = "play";
+  state.turnIndex = (state.turnIndex + 1) % state.players.length;
+  state.currentBuyCount = 0;
 }
