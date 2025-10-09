@@ -5,6 +5,7 @@ import {
   getAdjacentCoords,
   floodFillUnclaimed,
   getTilesForStartup,
+  getStartupSize,
 } from "../utils/gameHelpers";
 
 //----------------------------------------------------
@@ -12,13 +13,34 @@ import {
 //----------------------------------------------------
 
 export const AVAILABLE_STARTUPS = [
-  { id: "Gobble" },
-  { id: "Scrapple" },
-  { id: "PaperfulPost" },
-  { id: "CamCrooned" },
-  { id: "Messla" },
-  { id: "ZuckFace" },
-  { id: "WrecksonMobil" },
+  { id: "Gobble", tier: 2 },
+  { id: "Scrapple", tier: 2 },
+  { id: "PaperfulPost", tier: 0 },
+  { id: "CamCrooned", tier: 1 },
+  { id: "Messla", tier: 1 },
+  { id: "ZuckFace", tier: 1 },
+  { id: "WrecksonMobil", tier: 2 },
+];
+
+export const sharePrices = [
+  {
+    sharePrice: [200, 300, 400, 500, 600, 700, 800, 900, 1000],
+    majorityHolderBonus: [
+      2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000,
+    ],
+  },
+  {
+    sharePrice: [300, 400, 500, 600, 700, 800, 900, 1000, 1100],
+    majorityHolderBonus: [
+      3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000,
+    ],
+  },
+  {
+    sharePrice: [400, 500, 600, 700, 800, 900, 1000, 1100, 1200],
+    majorityHolderBonus: [
+      4000, 5000, 6000, 7000, 8000, 9000, 10000, 11000, 12000,
+    ],
+  },
 ];
 
 //----------------------------------------------------
@@ -106,15 +128,16 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
 
   if (adjStartups.size === 0) {
     // Found new startup?
-    if (adjUnclaimed.length > 0 && state.availableStartups.length > 0) {
-      const brandChoices = state.availableStartups;
+    if (adjUnclaimed.length > 0 && getAvailableStartups(state).length > 0) {
+      const brandChoices = getAvailableStartups(state).map((s) => s.id);
       const chosen = window.prompt(
         `Choose startup to found: ${brandChoices.join(", ")}`,
         brandChoices[0]
       );
       const chosenId =
         chosen && brandChoices.includes(chosen) ? chosen : brandChoices[0];
-      createStartup(state, chosenId, coord);
+        const tier = AVAILABLE_STARTUPS.find(s => s.id === chosenId)?.tier || 1;
+      foundStartup(state, chosenId, coord);
 
       // Claim contiguous unclaimed group
       const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
@@ -186,29 +209,18 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
 export function assignTilesToStartup(
   state: GameState,
   id: string,
-  tiles: Coord[]
+ 
+ 
 ) {
-  if (!state.startups[id]) {
-    //foundingTile must be one of the coords in the list
-    state.startups[id] = { id, tiles: [], foundingTile: tiles[0] };
-    console.log("New startup founded:", id, "at", tiles[0]);
-    // remove brand from available pool if present
-    state.availableStartups = state.availableStartups.filter((a) => a !== id);
-  }
-
-  const s = state.startups[id];
-  for (const t of tiles) {
-    state.board[t].startupId = id;
-    if (!s.tiles.includes(t)) s.tiles.push(t);
-  }
+//assign given tiles to the givien startup id
 }
 
 export function returnBrandToAvailable(state: GameState, id: string) {
   // Only return if not already available and not active
-  if (state.startups[id]) return; // still active
-  if (!state.availableStartups.includes(id)) {
-    state.availableStartups.push(id);
-  }
+  // if (state.startups[id]) return; // still active
+  state.startups[id].isFounded = false;
+  state.startups[id].foundingTile = null;
+
 }
 
 export function chooseFoundingBrand(
@@ -216,7 +228,7 @@ export function chooseFoundingBrand(
   playerName: string
 ): string | null {
   // TODO: replace with your modal; prompt is just a dev stub
-  const choices = state.availableStartups;
+  const choices = getAvailableStartups(state).map((s) => s.id);
   if (choices.length === 0) return null;
   if (choices.length === 1) return choices[0];
   const chosen = window.prompt(
@@ -256,36 +268,43 @@ export function pickMergeSurvivor(
 /**
  * Count how many tiles belong to each startup ID.
  */
-function getStartupSize(state: GameState, id: string): number {
-  let count = 0;
-  for (const cell of Object.values(state.board)) {
-    if (cell.startupId === id) count++;
-  }
-  return count;
-}
+// export function getStartupSize(state: GameState, id: string): number {
+//   let count = 0;
+//   for (const cell of Object.values(state.board)) {
+//     if (cell.startupId === id) count++;
+//   }
+//   return count;
+// }
 
 /**
  * Returns true if ANY of the given startups are "safe" (>=11 tiles).
  */
-function anySafe(ids: string[], state: GameState): boolean {
-  for (const id of ids) {
-    const size = getStartupSize(state, id);
-    if (size >= 11) return true;
-  }
-  return false;
-}
+// function anySafe(ids: string[], state: GameState): boolean {
+//   for (const id of ids) {
+//     const size = getStartupSize(state, id);
+//     if (size >= 11) return true;
+//   }
+//   return false;
+// }
 
 /**
  * Create a new startup on the board.
  */
-export function createStartup(
+export function foundStartup(
   state: GameState,
   id: string,
-  foundingTile: Coord
+  foundingTile: Coord,
+  // tier: number
 ) {
-  state.startups[id] = { id, foundingTile, tiles: [] };
-  state.availableStartups = state.availableStartups.filter((a) => a !== id);
+  const s = state.startups[id];
+  if (!s) return
+  s.isFounded = true;
+  s.foundingTile = foundingTile;
+
+  // state.startups[id] = { id, foundingTile, tiles: [], tier };
+  // state.availableStartups = state.availableStartups.filter((a) => a !== id);
   state.board[foundingTile].startupId = id;
+  state.log.push(`${id} was founded at ${foundingTile}.`);
 }
 
 /**
@@ -297,18 +316,24 @@ export function mergeStartups(
   survivorId: string,
   absorbedIds: string[]
 ) {
+
+  // Return absorbed brands to available pool
+  for (const id of absorbedIds) {
+    const absorbed = state.startups[id];
+    if (!absorbed) return;
+    returnBrandToAvailable(state, id);
+
+  
+    // Reset player portfolios
+    //trigger payouts for majority holders, and sell off stocks back to bank
+  // set abosrobed tile to survivor
   for (const [coord, cell] of Object.entries(state.board)) {
     if (absorbedIds.includes(cell.startupId || "")) {
       cell.startupId = survivorId;
     }
   }
 
-  // Return absorbed brands to available pool
-  for (const id of absorbedIds) {
-    delete state.startups[id];
-    if (!state.availableStartups.includes(id)) {
-      state.availableStartups.push(id);
-    }
+
   }
 }
 
@@ -330,4 +355,32 @@ function getTouchingStartups(state: GameState, coord: Coord): string[] {
 
 export function advanceTurn(state: GameState) {
   state.turnIndex = (state.turnIndex + 1) % state.players.length;
+}
+
+//get share price based on tier and size
+export function getSharePrice(state: GameState, startupId: string): number {
+  const size = getStartupSize(state, startupId);
+  const { tier } = state.startups[startupId];
+
+  //array of cutoff values, index corresponds to shareprice index
+  const thresholds = [2, 3, 4, 5, 6, 11, 21, 31, 41]; //size thresholds
+
+  //find first index whose value is >= si
+  //array indexof
+  const payoutIndex = thresholds.reduce((acc, val, idx) => {
+    if (size >= val) {
+      return idx;
+    }
+    return acc;
+  }, 0);
+  return sharePrices[tier].sharePrice[payoutIndex];
+}
+
+
+export const getAvailableStartups = function(state: GameState) {
+  return Object.values(state.startups).filter((s) => !s.isFounded);
+}
+
+export const getActiveStartups = function(state: GameState) {
+  return Object.values(state.startups).filter((s) => s.isFounded);
 }

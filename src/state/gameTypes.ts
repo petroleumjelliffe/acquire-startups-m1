@@ -4,17 +4,24 @@ export interface TileCell {
   placed: boolean;
   startupId?: string;
 }
+
+export type StartupId = "Gobble" | "Scrapple" | "PaperfulPost" | "CamCrooned" | "Messla" | "ZuckFace" | "WrecksonMobil";
+
 export interface Player {
   id: string;
   name: string;
   cash: number;
   hand: Coord[];
+  portfolio: Record<string, number>; //startupId -> shares owned
 }
 export interface Startup {
-  id: string;
-//   color?: string;
-  tiles: Coord[];
-  foundingTile: Coord;
+  id: string; //todo: replace with StartupId type
+  tiles: Coord[]; //TODO: deprecate in favor of getStartupTiles from Board
+  foundingTile: Coord|null;
+  tier: number; //0-2
+  totalShares: number; //usually 25
+  availableShares: number; //starts at totalShares
+  isFounded: boolean; 
 }
 
 export interface GameState {
@@ -27,6 +34,6 @@ export interface GameState {
   bag: Coord[];
   log: string[];
   //   startups: Record<string, Startup>;
-  startups: Record<string, Startup >; //active only
-  availableStartups: string[]; //available ids
+  startups: Record<string, Startup >; //all
+  // availableStartups: string[]; //available ids
 }
