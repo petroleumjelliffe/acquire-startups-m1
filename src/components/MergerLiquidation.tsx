@@ -1,5 +1,5 @@
 // src/components/MergerLiquidation.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GameState } from "../state/gameTypes";
 import { completePlayerMergerLiquidation } from "../state/gameLogic";
 
@@ -24,6 +24,12 @@ export const MergerLiquidationModal: React.FC<{
 
   const [trade, setTrade] = useState(0);
   const [sell, setSell] = useState(0);
+
+  // Reset selections when the player changes
+  useEffect(() => {
+    setTrade(0);
+    setSell(0);
+  }, [playerId, absorbedId]);
 
   const survivor = state.startups[survivorId];
 
