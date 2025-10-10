@@ -125,6 +125,10 @@ export const WaitingRoom: React.FC<{
   }
 
   if (mode === 'inRoom' && room) {
+    // Construct shareable link with proper base path
+    const basePath = import.meta.env.PROD ? '/acquire-startups-m1' : '';
+    const shareableLink = `${window.location.origin}${basePath}/room/${room.gameId}`;
+
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
         <div className="bg-white p-8 rounded-xl shadow-xl w-[600px] max-w-full">
@@ -136,13 +140,13 @@ export const WaitingRoom: React.FC<{
               <input
                 type="text"
                 readOnly
-                value={`${window.location.origin}/room/${room.gameId}`}
+                value={shareableLink}
                 className="flex-1 px-3 py-2 bg-white border border-blue-200 rounded font-mono text-sm text-blue-600"
                 onClick={(e) => e.currentTarget.select()}
               />
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/room/${room.gameId}`);
+                  navigator.clipboard.writeText(shareableLink);
                   setError('');
                 }}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold"
