@@ -47,6 +47,8 @@ export interface Player {
   cash: number;
   hand: Coord[];
   portfolio: Record<string, number>; //startupId -> shares owned
+  isConnected?: boolean; // Multiplayer: is player currently online
+  socketId?: string; // Multiplayer: current socket connection ID
 }
 export interface Startup {
   id: string; //todo: replace with StartupId type
@@ -76,4 +78,7 @@ export interface GameState {
   lastAction?: string; //for UI hints
   pendingLiquidations?: string[]; //playerId -> shares to liquidate
   currentLiquidation?: string | null; //index in liquidation order
+  gameId?: string; // Multiplayer: unique game instance ID
+  createdAt?: number; // Multiplayer: timestamp when game was created
+  lastUpdated?: number; // Multiplayer: timestamp of last state update
 }
