@@ -554,8 +554,8 @@ export function prepareMergerPayout(
   }
 
   // Store merger context for UI
-  state.merger = { survivorId, absorbedIds, resolved: false };
-  state.stage = "mergerPayout";
+  state.mergerContext = { survivorId, absorbedIds, resolved: false };
+  state.stage = "mergerLiquidation";
 
   // Save the computed bonuses for the modal
   (state as any).pendingBonuses = allBonuses;
@@ -599,4 +599,49 @@ export function finalizeMergerPayout(state: GameState) {
   state.stage = "buy";
   state.merger = undefined;
   (state as any).pendingBonuses = undefined;
+}
+
+
+export function completePlayerMergerLiquidation(
+  state: GameState,
+  playerId: string,
+  {
+    survivorId,
+    absorbedId,
+    trade,
+    sell,
+    sharePrice,
+  }: {
+    survivorId: string;
+    absorbedId: string;
+    trade: number;
+    sell: number;
+    sharePrice: number;
+  }
+) {
+  const player = state.players.find((p) => p.id === playerId)!;
+  const survivor = state.startups[survivorId];
+  const absorbed = state.startups[absorbedId];
+
+  const tradeCost = trade * 2;
+  const sellGain = sell * sharePrice;
+
+  // Deduct absorbed shares
+  player.portfolio[absorbedId] -= tradeCost + sell;
+  if (player.portfolio[absorbedId] < 0) player.portfolio[absorbedId] = 0;
+
+  // Add survivor shares
+  player.portfolio[survivorId] =
+    (player.portfolio[survivorId] || 0) + trade;
+  survivor.availableShares -= trade;
+
+  // Add cash from sells
+  player.cash += sellGain;
+
+  // If all players finished, return absorbed startup to available list
+  if (state.mergerContext?.currentChoiceIndex ===
+      state.mergerContext.payoutQueue.length - 1) {
+    absorbed.isFounded = false;
+    absorbed.foundingTile = null;
+  }
 }

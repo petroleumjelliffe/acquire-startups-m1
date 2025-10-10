@@ -1,5 +1,5 @@
 import type { Coord } from "../utils/gameHelpers";
-export type Stage = "setup" | "draw" | "dealHands" | "play" | "foundStartup" | "buy" |  "mergerPayout" | "end";
+export type Stage = "setup" | "draw" | "dealHands" | "play" | "foundStartup" | "buy" |  "mergerPayout" | "mergerLiquidation" | "end";
 export interface TileCell {
   placed: boolean;
   startupId?: string;
@@ -11,6 +11,9 @@ export interface MergerContext {
   survivorId: string;
   absorbedIds: string[];
   resolved: boolean;
+  payoutQueue: string[]; //player ids in order
+  currentChoiceIndex: number; //index in payoutQueue
+  sharePrice:number;
 }
 
 export interface Player {
@@ -43,6 +46,6 @@ export interface GameState {
   startups: Record<string, Startup >; //all
   // availableStartups: string[]; //available ids
   currentBuyCount?:number; //how many shares bought this turn
-  merger?: MergerContext;
+  mergerContext?: MergerContext;
   pendingFoundTile?: Coord; //when in foundStartup stage, which tile is being used to found
 }
