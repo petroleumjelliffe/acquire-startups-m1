@@ -11,8 +11,8 @@ export default function MergerPayoutModal({
   onUpdate: (s: GameState) => void;
 }) {
   const bonuses: any[] = (state as any).pendingBonuses || [];
-  const survivor = state.merger?.survivorId;
-  const absorbed = state.merger?.absorbedIds || [];
+  const survivor = state.mergerContext?.survivorId;
+  const absorbed = state.mergerContext?.absorbedIds || [];
 
   function handleContinue() {
     const newState = { ...state };

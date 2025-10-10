@@ -640,7 +640,7 @@ export function completePlayerMergerLiquidation(
 
   // If all players finished, return absorbed startup to available list
   if (state.mergerContext?.currentChoiceIndex ===
-      state.mergerContext.payoutQueue.length - 1) {
+      state.mergerContext?.payoutQueue.length - 1) {
     absorbed.isFounded = false;
     absorbed.foundingTile = null;
   }
