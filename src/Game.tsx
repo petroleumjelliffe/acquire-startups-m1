@@ -115,11 +115,14 @@ export function Game({
       )}
 
       {/* Only show modals if it's your turn in multiplayer, or always in singleplayer */}
+      {/* Special case for draw stage: only first player executes in multiplayer */}
+      {state.stage === "draw" && (!isMultiplayer || state.players[0]?.id === playerId) && (
+        <DrawModal state={state} setState={handleStateUpdate} />
+      )}
+
+      {/* Other modals: only show if it's your turn */}
       {(!isMultiplayer || isMyTurn) && (
         <>
-          {state.stage === "draw" && (
-            <DrawModal state={state} setState={handleStateUpdate} />
-          )}
           {state.stage === "mergerPayout" && (
             <MergerPayoutModal state={state} onUpdate={handleStateUpdate} />
           )}

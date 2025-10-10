@@ -79,11 +79,11 @@ export default function App() {
 
   return (
     <Routes>
-      {/* Direct room link */}
+      {/* Direct room link - must come before catch-all */}
       <Route path="/room/:roomId" element={<RoomRoute />} />
 
-      {/* Main app flow */}
-      <Route path="*" element={
+      {/* Home page */}
+      <Route path="/" element={
         <>
           {/* Mode selection screen */}
           {!mode && <ModeSelection onSelectMode={setMode} />}
