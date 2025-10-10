@@ -1,0 +1,532 @@
+{
+  "gameId": "game-4d2b4081",
+  "state": {
+    "seed": "game-game-4d2b4081-1760121865030",
+    "stage": "draw",
+    "players": [
+      {
+        "id": "player-1760121419484-i3j48e6",
+        "name": "player 1",
+        "cash": 6000,
+        "hand": [],
+        "portfolio": {},
+        "isConnected": true
+      },
+      {
+        "id": "player-1760121468797-qbiczyo",
+        "name": "player 2",
+        "cash": 6000,
+        "hand": [],
+        "portfolio": {},
+        "isConnected": true
+      }
+    ],
+    "turnIndex": 0,
+    "board": {
+      "A1": {
+        "placed": false
+      },
+      "A2": {
+        "placed": false
+      },
+      "A3": {
+        "placed": false
+      },
+      "A4": {
+        "placed": false
+      },
+      "A5": {
+        "placed": false
+      },
+      "A6": {
+        "placed": false
+      },
+      "A7": {
+        "placed": false
+      },
+      "A8": {
+        "placed": false
+      },
+      "A9": {
+        "placed": false
+      },
+      "A10": {
+        "placed": false
+      },
+      "A11": {
+        "placed": false
+      },
+      "A12": {
+        "placed": false
+      },
+      "B1": {
+        "placed": false
+      },
+      "B2": {
+        "placed": false
+      },
+      "B3": {
+        "placed": false
+      },
+      "B4": {
+        "placed": false
+      },
+      "B5": {
+        "placed": false
+      },
+      "B6": {
+        "placed": false
+      },
+      "B7": {
+        "placed": false
+      },
+      "B8": {
+        "placed": false
+      },
+      "B9": {
+        "placed": false
+      },
+      "B10": {
+        "placed": false
+      },
+      "B11": {
+        "placed": false
+      },
+      "B12": {
+        "placed": false
+      },
+      "C1": {
+        "placed": false
+      },
+      "C2": {
+        "placed": false
+      },
+      "C3": {
+        "placed": false
+      },
+      "C4": {
+        "placed": false
+      },
+      "C5": {
+        "placed": false
+      },
+      "C6": {
+        "placed": false
+      },
+      "C7": {
+        "placed": false
+      },
+      "C8": {
+        "placed": false
+      },
+      "C9": {
+        "placed": false
+      },
+      "C10": {
+        "placed": false
+      },
+      "C11": {
+        "placed": false
+      },
+      "C12": {
+        "placed": false
+      },
+      "D1": {
+        "placed": false
+      },
+      "D2": {
+        "placed": false
+      },
+      "D3": {
+        "placed": false
+      },
+      "D4": {
+        "placed": false
+      },
+      "D5": {
+        "placed": false
+      },
+      "D6": {
+        "placed": false
+      },
+      "D7": {
+        "placed": false
+      },
+      "D8": {
+        "placed": false
+      },
+      "D9": {
+        "placed": false
+      },
+      "D10": {
+        "placed": false
+      },
+      "D11": {
+        "placed": false
+      },
+      "D12": {
+        "placed": false
+      },
+      "E1": {
+        "placed": false
+      },
+      "E2": {
+        "placed": false
+      },
+      "E3": {
+        "placed": false
+      },
+      "E4": {
+        "placed": false
+      },
+      "E5": {
+        "placed": false
+      },
+      "E6": {
+        "placed": false
+      },
+      "E7": {
+        "placed": false
+      },
+      "E8": {
+        "placed": false
+      },
+      "E9": {
+        "placed": false
+      },
+      "E10": {
+        "placed": false
+      },
+      "E11": {
+        "placed": false
+      },
+      "E12": {
+        "placed": false
+      },
+      "F1": {
+        "placed": false
+      },
+      "F2": {
+        "placed": false
+      },
+      "F3": {
+        "placed": false
+      },
+      "F4": {
+        "placed": false
+      },
+      "F5": {
+        "placed": false
+      },
+      "F6": {
+        "placed": false
+      },
+      "F7": {
+        "placed": false
+      },
+      "F8": {
+        "placed": false
+      },
+      "F9": {
+        "placed": false
+      },
+      "F10": {
+        "placed": false
+      },
+      "F11": {
+        "placed": false
+      },
+      "F12": {
+        "placed": false
+      },
+      "G1": {
+        "placed": false
+      },
+      "G2": {
+        "placed": false
+      },
+      "G3": {
+        "placed": false
+      },
+      "G4": {
+        "placed": false
+      },
+      "G5": {
+        "placed": false
+      },
+      "G6": {
+        "placed": false
+      },
+      "G7": {
+        "placed": false
+      },
+      "G8": {
+        "placed": false
+      },
+      "G9": {
+        "placed": false
+      },
+      "G10": {
+        "placed": false
+      },
+      "G11": {
+        "placed": false
+      },
+      "G12": {
+        "placed": false
+      },
+      "H1": {
+        "placed": false
+      },
+      "H2": {
+        "placed": false
+      },
+      "H3": {
+        "placed": false
+      },
+      "H4": {
+        "placed": false
+      },
+      "H5": {
+        "placed": false
+      },
+      "H6": {
+        "placed": false
+      },
+      "H7": {
+        "placed": false
+      },
+      "H8": {
+        "placed": false
+      },
+      "H9": {
+        "placed": false
+      },
+      "H10": {
+        "placed": false
+      },
+      "H11": {
+        "placed": false
+      },
+      "H12": {
+        "placed": false
+      },
+      "I1": {
+        "placed": false
+      },
+      "I2": {
+        "placed": false
+      },
+      "I3": {
+        "placed": false
+      },
+      "I4": {
+        "placed": false
+      },
+      "I5": {
+        "placed": false
+      },
+      "I6": {
+        "placed": false
+      },
+      "I7": {
+        "placed": false
+      },
+      "I8": {
+        "placed": false
+      },
+      "I9": {
+        "placed": false
+      },
+      "I10": {
+        "placed": false
+      },
+      "I11": {
+        "placed": false
+      },
+      "I12": {
+        "placed": false
+      }
+    },
+    "bag": [
+      "G8",
+      "E11",
+      "E1",
+      "G10",
+      "G5",
+      "F2",
+      "G4",
+      "B12",
+      "A9",
+      "D2",
+      "E7",
+      "F4",
+      "B7",
+      "B5",
+      "E3",
+      "C12",
+      "B1",
+      "I7",
+      "F11",
+      "C10",
+      "F3",
+      "D4",
+      "F10",
+      "B2",
+      "A10",
+      "D11",
+      "H2",
+      "C8",
+      "H9",
+      "A1",
+      "I12",
+      "I11",
+      "C1",
+      "D8",
+      "A7",
+      "F7",
+      "H7",
+      "E4",
+      "A5",
+      "C11",
+      "H6",
+      "D3",
+      "A2",
+      "G3",
+      "C2",
+      "F5",
+      "G9",
+      "C9",
+      "G7",
+      "I6",
+      "D5",
+      "E12",
+      "F12",
+      "C5",
+      "H12",
+      "E2",
+      "H8",
+      "H11",
+      "D10",
+      "A11",
+      "H1",
+      "F9",
+      "B3",
+      "I5",
+      "G1",
+      "B4",
+      "B10",
+      "E6",
+      "E5",
+      "I8",
+      "G12",
+      "G11",
+      "D7",
+      "C6",
+      "E8",
+      "H4",
+      "A3",
+      "I10",
+      "H5",
+      "C4",
+      "F6",
+      "H10",
+      "I2",
+      "F1",
+      "D1",
+      "B11",
+      "E9",
+      "E10",
+      "I4",
+      "B6",
+      "I3",
+      "G6",
+      "H3",
+      "A8",
+      "B9",
+      "D6",
+      "D9",
+      "G2",
+      "C7",
+      "A6",
+      "A4",
+      "A12",
+      "I9",
+      "F8",
+      "D12",
+      "C3",
+      "B8",
+      "I1"
+    ],
+    "startups": {
+      "Gobble": {
+        "id": "Gobble",
+        "tier": 2,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "Scrapple": {
+        "id": "Scrapple",
+        "tier": 2,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "PaperfulPost": {
+        "id": "PaperfulPost",
+        "tier": 0,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "CamCrooned": {
+        "id": "CamCrooned",
+        "tier": 1,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "Messla": {
+        "id": "Messla",
+        "tier": 0,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "ZuckFace": {
+        "id": "ZuckFace",
+        "tier": 1,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "WrecksonMobil": {
+        "id": "WrecksonMobil",
+        "tier": 1,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      }
+    },
+    "log": [],
+    "gameId": "game-4d2b4081",
+    "createdAt": 1760121865032,
+    "lastUpdated": 1760121865032
+  },
+  "version": 1
+}

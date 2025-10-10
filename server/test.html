@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Test - Acquire Multiplayer</title>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-top: 0;
+    }
+    .status {
+      padding: 10px;
+      border-radius: 4px;
+      margin: 10px 0;
+      font-weight: 500;
+    }
+    .status.connected { background: #d4edda; color: #155724; }
+    .status.disconnected { background: #f8d7da; color: #721c24; }
+    .status.info { background: #d1ecf1; color: #0c5460; }
+
+    button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    input {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      width: 200px;
+      margin: 5px;
+    }
+
+    .log {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      padding: 15px;
+      margin-top: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+    }
+    .log-entry {
+      margin: 5px 0;
+      padding: 5px;
+      border-left: 3px solid #007bff;
+      padding-left: 10px;
+    }
+    .log-entry.success { border-left-color: #28a745; }
+    .log-entry.error { border-left-color: #dc3545; }
+
+    .section {
+      margin: 20px 0;
+      padding: 20px;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+    }
+    .section h3 {
+      margin-top: 0;
+      color: #555;
+    }
+
+    .room-info {
+      background: #e7f3ff;
+      padding: 15px;
+      border-radius: 4px;
+      margin: 10px 0;
+    }
+    .room-info strong { color: #0066cc; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Acquire Multiplayer - Server Test</h1>
+
+    <div id="connection-status" class="status disconnected">
+      ⚫ Not connected
+    </div>
+
+    <div class="section">
+      <h3>1. Connect to Server</h3>
+      <input type="text" id="playerName" placeholder="Your Name" value="Player 1">
+      <button id="connectBtn" onclick="connect()">Connect</button>
+    </div>
+
+    <div class="section">
+      <h3>2. Create or Join Room</h3>
+      <button id="createRoomBtn" onclick="createRoom()" disabled>Create New Room</button>
+      <br>
+      <input type="text" id="roomId" placeholder="Room ID (e.g., game-abc123)">
+      <button id="joinRoomBtn" onclick="joinRoom()" disabled>Join Room</button>
+    </div>
+
+    <div id="roomInfo" class="room-info" style="display: none;">
+      <h3>Current Room</h3>
+      <div><strong>Room ID:</strong> <span id="currentRoomId">-</span></div>
+      <div><strong>Players:</strong> <span id="playerCount">0</span></div>
+      <div id="playerList"></div>
+      <br>
+      <button id="startGameBtn" onclick="startGame()" disabled>Start Game</button>
+    </div>
+
+    <div class="log" id="log">
+      <div class="log-entry">Waiting to connect...</div>
+    </div>
+  </div>
+
+  <script>
+    let socket = null;
+    let playerId = null;
+    let currentRoomId = null;
+
+    function log(message, type = 'info') {
+      const logDiv = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      const timestamp = new Date().toLocaleTimeString();
+      entry.textContent = `[${timestamp}] ${message}`;
+      logDiv.appendChild(entry);
+      logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    function updateStatus(connected) {
+      const status = document.getElementById('connection-status');
+      if (connected) {
+        status.className = 'status connected';
+        status.textContent = '🟢 Connected';
+      } else {
+        status.className = 'status disconnected';
+        status.textContent = '⚫ Disconnected';
+      }
+    }
+
+    function connect() {
+      const playerName = document.getElementById('playerName').value.trim();
+      if (!playerName) {
+        alert('Please enter your name');
+        return;
+      }
+
+      log('Connecting to server at http://localhost:3001...');
+
+      socket = io('http://localhost:3001');
+
+      // Generate or retrieve player ID
+      playerId = localStorage.getItem('playerId');
+      if (!playerId) {
+        playerId = 'player-' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('playerId', playerId);
+      }
+
+      socket.on('connect', () => {
+        log('✅ Connected! Socket ID: ' + socket.id, 'success');
+        updateStatus(true);
+
+        // Register player
+        socket.emit('registerPlayer', playerId, playerName);
+
+        document.getElementById('connectBtn').disabled = true;
+        document.getElementById('createRoomBtn').disabled = false;
+        document.getElementById('joinRoomBtn').disabled = false;
+      });
+
+      socket.on('playerRegistered', (id) => {
+        log('✅ Player registered: ' + id, 'success');
+      });
+
+      socket.on('roomState', (room) => {
+        log('📊 Room state updated');
+        displayRoom(room);
+      });
+
+      socket.on('gameStarted', (gameState) => {
+        log('🎮 Game started! ' + gameState.gameId, 'success');
+        log('Players: ' + gameState.players.map(p => p.name).join(', '));
+        log('Current turn: ' + gameState.players[gameState.turnIndex].name);
+        log('Stage: ' + gameState.stage);
+      });
+
+      socket.on('playerConnected', (data) => {
+        log('✅ Player connected: ' + data.playerName, 'success');
+      });
+
+      socket.on('playerDisconnected', (data) => {
+        log('👋 Player disconnected: ' + data.playerName);
+      });
+
+      socket.on('disconnect', () => {
+        log('⚠️ Disconnected from server', 'error');
+        updateStatus(false);
+        document.getElementById('connectBtn').disabled = false;
+        document.getElementById('createRoomBtn').disabled = true;
+        document.getElementById('joinRoomBtn').disabled = true;
+        document.getElementById('startGameBtn').disabled = true;
+      });
+
+      socket.on('connect_error', (error) => {
+        log('❌ Connection error: ' + error.message, 'error');
+      });
+    }
+
+    function createRoom() {
+      const playerName = document.getElementById('playerName').value.trim();
+      log('Creating new room...');
+
+      socket.emit('createRoom', { playerId, playerName }, (response) => {
+        if (response.success) {
+          currentRoomId = response.room.gameId;
+          log('✅ Room created: ' + currentRoomId, 'success');
+          displayRoom(response.room);
+        } else {
+          log('❌ Failed to create room: ' + response.error, 'error');
+        }
+      });
+    }
+
+    function joinRoom() {
+      const roomId = document.getElementById('roomId').value.trim();
+      const playerName = document.getElementById('playerName').value.trim();
+
+      if (!roomId) {
+        alert('Please enter a room ID');
+        return;
+      }
+
+      log('Joining room: ' + roomId);
+
+      socket.emit('joinRoom', { gameId: roomId, playerId, playerName }, (response) => {
+        if (response.success) {
+          currentRoomId = roomId;
+          log('✅ Joined room: ' + roomId, 'success');
+          displayRoom(response.room);
+        } else {
+          log('❌ Failed to join room: ' + response.error, 'error');
+        }
+      });
+    }
+
+    function displayRoom(room) {
+      document.getElementById('roomInfo').style.display = 'block';
+      document.getElementById('currentRoomId').textContent = room.gameId;
+      document.getElementById('playerCount').textContent = room.players.length;
+
+      const playerListHtml = room.players.map(p =>
+        `<div>• ${p.name} ${p.isHost ? '(Host)' : ''} ${p.isConnected ? '🟢' : '⚫'}</div>`
+      ).join('');
+      document.getElementById('playerList').innerHTML = playerListHtml;
+
+      // Enable start button if user is host
+      const isHost = room.players.find(p => p.id === playerId)?.isHost;
+      document.getElementById('startGameBtn').disabled = !isHost || room.players.length < 2;
+    }
+
+    function startGame() {
+      if (!currentRoomId) return;
+
+      log('Starting game...');
+
+      socket.emit('startGame', { gameId: currentRoomId, playerId }, (response) => {
+        if (response.success) {
+          log('✅ Game starting...', 'success');
+        } else {
+          log('❌ Failed to start game: ' + response.error, 'error');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
