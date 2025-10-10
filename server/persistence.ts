@@ -4,7 +4,7 @@
 import { writeFile, readFile, readdir, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
-import type { MultiplayerGameState, SavedGameState } from "./types";
+import type { MultiplayerGameState, SavedGameState } from "./types.js";
 
 const GAMES_DIR = join(process.cwd(), "server", "games");
 const SAVE_VERSION = 1;

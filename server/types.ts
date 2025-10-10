@@ -1,7 +1,7 @@
 // server/types.ts
 // Shared types between server and client
 
-import type { GameState } from "../src/state/gameTypes";
+import type { GameState } from "../src/state/gameTypes.js";
 
 export interface MultiplayerGameState extends GameState {
   gameId: string;

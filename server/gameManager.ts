@@ -1,9 +1,9 @@
 // server/gameManager.ts
 // Manages active game instances
 
-import type { MultiplayerGameState, MultiplayerPlayer } from "./types";
-import { saveGame, loadAllGames } from "./persistence";
-import { createInitialGame } from "../src/state/gameInit";
+import type { MultiplayerGameState, MultiplayerPlayer } from "./types.js";
+import { saveGame, loadAllGames } from "./persistence.js";
+import { createInitialGame } from "../src/state/gameInit.js";
 
 export class GameManager {
   private games: Map<string, MultiplayerGameState> = new Map();

@@ -1,7 +1,7 @@
 // server/playerAuth.ts
 // Validate player IDs and turn ownership
 
-import type { MultiplayerGameState, GameAction } from "./types";
+import type { MultiplayerGameState, GameAction } from "./types.js";
 
 export class PlayerAuthError extends Error {
   constructor(message: string) {

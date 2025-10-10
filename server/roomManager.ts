@@ -2,7 +2,7 @@
 // Manage waiting rooms before games start
 
 import { v4 as uuidv4 } from "uuid";
-import type { WaitingRoom, RoomPlayer } from "./types";
+import type { WaitingRoom, RoomPlayer } from "./types.js";
 
 export class RoomManager {
   private rooms: Map<string, WaitingRoom> = new Map();

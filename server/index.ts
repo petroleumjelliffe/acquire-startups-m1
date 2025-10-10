@@ -5,16 +5,16 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import { GameManager } from "./gameManager";
-import { RoomManager } from "./roomManager";
-import { initPersistence } from "./persistence";
+import { GameManager } from "./gameManager.js";
+import { RoomManager } from "./roomManager.js";
+import { initPersistence } from "./persistence.js";
 import {
   validateAction,
   validateLiquidationAction,
   PlayerAuthError,
   isHost,
-} from "./playerAuth";
-import type { GameAction } from "./types";
+} from "./playerAuth.js";
+import type { GameAction } from "./types.js";
 
 const app = express();
 const httpServer = createServer(app);
