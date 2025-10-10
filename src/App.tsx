@@ -11,7 +11,7 @@ export default function App() {
       {!config ? (
         <SetupScreen
           defaultSeed="scaffold-seed"
-          defaultPlayers="Ava, Ben, Carly"
+          defaultPlayers="Dad, Maya, Nina, Monty, Baby Cat, Ricky Boy"
           onStart={(seed, names) => setConfig({ seed, names })}
         />
       ) : (
