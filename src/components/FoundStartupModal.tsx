@@ -2,7 +2,7 @@
 import React from "react";
 import { GameState } from "../state/gameTypes";
 import { foundStartup, grantFoundingShare } from "../state/gameLogic";
-import { Coord, floodFillUnclaimed } from "../utils/gameHelpers";
+import { Coord, floodFillUnclaimed, getAdjacentCoords } from "../utils/gameHelpers";
 
 interface FoundStartupModalProps {
   state: GameState;
@@ -20,7 +20,8 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
   const currentPlayer = state.players[state.turnIndex];
 
   function handleSelect(startupId: string) {
-    const newState = { ...state };
+    // const newState = { ...state };
+    const newState = JSON.parse(JSON.stringify(state)) as GameState; //deep copy to avoid mutating original state
     //found the new startup that player selected
     foundStartup(newState, startupId, foundingTile);
 

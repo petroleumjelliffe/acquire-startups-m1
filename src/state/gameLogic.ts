@@ -17,9 +17,9 @@ export const AVAILABLE_STARTUPS = [
   { id: "Scrapple", tier: 2 },
   { id: "PaperfulPost", tier: 0 },
   { id: "CamCrooned", tier: 1 },
-  { id: "Messla", tier: 1 },
+  { id: "Messla", tier: 0 },
   { id: "ZuckFace", tier: 1 },
-  { id: "WrecksonMobil", tier: 2 },
+  { id: "WrecksonMobil", tier: 1 },
 ];
 
 export const sharePrices = [
@@ -136,41 +136,37 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
   if (adjStartups.size === 0) {
     // Found new startup?
     if (adjUnclaimed.length > 0 && getAvailableStartups(state).length > 0) {
-
       //change state to found, in order to trigger the FoundStartupModal
       state.stage = "foundStartup";
       state.pendingFoundTile = coord;
 
       //move following game logic to the FoundStartupModal component
-    
 
-  //     const brandChoices = getAvailableStartups(state).map((s) => s.id);
-  //     const chosen = window.prompt(
-  //       `Choose startup to found: ${brandChoices.join(", ")}`,
-  //       brandChoices[0]
-  //     );
-  //     const chosenId =
-  //       chosen && brandChoices.includes(chosen) ? chosen : brandChoices[0];
-  //       const tier = AVAILABLE_STARTUPS.find(s => s.id === chosenId)?.tier || 1;
-  //     foundStartup(state, chosenId, coord);
+      //     const brandChoices = getAvailableStartups(state).map((s) => s.id);
+      //     const chosen = window.prompt(
+      //       `Choose startup to found: ${brandChoices.join(", ")}`,
+      //       brandChoices[0]
+      //     );
+      //     const chosenId =
+      //       chosen && brandChoices.includes(chosen) ? chosen : brandChoices[0];
+      //       const tier = AVAILABLE_STARTUPS.find(s => s.id === chosenId)?.tier || 1;
+      //     foundStartup(state, chosenId, coord);
 
-  //     // Claim contiguous unclaimed group
-  //     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
-  //     for (const g of group) state.board[g].startupId = chosenId;
+      //     // Claim contiguous unclaimed group
+      //     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
+      //     for (const g of group) state.board[g].startupId = chosenId;
 
-  //     state.log.push(
-  //       `${player.name} founded ${chosenId} with ${group.length} tiles.`
-  //     );
-  //     //enter buy stage
-  // state.stage = "buy";
-  // state.currentBuyCount = 0;
-
+      //     state.log.push(
+      //       `${player.name} founded ${chosenId} with ${group.length} tiles.`
+      //     );
+      //     //enter buy stage
+      // state.stage = "buy";
+      // state.currentBuyCount = 0;
     } else {
       state.log.push(`${player.name} placed ${coord} (isolated).`);
       //enter buy stage
-  state.stage = "buy";
-  state.currentBuyCount = 0;
-
+      state.stage = "buy";
+      state.currentBuyCount = 0;
     }
   } else if (adjStartups.size === 1) {
     // Expand existing startup
@@ -183,9 +179,8 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       } tiles.`
     );
     //enter buy stage
-  state.stage = "buy";
-  state.currentBuyCount = 0;
-
+    state.stage = "buy";
+    state.currentBuyCount = 0;
   } else {
     // Merge multiple startups
     const touchingIds = [...adjStartups];
@@ -237,13 +232,8 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
 // STARTUP ASSIGNMENT + MERGER
 //----------------------------------------------------
 
-export function assignTilesToStartup(
-  state: GameState,
-  id: string,
- 
- 
-) {
-//assign given tiles to the givien startup id
+export function assignTilesToStartup(state: GameState, id: string) {
+  //assign given tiles to the givien startup id
 }
 
 export function returnBrandToAvailable(state: GameState, id: string) {
@@ -251,7 +241,6 @@ export function returnBrandToAvailable(state: GameState, id: string) {
   // if (state.startups[id]) return; // still active
   state.startups[id].isFounded = false;
   state.startups[id].foundingTile = null;
-
 }
 
 export function chooseFoundingBrand(
@@ -324,29 +313,43 @@ export function pickMergeSurvivor(
 export function foundStartup(
   state: GameState,
   id: string,
-  foundingTile: Coord,
+  foundingTile: Coord
   // tier: number
 ) {
   const s = state.startups[id];
-  if (!s) return
+  if (!s) return;
   s.isFounded = true;
   s.foundingTile = foundingTile;
 
-  // state.startups[id] = { id, foundingTile, tiles: [], tier };
-  // state.availableStartups = state.availableStartups.filter((a) => a !== id);
-  state.board[foundingTile].startupId = id;
+  // Mark the founding tile and its connected placed neighbors
+  const toVisit = [foundingTile];
+  const visited = new Set();
 
-  floodFillUnclaimed([foundingTile], state.board);
-  
+  while (toVisit.length) {
+    const tile = toVisit.pop()!;
+    if (visited.has(tile)) continue;
+    visited.add(tile);
 
-  
+    const cell = state.board[tile];
+    if (!cell?.placed || cell.startupId) continue;
+
+    cell.startupId = id;
+
+    for (const adj of getAdjacentCoords(tile)) {
+      const adjCell = state.board[adj];
+      if (adjCell && adjCell.placed && !adjCell.startupId) {
+        toVisit.push(adj);
+      }
+    }
+  }
+
   //grant founding bondus
   grantFoundingShare(state, state.players[state.turnIndex].id, id);
   state.log.push(`${id} was founded at ${foundingTile}.`);
 
   state.stage = "buy";
-  state.pendingFoundTile = foundingTile;
-  return state
+  delete state.pendingFoundTile;
+  return state;
 }
 
 /**
@@ -358,24 +361,20 @@ export function mergeStartups(
   survivorId: string,
   absorbedIds: string[]
 ) {
-
   // Return absorbed brands to available pool
   for (const id of absorbedIds) {
     const absorbed = state.startups[id];
     if (!absorbed) return;
     returnBrandToAvailable(state, id);
 
-  
     // Reset player portfolios
     //trigger payouts for majority holders, and sell off stocks back to bank
-  // set abosrobed tile to survivor
-  for (const [coord, cell] of Object.entries(state.board)) {
-    if (absorbedIds.includes(cell.startupId || "")) {
-      cell.startupId = survivorId;
+    // set abosrobed tile to survivor
+    for (const [coord, cell] of Object.entries(state.board)) {
+      if (absorbedIds.includes(cell.startupId || "")) {
+        cell.startupId = survivorId;
+      }
     }
-  }
-
-
   }
 }
 
@@ -418,26 +417,30 @@ export function getSharePrice(state: GameState, startupId: string): number {
   return sharePrices[tier].sharePrice[payoutIndex];
 }
 
-
-export const getAvailableStartups = function(state: GameState) {
+export const getAvailableStartups = function (state: GameState) {
   return Object.values(state.startups).filter((s) => !s.isFounded);
-}
+};
 
 export function getActiveStartups(state: GameState) {
   return Object.values(state.startups).filter((s) => s.isFounded);
 }
 
 export function getBuyableStartups(state: GameState) {
-  return Object.values(state.startups).filter((s) => s.isFounded && s.availableShares > 0)
-  .map(s => ({
-    id: s.id,
-    price: getSharePrice(state, s.id),
-    availableShares: s.availableShares, 
-    tier: s.tier,
-  }));
+  return Object.values(state.startups)
+    .filter((s) => s.isFounded && s.availableShares > 0)
+    .map((s) => ({
+      id: s.id,
+      price: getSharePrice(state, s.id),
+      availableShares: s.availableShares,
+      tier: s.tier,
+    }));
 }
 
-export function grantFoundingShare(state: GameState, playerId: string, startupId: string) {
+export function grantFoundingShare(
+  state: GameState,
+  playerId: string,
+  startupId: string
+) {
   const player = state.players.find((p) => p.id === playerId);
   const startup = state.startups[startupId];
   if (!player || !startup) return;
@@ -445,11 +448,18 @@ export function grantFoundingShare(state: GameState, playerId: string, startupId
   if (startup.availableShares > 0) {
     startup.availableShares -= 1;
     player.portfolio[startupId] = (player.portfolio[startupId] || 0) + 1;
-    state.log.push(`${player.name} received a free share of ${startupId} for founding it.`);
+    state.log.push(
+      `${player.name} received a free share of ${startupId} for founding it.`
+    );
   }
 }
 
-export function buyShares(state: GameState, playerId: string, startupId: string, count: number): boolean {
+export function buyShares(
+  state: GameState,
+  playerId: string,
+  startupId: string,
+  count: number
+): boolean {
   const player = state.players.find((p) => p.id === playerId);
   const startup = state.startups[startupId];
   if (!player || !startup || !startup.isFounded) return false;
@@ -467,7 +477,9 @@ export function buyShares(state: GameState, playerId: string, startupId: string,
   startup.availableShares -= buyCount;
   state.currentBuyCount = (state.currentBuyCount || 0) + buyCount;
 
-  state.log.push(`${player.name} bought ${buyCount} ${startupId} share(s) for $${total}.`);
+  state.log.push(
+    `${player.name} bought ${buyCount} ${startupId} share(s) for $${total}.`
+  );
   return true;
 }
 
@@ -475,9 +487,13 @@ export function endBuyPhase(state: GameState) {
   state.stage = "play";
   state.turnIndex = (state.turnIndex + 1) % state.players.length;
   state.currentBuyCount = 0;
-  return state
+  return state;
 }
-export function prepareMergerPayout(state: GameState, survivorId: string, absorbedIds: string[]) {
+export function prepareMergerPayout(
+  state: GameState,
+  survivorId: string,
+  absorbedIds: string[]
+) {
   const allBonuses: BonusResult[] = [];
 
   for (const absorbedId of absorbedIds) {
@@ -498,11 +514,11 @@ export function prepareMergerPayout(state: GameState, survivorId: string, absorb
     const majorityHolders = holdings.filter((h) => h.shares === majorityShares);
     const minorityShares = Math.max(
       0,
-      ...holdings
-        .filter((h) => h.shares < majorityShares)
-        .map((h) => h.shares)
+      ...holdings.filter((h) => h.shares < majorityShares).map((h) => h.shares)
     );
-    const minorityHolders = holdings.filter((h) => h.shares === minorityShares && h.shares < majorityShares);
+    const minorityHolders = holdings.filter(
+      (h) => h.shares === minorityShares && h.shares < majorityShares
+    );
 
     const majBonus = price * 10;
     const minBonus = price * 5;
@@ -510,14 +526,29 @@ export function prepareMergerPayout(state: GameState, survivorId: string, absorb
     if (majorityHolders.length > 1) {
       const split = Math.floor((majBonus + minBonus) / majorityHolders.length);
       for (const h of majorityHolders) {
-        allBonuses.push({ playerId: h.id, playerName: h.name, amount: split, type: "majority" });
+        allBonuses.push({
+          playerId: h.id,
+          playerName: h.name,
+          amount: split,
+          type: "majority",
+        });
       }
     } else {
       for (const h of majorityHolders) {
-        allBonuses.push({ playerId: h.id, playerName: h.name, amount: majBonus, type: "majority" });
+        allBonuses.push({
+          playerId: h.id,
+          playerName: h.name,
+          amount: majBonus,
+          type: "majority",
+        });
       }
       for (const h of minorityHolders) {
-        allBonuses.push({ playerId: h.id, playerName: h.name, amount: minBonus, type: "minority" });
+        allBonuses.push({
+          playerId: h.id,
+          playerName: h.name,
+          amount: minBonus,
+          type: "minority",
+        });
       }
     }
   }
@@ -550,7 +581,9 @@ export function finalizeMergerPayout(state: GameState) {
         const proceeds = price * shares;
         p.cash += proceeds;
         p.portfolio[id] = 0;
-        state.log.push(`${p.name} sold ${shares} shares of ${id} for $${proceeds}`);
+        state.log.push(
+          `${p.name} sold ${shares} shares of ${id} for $${proceeds}`
+        );
       }
     }
   }
