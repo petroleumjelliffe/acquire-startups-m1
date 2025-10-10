@@ -1,3 +1,5 @@
+import { GameState } from '../state/gameTypes';
+
 // Utility helpers for Project Saffold
 //----------------------------------------------------
 
@@ -100,3 +102,9 @@ export function getTilesForStartup(board: Record<Coord, { placed: boolean; start
     .filter(([_, cell]) => cell.startupId === id)
     .map(([coord]) => coord as Coord);
 }
+
+export function getStartupSize(state:GameState, id: string): number {
+  return getTilesForStartup(state.board, id).length;
+}
+
+

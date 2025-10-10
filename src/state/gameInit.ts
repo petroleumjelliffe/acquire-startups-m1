@@ -1,8 +1,8 @@
-import type { GameState, Player, TileCell } from "./gameTypes";
+import type { GameState, Startup, Player, TileCell } from "./gameTypes";
 import { generateAllCoords, shuffleSeeded, Coord } from "../utils/gameHelpers";
 
 // keep your existing AVAILABLE_STARTUPS array in gameLogic.ts or a config file
-import { AVAILABLE_STARTUPS } from "./gameLogic"; 
+import { AVAILABLE_STARTUPS } from "./gameLogic";
 
 export function createEmptyBoard(): Record<Coord, TileCell> {
   const b: Record<string, TileCell> = {};
@@ -17,7 +17,21 @@ export function createInitialGame(seed: string, names: string[]): GameState {
     name: n,
     cash: 6000,
     hand: [],
+    portfolio: {}
   }));
+  const startups: Record<string, Startup> = Object.fromEntries(
+    AVAILABLE_STARTUPS.map((s) => [
+      s.id,
+      {
+        ...s,
+        tiles: [],
+        foundingTile: null,
+        totalShares: 25,
+        availableShares: 25,
+        isFounded: false,
+      },
+    ])
+  );
   return {
     seed,
     stage: "draw",
@@ -25,8 +39,8 @@ export function createInitialGame(seed: string, names: string[]): GameState {
     turnIndex: 0,
     board,
     bag,
-    startups: {},
+    startups,
     log: [],
-    availableStartups: AVAILABLE_STARTUPS.map((s) => s.id), //list of ids
+    // availableStartups: AVAILABLE_STARTUPS.map((s) => s.id), //list of ids
   };
 }
