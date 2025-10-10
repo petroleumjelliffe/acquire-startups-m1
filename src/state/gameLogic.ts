@@ -1,6 +1,5 @@
-import type { GameState, Player } from "./gameTypes";
-import type { Coord } from "../utils/gameHelpers";
-import {
+import type { GameState, Player, MergerContext } from "./gameTypes";
+import { Coord,
   compareTiles,
   getAdjacentCoords,
   floodFillUnclaimed,
@@ -48,6 +47,28 @@ export interface BonusResult {
   playerName: string;
   amount: number;
   type: "majority" | "minority";
+}
+
+export function createMergerContext(
+  survivorId: string,
+  absorbedIds: string[]
+): MergerContext {
+  return {
+    survivorId,
+    absorbedIds,
+    resolved: false,
+
+    // payout phase defaults
+    payoutQueue: [],
+    currentChoiceIndex: 0,
+    sharePrice: 0,
+
+    // liquidation phase defaults
+    currentLiquidationIndex: -1,
+    shareholderQueue: [],
+    currentShareholderIndex: -1,
+    activePlayerId: undefined,
+  };
 }
 
 //----------------------------------------------------
@@ -554,8 +575,8 @@ export function prepareMergerPayout(
   }
 
   // Store merger context for UI
-  state.mergerContext = { survivorId, absorbedIds, resolved: false };
-  state.stage = "mergerLiquidation";
+  state.mergerContext = createMergerContext(survivorId, absorbedIds);
+  state.stage = "mergerPayout";
 
   // Save the computed bonuses for the modal
   (state as any).pendingBonuses = allBonuses;
@@ -563,6 +584,8 @@ export function prepareMergerPayout(
 
 export function finalizeMergerPayout(state: GameState) {
   const bonuses: BonusResult[] = (state as any).pendingBonuses || [];
+
+  // Award bonuses
   for (const b of bonuses) {
     const player = state.players.find((p) => p.id === b.playerId);
     if (player) {
@@ -571,77 +594,312 @@ export function finalizeMergerPayout(state: GameState) {
     }
   }
 
-  // Auto-sell all absorbed shares at current share price
-  const absorbedIds = state.merger?.absorbedIds || [];
-  for (const p of state.players) {
-    for (const id of absorbedIds) {
-      const shares = p.portfolio[id] || 0;
-      if (shares > 0) {
-        const price = getSharePrice(state, id);
-        const proceeds = price * shares;
-        p.cash += proceeds;
-        p.portfolio[id] = 0;
-        state.log.push(
-          `${p.name} sold ${shares} shares of ${id} for $${proceeds}`
-        );
-      }
-    }
-  }
-
-  // Reset absorbed startups
-  for (const id of absorbedIds) {
-    const s = state.startups[id];
-    s.isFounded = false;
-    s.foundingTile = null;
-    s.availableShares = s.totalShares;
-  }
-
-  state.stage = "buy";
-  state.merger = undefined;
   (state as any).pendingBonuses = undefined;
+
+  // Now transition to liquidation phase
+  const ctx = state.mergerContext!;
+  if (!ctx) {
+    state.stage = "buy";
+    return;
+  }
+
+  // Start processing first absorbed startup
+  ctx.currentLiquidationIndex = 0;
+  const firstAbsorbed = ctx.absorbedIds[0];
+
+  // Build shareholder queue for first absorbed startup
+  const shareholders = state.players
+    .filter((p) => (p.portfolio[firstAbsorbed] || 0) > 0)
+    .map((p) => p.id);
+
+  ctx.shareholderQueue = shareholders;
+  ctx.currentShareholderIndex = 0;
+  ctx.sharePrice = getSharePrice(state, firstAbsorbed);
+
+  if (shareholders.length > 0) {
+    ctx.activePlayerId = shareholders[0];
+    state.stage = "mergerLiquidation";
+  } else {
+    // No shareholders, skip to next or finish
+    advanceToNextAbsorbedStartup(state);
+  }
 }
 
+/**
+ * Helper to advance to the next absorbed startup or finish merger
+ */
+export function advanceToNextAbsorbedStartup(state: GameState) {
+  const ctx = state.mergerContext!;
+  if (!ctx) return;
+
+  // Clean up current absorbed startup
+  const currentAbsorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
+  const s = state.startups[currentAbsorbed];
+  s.isFounded = false;
+  s.foundingTile = null;
+  s.availableShares = s.totalShares;
+
+  // Clear any remaining shares from portfolios
+  for (const p of state.players) {
+    p.portfolio[currentAbsorbed] = 0;
+  }
+
+  state.log.push(`${currentAbsorbed} has been liquidated.`);
+
+  // Move to next absorbed startup
+  ctx.currentLiquidationIndex += 1;
+
+  if (ctx.currentLiquidationIndex < ctx.absorbedIds.length) {
+    // Process next absorbed startup
+    const nextAbsorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
+    const shareholders = state.players
+      .filter((p) => (p.portfolio[nextAbsorbed] || 0) > 0)
+      .map((p) => p.id);
+
+    ctx.shareholderQueue = shareholders;
+    ctx.currentShareholderIndex = 0;
+    ctx.sharePrice = getSharePrice(state, nextAbsorbed);
+
+    if (shareholders.length > 0) {
+      ctx.activePlayerId = shareholders[0];
+      state.stage = "mergerLiquidation";
+    } else {
+      // No shareholders for this one either, recurse
+      advanceToNextAbsorbedStartup(state);
+    }
+  } else {
+    // All absorbed startups processed
+    delete state.mergerContext;
+    state.stage = "buy";
+    state.log.push("Merger complete. Entering buy phase.");
+  }
+}
 
 export function completePlayerMergerLiquidation(
   state: GameState,
   playerId: string,
   {
-    survivorId,
     absorbedId,
     trade,
     sell,
-    sharePrice,
   }: {
-    survivorId: string;
     absorbedId: string;
     trade: number;
     sell: number;
-    sharePrice: number;
   }
 ) {
+  const ctx = state.mergerContext;
+  if (!ctx) return;
+
   const player = state.players.find((p) => p.id === playerId)!;
-  const survivor = state.startups[survivorId];
-  const absorbed = state.startups[absorbedId];
+  const survivor = state.startups[ctx.survivorId];
+  const sharePrice = ctx.sharePrice;
 
   const tradeCost = trade * 2;
   const sellGain = sell * sharePrice;
+  const hold = (player.portfolio[absorbedId] || 0) - tradeCost - sell;
 
   // Deduct absorbed shares
   player.portfolio[absorbedId] -= tradeCost + sell;
   if (player.portfolio[absorbedId] < 0) player.portfolio[absorbedId] = 0;
 
-  // Add survivor shares
-  player.portfolio[survivorId] =
-    (player.portfolio[survivorId] || 0) + trade;
-  survivor.availableShares -= trade;
+  // Add survivor shares if traded
+  if (trade > 0) {
+    player.portfolio[ctx.survivorId] = (player.portfolio[ctx.survivorId] || 0) + trade;
+    survivor.availableShares -= trade;
+    state.log.push(
+      `${player.name} traded ${tradeCost} ${absorbedId} shares for ${trade} ${ctx.survivorId} shares.`
+    );
+  }
 
   // Add cash from sells
-  player.cash += sellGain;
-
-  // If all players finished, return absorbed startup to available list
-  if (state.mergerContext?.currentChoiceIndex ===
-      state.mergerContext?.payoutQueue.length - 1) {
-    absorbed.isFounded = false;
-    absorbed.foundingTile = null;
+  if (sell > 0) {
+    player.cash += sellGain;
+    state.log.push(`${player.name} sold ${sell} ${absorbedId} shares for $${sellGain}.`);
   }
+
+  if (hold > 0) {
+    state.log.push(`${player.name} held ${hold} ${absorbedId} shares.`);
+  }
+
+  // Advance to next shareholder
+  ctx.currentShareholderIndex += 1;
+
+  if (ctx.currentShareholderIndex < ctx.shareholderQueue.length) {
+    // Next player for same absorbed startup
+    ctx.activePlayerId = ctx.shareholderQueue[ctx.currentShareholderIndex];
+  } else {
+    // All shareholders done for this absorbed startup, move to next
+    advanceToNextAbsorbedStartup(state);
+  }
+}
+
+//----------------------------------------------------
+// POST-MERGER LIQUIDATION LOGIC
+//----------------------------------------------------
+
+/**
+ * Initialize the liquidation phase after bonuses have been distributed.
+ * Handles multiple absorbed startups sequentially.
+ */
+export function startLiquidations(
+  state: GameState,
+  survivorId: string,
+  absorbedIds: string[]
+) {
+  state.pendingLiquidations = [...absorbedIds];
+  state.currentLiquidation = null;
+  state.mergerContext = createMergerContext(
+    survivorId,
+    absorbedIds)
+    // resolved: false,
+    // payoutQueue: [],
+    // sharePrice: 0, // to be set per absorbed startup
+    // currentLiquidationIndex: -1,
+    // shareholderQueue: [],
+    // currentShareholderIndex: -1,
+  
+  state.stage = "liquidation";
+  nextLiquidation(state);
+}
+
+/**
+ * Moves to the next absorbed startup in the queue.
+ */
+export function nextLiquidation(state: GameState) {
+  if (!state.pendingLiquidations?.length) {
+    finalizeAllLiquidations(state);
+    return;
+  }
+
+  const absorbedId = state.pendingLiquidations.shift()!;
+  state.currentLiquidation = absorbedId;
+
+  const shareholders = getShareholders(state, absorbedId);
+  if (shareholders.length === 0) {
+    // No shareholders → auto cleanup
+    completeLiquidation(state, absorbedId);
+    return;
+  }
+
+  // Initialize shareholder queue
+  state.mergerContext!.shareholderQueue = shareholders.map((p) => p.id);
+  state.mergerContext!.currentShareholderIndex = 0;
+  const currentPlayerId = shareholders[0].id;
+
+  // Move to modal stage
+  state.stage = "liquidationPrompt";
+  state.mergerContext!.activePlayerId = currentPlayerId;
+}
+
+/**
+ * Returns a list of players who hold shares in a startup.
+ */
+export function getShareholders(state: GameState, startupId: string): Player[] {
+  return state.players.filter((p) => (p.portfolio[startupId] || 0) > 0);
+}
+
+/**
+ * Applies a player's liquidation choice and advances to the next shareholder.
+ */
+export function handleLiquidationChoice(
+  state: GameState,
+  playerId: string,
+  absorbedId: string,
+  survivorId: string,
+  choice: "sell" | "trade" | "hold"
+) {
+  const player = state.players.find((p) => p.id === playerId)!;
+  const absorbed = state.startups[absorbedId];
+  const survivor = state.startups[survivorId];
+  const shares = player.portfolio[absorbedId] || 0;
+  const price = getSharePrice(state, absorbedId);
+
+  switch (choice) {
+    case "sell": {
+      const proceeds = shares * price;
+      player.cash += proceeds;
+      player.portfolio[absorbedId] = 0;
+      state.log.push(
+        `${player.name} sold ${shares} ${absorbedId} share(s) for $${proceeds}.`
+      );
+      break;
+    }
+    case "trade": {
+      const tradeable = Math.floor(shares / 2);
+      const tradeCount = Math.min(tradeable, survivor.availableShares);
+      if (tradeCount > 0) {
+        player.portfolio[absorbedId] -= tradeCount * 2;
+        player.portfolio[survivorId] =
+          (player.portfolio[survivorId] || 0) + tradeCount;
+        survivor.availableShares -= tradeCount;
+        state.log.push(
+          `${player.name} traded ${
+            tradeCount * 2
+          } ${absorbedId} shares for ${tradeCount} ${survivorId} share(s).`
+        );
+      }
+      break;
+    }
+    case "hold": {
+      state.log.push(
+        `${player.name} chose to hold ${shares} ${absorbedId} share(s).`
+      );
+      break;
+    }
+  }
+
+  advanceLiquidationTurn(state);
+}
+
+/**
+ * Move to next shareholder in the liquidation sequence.
+ */
+export function advanceLiquidationTurn(state: GameState) {
+  const ctx = state.mergerContext!;
+  if (!ctx) return;
+  ctx.currentShareholderIndex += 1;
+
+  if (ctx.currentShareholderIndex >= ctx.shareholderQueue.length) {
+    // Finished all shareholders → cleanup absorbed startup
+    completeLiquidation(state, state.currentLiquidation!);
+  } else {
+    // Prompt next player
+    const nextPlayerId = ctx.shareholderQueue[ctx.currentShareholderIndex];
+    ctx.activePlayerId = nextPlayerId;
+    state.stage = "liquidationPrompt";
+  }
+}
+
+/**
+ * Final cleanup for one absorbed startup.
+ */
+export function completeLiquidation(state: GameState, absorbedId: string) {
+  const absorbed = state.startups[absorbedId];
+  if (!absorbed) return;
+
+  absorbed.isFounded = false;
+  absorbed.foundingTile = null;
+  absorbed.availableShares = absorbed.totalShares;
+
+  // Remove all tiles from board for this startup
+  for (const cell of Object.values(state.board)) {
+    if (cell.startupId === absorbedId) cell.startupId = undefined;
+  }
+
+  state.log.push(`${absorbedId} has been liquidated.`);
+
+  // Proceed to next liquidation if any remain
+  nextLiquidation(state);
+}
+
+/**
+ * Once all liquidations are complete, clean up merger context and move to next phase.
+ */
+export function finalizeAllLiquidations(state: GameState) {
+  state.currentLiquidation = null;
+  state.pendingLiquidations = [];
+  delete state.mergerContext;
+  state.stage = "buy"; // or next phase depending on your flow
+  state.log.push(`All liquidations complete. Returning to buy phase.`);
 }

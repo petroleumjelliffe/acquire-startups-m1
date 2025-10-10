@@ -1,9 +1,8 @@
 // src/components/BuyModal.tsx
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { GameState } from "../state/gameTypes";
 import {
   getBuyableStartups,
-  getSharePrice,
   buyShares,
   endBuyPhase,
 } from "../state/gameLogic";
@@ -13,136 +12,191 @@ interface BuyModalProps {
   onUpdate: (newState: GameState) => void;
 }
 
+interface SelectedShare {
+  id: string;
+  price: number;
+}
+
 export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate }) => {
   const player = state.players[state.turnIndex];
   const buyables = getBuyableStartups(state);
-  const [purchases, setPurchases] = useState<Record<string, number>>({});
+  const [selectedShares, setSelectedShares] = useState<SelectedShare[]>([]);
 
-  const totalShares = Object.values(purchases).reduce((a, b) => a + b, 0);
-  const subtotals = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const s of buyables) {
-      map[s.id] = (purchases[s.id] || 0) * s.price;
-    }
-    return map;
-  }, [buyables, purchases]);
-  const grandTotal = Object.values(subtotals).reduce((a, b) => a + b, 0);
+  const totalCost = selectedShares.reduce((sum, share) => sum + share.price, 0);
+  const remainingCash = player.cash - totalCost;
 
-  const exceedsLimit = totalShares > 3;
-  const insufficientFunds = grandTotal > player.cash;
+  function addShareToHand(startupId: string, price: number) {
+    if (selectedShares.length >= 3) return;
+    setSelectedShares([...selectedShares, { id: startupId, price }]);
+  }
 
-  function adjust(id: string, delta: number) {
-    setPurchases((prev) => {
-      const next = { ...prev, [id]: Math.max(0, (prev[id] || 0) + delta) };
-      return next;
-    });
+  function removeShareFromHand(index: number) {
+    setSelectedShares(selectedShares.filter((_, i) => i !== index));
   }
 
   function handleConfirm() {
-    if (exceedsLimit || insufficientFunds) return;
-    const newState = { ...state };
-    for (const [id, count] of Object.entries(purchases)) {
-      if (count > 0) buyShares(newState, player.id, id, count);
+    const newState = structuredClone(state);
+
+    // Group purchases by startup ID
+    const purchases: Record<string, number> = {};
+    for (const share of selectedShares) {
+      purchases[share.id] = (purchases[share.id] || 0) + 1;
     }
+
+    // Execute purchases
+    for (const [id, count] of Object.entries(purchases)) {
+      buyShares(newState, player.id, id, count);
+    }
+
     endBuyPhase(newState);
     onUpdate(newState);
   }
 
   function handleSkip() {
-    const newState = { ...state };
+    const newState = structuredClone(state);
     endBuyPhase(newState);
     onUpdate(newState);
   }
 
+  // Count how many of each startup are in hand
+  const handCounts = selectedShares.reduce((counts, share) => {
+    counts[share.id] = (counts[share.id] || 0) + 1;
+    return counts;
+  }, {} as Record<string, number>);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-lg p-6 w-[500px] max-w-full">
-        <h2 className="text-lg font-semibold mb-4">{player.name}: Buy Shares</h2>
-        <div className="text-sm text-gray-700 mb-2">
-          Cash: ${player.cash} | Shares remaining: {3 - totalShares}/3
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-xl p-8 w-[900px] max-w-full">
+        <h2 className="text-2xl font-bold mb-6 text-center">
+          {player.name}: Buy Shares
+        </h2>
+
+        {/* Cash display */}
+        <div className="text-center mb-6">
+          <div className="text-lg">
+            <span className="font-semibold">Cash Available:</span>{" "}
+            <span className={remainingCash < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
+              ${remainingCash.toLocaleString()}
+            </span>
+          </div>
+          <div className="text-sm text-gray-600 mt-1">
+            Selected: {selectedShares.length}/3 shares (${totalCost.toLocaleString()})
+          </div>
         </div>
-        <table className="w-full text-sm border-collapse mb-4">
-          <thead>
-            <tr className="border-b font-semibold">
-              <th className="text-left py-1">Startup</th>
-              <th className="text-right py-1">Price</th>
-              <th className="text-right py-1">Available</th>
-              <th className="text-center py-1">Buy</th>
-              <th className="text-right py-1">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody>
-            {buyables.map((s) => (
-              <tr key={s.id} className="border-b last:border-none">
-                <td className="py-1">{s.id}</td>
-                <td className="py-1 text-right">${s.price}</td>
-                <td className="py-1 text-right">{s.availableShares}</td>
-                <td className="py-1 text-center">
-                  <div className="inline-flex items-center border rounded">
-                    <button
-                      className="px-2 text-lg"
-                      onClick={() => adjust(s.id, -1)}
-                      disabled={(purchases[s.id] || 0) <= 0}
-                    >
-                      −
-                    </button>
-                    <span className="w-6 text-center">
-                      {purchases[s.id] || 0}
-                    </span>
-                    <button
-                      className="px-2 text-lg"
-                      onClick={() => adjust(s.id, 1)}
-                      disabled={
-                        (purchases[s.id] || 0) >= s.availableShares ||
-                        totalShares >= 3
-                      }
-                    >
-                      +
-                    </button>
+
+        {/* Available startups as card stacks */}
+        <div className="mb-6">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">
+            Available Startups
+          </h3>
+          <div className="flex gap-4 justify-center flex-wrap">
+            {buyables.map((startup) => {
+              const isAffordable = startup.price <= remainingCash;
+              const sharesInHand = handCounts[startup.id] || 0;
+              const canBuyMore = selectedShares.length < 3 &&
+                               startup.availableShares > sharesInHand &&
+                               isAffordable;
+
+              return (
+                <button
+                  key={startup.id}
+                  onClick={() => canBuyMore && addShareToHand(startup.id, startup.price)}
+                  disabled={!canBuyMore}
+                  className={`
+                    relative w-32 h-40 rounded-lg border-2 shadow-md
+                    transition-all duration-200
+                    ${canBuyMore
+                      ? 'hover:shadow-lg hover:scale-105 cursor-pointer'
+                      : 'opacity-60 cursor-not-allowed grayscale'
+                    }
+                  `}
+                >
+                  {/* Stack effect */}
+                  <div className={`absolute inset-0 rounded-lg border-2 -translate-x-1 -translate-y-1 opacity-60 startup-${startup.id}`}></div>
+                  <div className={`absolute inset-0 rounded-lg border-2 -translate-x-0.5 -translate-y-0.5 opacity-80 startup-${startup.id}`}></div>
+
+                  {/* Main card content */}
+                  <div className={`relative h-full flex flex-col items-center justify-between p-3 rounded-lg border-2 startup-${startup.id}`}>
+                    <div className="text-center flex-1 flex items-center">
+                      <div className="font-bold text-sm leading-tight">{startup.id}</div>
+                    </div>
+
+                    <div className="text-center space-y-1">
+                      <div className="text-xs opacity-75">
+                        {startup.availableShares - sharesInHand} left
+                      </div>
+                      <div className="font-bold text-lg">
+                        ${startup.price}
+                      </div>
+                    </div>
                   </div>
-                </td>
-                <td className="py-1 text-right">${subtotals[s.id] || 0}</td>
-              </tr>
-            ))}
-          </tbody>
-          <tfoot>
-            <tr className="font-semibold">
-              <td colSpan={4} className="text-right py-2">
-                Total:
-              </td>
-              <td
-                className={`text-right py-2 ${
-                  insufficientFunds ? "text-red-600 font-bold" : ""
-                }`}
-              >
-                ${grandTotal}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
-        <div className="flex justify-between items-center mt-4">
-          <div className="text-sm text-gray-600">
-            Shares selected: {totalShares}/3
+                </button>
+              );
+            })}
           </div>
-          <div className="space-x-2">
-            <button
-              onClick={handleSkip}
-              className="px-3 py-1 border rounded hover:bg-gray-100"
-            >
-              Skip
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={exceedsLimit || insufficientFunds || totalShares === 0}
-              className={`px-3 py-1 rounded ${
-                exceedsLimit || insufficientFunds
-                  ? "bg-gray-300 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-            >
-              Confirm Purchase
-            </button>
+          {buyables.length === 0 && (
+            <div className="text-center text-gray-500 py-8">
+              No startups available for purchase
+            </div>
+          )}
+        </div>
+
+        {/* Selected shares hand */}
+        <div className="mb-6 min-h-[180px]">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">
+            Your Selection
+          </h3>
+          <div className="flex gap-4 justify-center items-center min-h-[140px] p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            {selectedShares.length === 0 ? (
+              <div className="text-gray-400 text-center">
+                Click a startup above to add shares to your hand
+              </div>
+            ) : (
+              selectedShares.map((share, index) => (
+                <button
+                  key={index}
+                  onClick={() => removeShareFromHand(index)}
+                  className={`
+                    w-24 h-32 rounded-lg border-2
+                    shadow-md hover:shadow-lg
+                    transition-all duration-200 hover:scale-105
+                    cursor-pointer
+                    startup-${share.id}
+                  `}
+                >
+                  <div className="h-full flex flex-col items-center justify-between p-2">
+                    <div className="text-center flex-1 flex items-center">
+                      <div className="font-bold text-xs leading-tight">{share.id}</div>
+                    </div>
+                    <div className="font-bold text-sm">
+                      ${share.price}
+                    </div>
+                  </div>
+                </button>
+              ))
+            )}
           </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex justify-between items-center pt-4 border-t">
+          <button
+            onClick={handleSkip}
+            className="px-6 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Skip
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={selectedShares.length === 0 || remainingCash < 0}
+            className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+              selectedShares.length === 0 || remainingCash < 0
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-blue-600 text-white hover:bg-blue-700"
+            }`}
+          >
+            Confirm Purchase
+          </button>
         </div>
       </div>
     </div>

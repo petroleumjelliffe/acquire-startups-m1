@@ -9,6 +9,7 @@ import { Coord } from "./utils/gameHelpers";
 import { DrawModal } from "./components/DrawModal";
 import { BuyModal } from "./components/BuyModal";
 import { MergerPayoutModal, FoundStartupModal } from "./components"; //barrelfile
+import { MergerLiquidationModal } from "./components/MergerLiquidation";
 import { useEffect } from "react";
 
 export function Game({
@@ -48,6 +49,9 @@ export function Game({
       )}
       {state.stage === "mergerPayout" && (
         <MergerPayoutModal state={state} onUpdate={setState} />
+      )}
+      {state.stage === "mergerLiquidation" && (
+        <MergerLiquidationModal state={state} onUpdate={setState} />
       )}
       {state.stage === "foundStartup" && state.pendingFoundTile && (
         <FoundStartupModal
