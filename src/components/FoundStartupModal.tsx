@@ -8,12 +8,14 @@ interface FoundStartupModalProps {
   state: GameState;
   foundingTile: Coord; // coordinate of the tile that triggered the founding
   onUpdate: (s: GameState) => void;
+  onCancel?: () => void;
 }
 
 export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
   state,
   foundingTile,
   onUpdate,
+  onCancel,
 }) => {
   const available = Object.values(state.startups).filter((s) => !s.isFounded);
   const founded = Object.values(state.startups).filter((s) => s.isFounded);
@@ -45,9 +47,20 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-xl shadow-xl w-[700px] max-w-full">
-        <h2 className="text-xl font-bold mb-4 text-center">
-          Select a Startup to Found
-        </h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-center flex-1">
+            Select a Startup to Found
+          </h2>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
+              title="Cancel and return to placement"
+            >
+              ×
+            </button>
+          )}
+        </div>
 
         <div className="grid grid-cols-3 gap-4">
           {tierGroups.map(({ tier, startups }) => (

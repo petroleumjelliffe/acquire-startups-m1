@@ -49,6 +49,7 @@ export interface Player {
   portfolio: Record<string, number>; //startupId -> shares owned
   isConnected?: boolean; // Multiplayer: is player currently online
   socketId?: string; // Multiplayer: current socket connection ID
+  lastPlacedTile?: Coord; // Track most recent tile placement for UI
 }
 export interface Startup {
   id: string; //todo: replace with StartupId type

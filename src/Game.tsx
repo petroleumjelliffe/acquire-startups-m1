@@ -11,7 +11,10 @@ import { BuyModal } from "./components/BuyModal";
 import { MergerPayoutModal, FoundStartupModal } from "./components"; //barrelfile
 import { MergerLiquidationModal } from "./components/MergerLiquidation";
 import { PlayerSummary } from "./components/PlayerSummary";
+import { PlayerStatusPanel } from "./components/PlayerStatusPanel";
 import { WaitingForPlayer } from "./components/WaitingForPlayer";
+import { YourTurnIndicator } from "./components/YourTurnIndicator";
+import { TilePlacementConfirmModal } from "./components/TilePlacementConfirmModal";
 import { useSocket } from "./context/SocketContext";
 import { useEffect } from "react";
 
@@ -30,6 +33,10 @@ export function Game({
   const [state, setState] = useState<GameState>(() =>
     initialState || createInitialGame(seed, playerNames)
   );
+  const [pendingTile, setPendingTile] = useState<Coord | null>(null);
+  const [pendingState, setPendingState] = useState<GameState | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
   const cur = state.players[state.turnIndex];
   const isMyTurn = isMultiplayer ? cur.id === playerId : true;
 
@@ -56,24 +63,58 @@ export function Game({
     if (state.stage !== "play") return;
     if (isMultiplayer && !isMyTurn) return; // Prevent action if not your turn
 
+    // Calculate the next state
     const next = handleTilePlacement(state, coord);
 
+    // Store pending placement and show highlight
+    setPendingTile(coord);
+    setPendingState(next);
+
+    // If tile is unclaimed (not part of any startup), show confirmation
+    if (!state.board[coord].startupId && next.stage === "play") {
+      setShowConfirmation(true);
+    } else {
+      // If it triggers founding/merger/buy, just transition (user can cancel from modal)
+      applyTilePlacement(next);
+    }
+  };
+
+  const confirmTilePlacement = () => {
+    if (pendingState) {
+      applyTilePlacement(pendingState);
+      setShowConfirmation(false);
+      setPendingTile(null);
+      setPendingState(null);
+    }
+  };
+
+  const cancelTilePlacement = () => {
+    setShowConfirmation(false);
+    setPendingTile(null);
+    setPendingState(null);
+  };
+
+  const applyTilePlacement = (newState: GameState) => {
     if (isMultiplayer && socket) {
       // Send to server instead of updating locally
-      socket.emit('tilePlacement', {
+      socket.emit('stateUpdate', {
         gameId: state.gameId,
         playerId,
-        coord,
-        newState: next
+        newState
       });
     } else {
       // Singleplayer: update locally
-      setState({ ...next });
+      setState({ ...newState });
     }
   };
 
   // Generic state update handler for multiplayer
   const handleStateUpdate = (newState: GameState) => {
+    // Clear pending tile when state updates
+    setPendingTile(null);
+    setPendingState(null);
+    setShowConfirmation(false);
+
     if (isMultiplayer && socket) {
       // Send to server
       socket.emit('stateUpdate', {
@@ -87,14 +128,42 @@ export function Game({
     }
   };
 
+  // Handler to cancel modal and return to place phase
+  const cancelModalAndReturnToPlay = () => {
+    // Reset to previous state (before tile placement)
+    setPendingTile(null);
+    setPendingState(null);
+    setShowConfirmation(false);
+    // State remains unchanged, user can try again
+  };
+
   useEffect(() => {
     console.log("Game state:", state.stage);
   }, [state]);
 
   return (
     <div className="space-y-4">
-      {/* Player Summary for multiplayer */}
-      {isMultiplayer && <PlayerSummary state={state} currentPlayerId={playerId} />}
+      {/* Your Turn Indicator - sticky at top */}
+      {isMultiplayer && isMyTurn && state.stage === "play" && <YourTurnIndicator />}
+
+      {/* Top row: Player cards and Game Log */}
+      <div className="flex gap-4">
+        {/* Player Summary */}
+        <div className="flex-1">
+          {isMultiplayer ? (
+            <PlayerSummary state={state} currentPlayerId={playerId} />
+          ) : (
+            <div className="bg-white rounded-lg shadow p-3">
+              <PlayerStatusPanel state={state} />
+            </div>
+          )}
+        </div>
+
+        {/* Game Log - upper right corner */}
+        <div className="w-80">
+          <GameLog state={state} />
+        </div>
+      </div>
 
       <h2 className="font-semibold">Current: {cur.name}</h2>
       <Board
@@ -102,9 +171,19 @@ export function Game({
         onPlace={placeTile}
         startups={state.startups}
         currentHand={myPlayer?.hand || []}
+        highlightedTile={pendingTile}
+        players={state.players}
       />
       {myPlayer && <PlayerHand name={myPlayer.name} hand={myPlayer.hand} onPlace={placeTile} />}
-      <GameLog state={state} />
+
+      {/* Tile placement confirmation modal */}
+      {showConfirmation && pendingTile && (
+        <TilePlacementConfirmModal
+          tile={pendingTile}
+          onConfirm={confirmTilePlacement}
+          onCancel={cancelTilePlacement}
+        />
+      )}
 
       {/* Waiting overlay when it's not your turn in multiplayer */}
       {isMultiplayer && !isMyTurn && (
@@ -134,9 +213,16 @@ export function Game({
               state={state}
               foundingTile={state.pendingFoundTile}
               onUpdate={handleStateUpdate}
+              onCancel={cancelModalAndReturnToPlay}
             />
           )}
-          {state.stage === "buy" && <BuyModal state={state} onUpdate={handleStateUpdate} />}
+          {state.stage === "buy" && (
+            <BuyModal
+              state={state}
+              onUpdate={handleStateUpdate}
+              onCancel={cancelModalAndReturnToPlay}
+            />
+          )}
         </>
       )}
     </div>

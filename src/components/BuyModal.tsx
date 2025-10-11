@@ -10,6 +10,7 @@ import {
 interface BuyModalProps {
   state: GameState;
   onUpdate: (newState: GameState) => void;
+  onCancel?: () => void;
 }
 
 interface SelectedShare {
@@ -17,7 +18,7 @@ interface SelectedShare {
   price: number;
 }
 
-export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate }) => {
+export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel }) => {
   const player = state.players[state.turnIndex];
   const buyables = getBuyableStartups(state);
   const [selectedShares, setSelectedShares] = useState<SelectedShare[]>([]);
@@ -67,9 +68,20 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate }) => {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl p-8 w-[900px] max-w-full">
-        <h2 className="text-2xl font-bold mb-6 text-center">
-          {player.name}: Buy Shares
-        </h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-center flex-1">
+            {player.name}: Buy Shares
+          </h2>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
+              title="Cancel and return to placement"
+            >
+              ×
+            </button>
+          )}
+        </div>
 
         {/* Cash display */}
         <div className="text-center mb-6">

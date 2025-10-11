@@ -23,7 +23,7 @@ export function SetupScreen({
   };
   return (
     <div className="max-w-md mx-auto space-y-4">
-      <h1 className="text-xl font-bold">Project Saffold</h1>
+      <h1 className="text-xl font-bold">Acquire - Startups Edition</h1>
       <p className="text-gray-600">
         A modern take on <i>Acquire</i> — Startups Edition
       </p>

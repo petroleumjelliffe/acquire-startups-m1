@@ -1,0 +1,545 @@
+{
+  "gameId": "game-33bd40a0",
+  "state": {
+    "seed": "game-game-33bd40a0-1760189994075",
+    "stage": "play",
+    "players": [
+      {
+        "id": "player-1760121419484-i3j48e6",
+        "name": "🐼",
+        "cash": 6000,
+        "hand": [
+          "I5",
+          "I8",
+          "F4",
+          "G3",
+          "I10",
+          "F5"
+        ],
+        "portfolio": {},
+        "isConnected": true
+      },
+      {
+        "id": "player-1760121468797-qbiczyo",
+        "name": "⛷️",
+        "cash": 5400,
+        "hand": [
+          "A6",
+          "G5",
+          "A1",
+          "G6",
+          "B9",
+          "B11"
+        ],
+        "portfolio": {
+          "PaperfulPost": 4
+        },
+        "isConnected": true
+      }
+    ],
+    "turnIndex": 0,
+    "board": {
+      "A1": {
+        "placed": false
+      },
+      "A2": {
+        "placed": false
+      },
+      "A3": {
+        "placed": false
+      },
+      "A4": {
+        "placed": false
+      },
+      "A5": {
+        "placed": false
+      },
+      "A6": {
+        "placed": false
+      },
+      "A7": {
+        "placed": false
+      },
+      "A8": {
+        "placed": false
+      },
+      "A9": {
+        "placed": false
+      },
+      "A10": {
+        "placed": true
+      },
+      "A11": {
+        "placed": false
+      },
+      "A12": {
+        "placed": false
+      },
+      "B1": {
+        "placed": false
+      },
+      "B2": {
+        "placed": false
+      },
+      "B3": {
+        "placed": false
+      },
+      "B4": {
+        "placed": false
+      },
+      "B5": {
+        "placed": false
+      },
+      "B6": {
+        "placed": false
+      },
+      "B7": {
+        "placed": false
+      },
+      "B8": {
+        "placed": true,
+        "startupId": "PaperfulPost"
+      },
+      "B9": {
+        "placed": false
+      },
+      "B10": {
+        "placed": false
+      },
+      "B11": {
+        "placed": false
+      },
+      "B12": {
+        "placed": false
+      },
+      "C1": {
+        "placed": false
+      },
+      "C2": {
+        "placed": false
+      },
+      "C3": {
+        "placed": false
+      },
+      "C4": {
+        "placed": false
+      },
+      "C5": {
+        "placed": false
+      },
+      "C6": {
+        "placed": false
+      },
+      "C7": {
+        "placed": false
+      },
+      "C8": {
+        "placed": true,
+        "startupId": "PaperfulPost"
+      },
+      "C9": {
+        "placed": false
+      },
+      "C10": {
+        "placed": false
+      },
+      "C11": {
+        "placed": false
+      },
+      "C12": {
+        "placed": false
+      },
+      "D1": {
+        "placed": false
+      },
+      "D2": {
+        "placed": false
+      },
+      "D3": {
+        "placed": false
+      },
+      "D4": {
+        "placed": false
+      },
+      "D5": {
+        "placed": false
+      },
+      "D6": {
+        "placed": false
+      },
+      "D7": {
+        "placed": false
+      },
+      "D8": {
+        "placed": false
+      },
+      "D9": {
+        "placed": false
+      },
+      "D10": {
+        "placed": false
+      },
+      "D11": {
+        "placed": false
+      },
+      "D12": {
+        "placed": false
+      },
+      "E1": {
+        "placed": false
+      },
+      "E2": {
+        "placed": false
+      },
+      "E3": {
+        "placed": false
+      },
+      "E4": {
+        "placed": false
+      },
+      "E5": {
+        "placed": false
+      },
+      "E6": {
+        "placed": false
+      },
+      "E7": {
+        "placed": false
+      },
+      "E8": {
+        "placed": false
+      },
+      "E9": {
+        "placed": false
+      },
+      "E10": {
+        "placed": false
+      },
+      "E11": {
+        "placed": false
+      },
+      "E12": {
+        "placed": false
+      },
+      "F1": {
+        "placed": false
+      },
+      "F2": {
+        "placed": false
+      },
+      "F3": {
+        "placed": false
+      },
+      "F4": {
+        "placed": false
+      },
+      "F5": {
+        "placed": false
+      },
+      "F6": {
+        "placed": false
+      },
+      "F7": {
+        "placed": false
+      },
+      "F8": {
+        "placed": false
+      },
+      "F9": {
+        "placed": false
+      },
+      "F10": {
+        "placed": false
+      },
+      "F11": {
+        "placed": false
+      },
+      "F12": {
+        "placed": false
+      },
+      "G1": {
+        "placed": false
+      },
+      "G2": {
+        "placed": false
+      },
+      "G3": {
+        "placed": false
+      },
+      "G4": {
+        "placed": false
+      },
+      "G5": {
+        "placed": false
+      },
+      "G6": {
+        "placed": false
+      },
+      "G7": {
+        "placed": false
+      },
+      "G8": {
+        "placed": false
+      },
+      "G9": {
+        "placed": false
+      },
+      "G10": {
+        "placed": false
+      },
+      "G11": {
+        "placed": false
+      },
+      "G12": {
+        "placed": false
+      },
+      "H1": {
+        "placed": false
+      },
+      "H2": {
+        "placed": false
+      },
+      "H3": {
+        "placed": false
+      },
+      "H4": {
+        "placed": false
+      },
+      "H5": {
+        "placed": false
+      },
+      "H6": {
+        "placed": false
+      },
+      "H7": {
+        "placed": false
+      },
+      "H8": {
+        "placed": false
+      },
+      "H9": {
+        "placed": false
+      },
+      "H10": {
+        "placed": false
+      },
+      "H11": {
+        "placed": false
+      },
+      "H12": {
+        "placed": false
+      },
+      "I1": {
+        "placed": false
+      },
+      "I2": {
+        "placed": false
+      },
+      "I3": {
+        "placed": false
+      },
+      "I4": {
+        "placed": false
+      },
+      "I5": {
+        "placed": false
+      },
+      "I6": {
+        "placed": false
+      },
+      "I7": {
+        "placed": false
+      },
+      "I8": {
+        "placed": false
+      },
+      "I9": {
+        "placed": false
+      },
+      "I10": {
+        "placed": false
+      },
+      "I11": {
+        "placed": false
+      },
+      "I12": {
+        "placed": false
+      }
+    },
+    "bag": [
+      "E8",
+      "E4",
+      "F12",
+      "F9",
+      "E3",
+      "F7",
+      "C1",
+      "A2",
+      "B10",
+      "C10",
+      "G2",
+      "H9",
+      "C12",
+      "B6",
+      "H1",
+      "H5",
+      "I2",
+      "E6",
+      "C9",
+      "G8",
+      "H4",
+      "I7",
+      "I6",
+      "C7",
+      "H10",
+      "B1",
+      "D9",
+      "E11",
+      "B4",
+      "I9",
+      "B12",
+      "D3",
+      "H8",
+      "D7",
+      "B2",
+      "H12",
+      "B3",
+      "E9",
+      "F1",
+      "B7",
+      "F11",
+      "B5",
+      "C11",
+      "C4",
+      "D10",
+      "D5",
+      "G1",
+      "H2",
+      "I4",
+      "H3",
+      "I12",
+      "F10",
+      "D8",
+      "D12",
+      "G4",
+      "C5",
+      "E7",
+      "I1",
+      "F3",
+      "G11",
+      "D1",
+      "G12",
+      "A7",
+      "E1",
+      "A5",
+      "D4",
+      "E5",
+      "G10",
+      "D6",
+      "I3",
+      "H7",
+      "H6",
+      "E12",
+      "I11",
+      "F2",
+      "G7",
+      "A9",
+      "A3",
+      "C2",
+      "E2",
+      "C6",
+      "D11",
+      "C3",
+      "A12",
+      "A8",
+      "H11",
+      "A4",
+      "F6",
+      "A11",
+      "F8",
+      "G9",
+      "D2",
+      "E10",
+      "B8",
+      "A10"
+    ],
+    "startups": {
+      "Gobble": {
+        "id": "Gobble",
+        "tier": 2,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "Scrapple": {
+        "id": "Scrapple",
+        "tier": 2,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "PaperfulPost": {
+        "id": "PaperfulPost",
+        "tier": 0,
+        "tiles": [],
+        "foundingTile": "C8",
+        "totalShares": 25,
+        "availableShares": 21,
+        "isFounded": true
+      },
+      "CamCrooned": {
+        "id": "CamCrooned",
+        "tier": 1,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "Messla": {
+        "id": "Messla",
+        "tier": 0,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "ZuckFace": {
+        "id": "ZuckFace",
+        "tier": 1,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      },
+      "WrecksonMobil": {
+        "id": "WrecksonMobil",
+        "tier": 1,
+        "tiles": [],
+        "foundingTile": null,
+        "totalShares": 25,
+        "availableShares": 25,
+        "isFounded": false
+      }
+    },
+    "log": [
+      "Initial draw: ⛷️→A10, 🐼→B8",
+      "⛷️ will go first.",
+      "⛷️ received a free share of PaperfulPost for founding it.",
+      "PaperfulPost was founded at C8.",
+      "⛷️ bought 3 PaperfulPost share(s) for $600."
+    ],
+    "gameId": "game-33bd40a0",
+    "createdAt": 1760189994078,
+    "lastUpdated": 1760190013142,
+    "pendingFoundTile": "C8",
+    "currentBuyCount": 0
+  },
+  "version": 1
+}

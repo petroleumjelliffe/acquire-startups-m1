@@ -154,6 +154,9 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
   // Place tile
   cell.placed = true;
 
+  // Track last placed tile for this player
+  player.lastPlacedTile = coord;
+
   if (adjStartups.size === 0) {
     // Found new startup?
     if (adjUnclaimed.length > 0 && getAvailableStartups(state).length > 0) {

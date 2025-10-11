@@ -8,6 +8,21 @@ interface PlayerSummaryProps {
 }
 
 export const PlayerSummary: React.FC<PlayerSummaryProps> = ({ state, currentPlayerId }) => {
+  // Helper to obscure cash for other players
+  const getCashDisplay = (player: any, isYou: boolean) => {
+    if (isYou) {
+      return `$${player.cash}`;
+    }
+    // Show n '$' characters where n = cash/2000 rounded
+    const dollarCount = Math.round(player.cash / 2000);
+    return '$'.repeat(Math.max(1, dollarCount));
+  };
+
+  // Helper to get portfolio count
+  const getPortfolioCount = (portfolio: Record<string, number>) => {
+    return Object.values(portfolio).reduce((sum, count) => sum + count, 0);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md p-4 mb-4">
       <h3 className="font-bold text-lg mb-3">Players</h3>
@@ -16,6 +31,7 @@ export const PlayerSummary: React.FC<PlayerSummaryProps> = ({ state, currentPlay
           const isCurrentTurn = index === state.turnIndex;
           const isYou = player.id === currentPlayerId;
           const isConnected = (player as any).isConnected !== false;
+          const portfolioCount = getPortfolioCount(player.portfolio);
 
           return (
             <div
@@ -52,27 +68,35 @@ export const PlayerSummary: React.FC<PlayerSummaryProps> = ({ state, currentPlay
                   )}
                 </div>
 
-                {/* Cash */}
-                <div className="font-bold text-green-700 text-xl">${player.cash}</div>
-
-                {/* Shares */}
-                <div className="flex gap-1 flex-wrap min-h-[24px]">
-                  {Object.entries(player.portfolio).map(([startupId, count]) => {
-                    if (count === 0) return null;
-                    const startup = state.startups[startupId];
-                    if (!startup?.isFounded) return null;
-
-                    return (
-                      <div
-                        key={startupId}
-                        className={`text-xs px-2 py-1 rounded startup-${startupId} font-semibold`}
-                        title={`${count} shares of ${startupId}`}
-                      >
-                        {count}×
-                      </div>
-                    );
-                  })}
+                {/* Cash - obscured for other players */}
+                <div className="font-bold text-green-700 text-xl">
+                  {getCashDisplay(player, isYou)}
                 </div>
+
+                {/* Shares - show details for you, count for others */}
+                {isYou ? (
+                  <div className="flex gap-1 flex-wrap min-h-[24px]">
+                    {Object.entries(player.portfolio).map(([startupId, count]) => {
+                      if (count === 0) return null;
+                      const startup = state.startups[startupId];
+                      if (!startup?.isFounded) return null;
+
+                      return (
+                        <div
+                          key={startupId}
+                          className={`text-xs px-2 py-1 rounded startup-${startupId} font-semibold`}
+                          title={`${count} shares of ${startupId}`}
+                        >
+                          {count}×
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-600">
+                    {portfolioCount > 0 ? `${portfolioCount} shares` : 'No shares'}
+                  </div>
+                )}
               </div>
             </div>
           );
