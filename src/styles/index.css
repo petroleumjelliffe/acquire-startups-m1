@@ -27,6 +27,11 @@ body {
   background-color: var(--tile-unclaimed-bg);
   border-color: var(--tile-border);
 }
+
+button {
+  border-radius: 5px;
+  margin: 1px;
+}
 button.tile-placed span {
   color: white;
 }
