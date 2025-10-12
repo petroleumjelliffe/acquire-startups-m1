@@ -49,7 +49,6 @@ export function Board({
           {cols.map((c) => {
             const id = `${r}${c}` as Coord;
             const cell = board[id];
-            const isInHand = currentHand.includes(id);
             const isHighlighted = highlightedTile === id;
             const playerName = lastPlacedTiles.get(id);
 
@@ -64,8 +63,6 @@ export function Board({
             // Add state-based classes
             if (cell.placed) {
               tileClasses.push("tile-placed");
-            } else if (isInHand) {
-              tileClasses.push("tile-in-hand");
             } else {
               tileClasses.push("tile-unclaimed");
             }
@@ -89,12 +86,11 @@ export function Board({
                 title={id}
               >
                 {/* Tile label */}
-                {cell.placed && (
+                {/* {cell.placed && ( */}
                   <span>
-                    {r}
-                    {c}
+                    {r}-{c}
                   </span>
-                )}
+                {/* )} */}
                 {/* Player name overlay for last placed tile */}
                 {playerName && (
                   <div className="player-tile-marker">{playerName}</div>

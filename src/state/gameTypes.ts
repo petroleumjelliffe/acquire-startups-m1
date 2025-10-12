@@ -76,6 +76,7 @@ export interface GameState {
   currentBuyCount?: number; //how many shares bought this turn
   mergerContext?: MergerContext;
   pendingFoundTile?: Coord; //when in foundStartup stage, which tile is being used to found
+  pendingTileToRemove?: Coord; //tile that was placed but not yet removed from hand/drawn
   lastAction?: string; //for UI hints
   pendingLiquidations?: string[]; //playerId -> shares to liquidate
   currentLiquidation?: string | null; //index in liquidation order

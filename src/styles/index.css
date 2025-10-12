@@ -10,6 +10,7 @@
   --tile-in-hand-bg: #549cfa;
   --tile-in-hand-hover-bg: #bfdbfe;
   --tile-border: #d1d5db;
+  --tile-color: #ccc;
 }
 
 body {
@@ -30,6 +31,11 @@ button.tile-placed span {
   color: white;
 }
 
+button span {
+  color: var(--tile-color);
+  font-size: 2em;
+  font-weight: bolder;
+} 
 .tile-unclaimed:hover {
   background-color: var(--tile-unclaimed-hover-bg);
 }
@@ -46,7 +52,16 @@ button.tile-placed span {
 
 .tile-in-hand:hover {
   background-color: var(--tile-in-hand-hover-bg);
+
+  box-shadow: var(--tile-in-hand-bg) 0px 0px 6px 10px inset;
+  border: var(--tile-in-hand-bg);
+  transition: ease-in-out 0.3s;
+  
 }
+.tile-in-hand:hover span {
+  color: var(--tile-in-hand-bg)
+}
+
 
 .tile-highlighted {
   @apply ring-4 ring-blue-500 ring-opacity-50;

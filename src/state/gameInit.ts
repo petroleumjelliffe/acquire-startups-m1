@@ -17,7 +17,7 @@ export function createInitialGame(seed: string, names: string[]): GameState {
     name: n,
     cash: 6000,
     hand: [],
-    portfolio: {}
+    portfolio: {},
   }));
   const startups: Record<string, Startup> = Object.fromEntries(
     AVAILABLE_STARTUPS.map((s) => [
@@ -32,6 +32,22 @@ export function createInitialGame(seed: string, names: string[]): GameState {
       },
     ])
   );
+
+  // Deal starting hands: round-robin from the bag, up to 6 tiles each
+  const HAND_SIZE = 6;
+  let dealt = 0;
+  while (dealt < HAND_SIZE) {
+    let anyDealtThisRound = false;
+    for (const p of players) {
+      if (p.hand.length >= HAND_SIZE) continue;
+      const tile = bag.shift();
+      if (!tile) break;
+      p.hand.push(tile);
+      anyDealtThisRound = true;
+    }
+    if (!anyDealtThisRound) break;
+    dealt += 1;
+  }
   return {
     seed,
     stage: "draw",

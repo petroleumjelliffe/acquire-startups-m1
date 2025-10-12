@@ -5,6 +5,7 @@ import {
   getBuyableStartups,
   buyShares,
   endBuyPhase,
+  completeTileTransaction,
 } from "../state/gameLogic";
 
 interface BuyModalProps {
@@ -38,6 +39,9 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel })
   function handleConfirm() {
     const newState = structuredClone(state);
 
+    // Complete the tile transaction (remove from hand, draw new tile)
+    completeTileTransaction(newState);
+
     // Group purchases by startup ID
     const purchases: Record<string, number> = {};
     for (const share of selectedShares) {
@@ -55,8 +59,19 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel })
 
   function handleSkip() {
     const newState = structuredClone(state);
+
+    // Complete the tile transaction (remove from hand, draw new tile)
+    completeTileTransaction(newState);
+
     endBuyPhase(newState);
     onUpdate(newState);
+  }
+
+  function handleCancel() {
+    if (onCancel) {
+      // Just call onCancel - Game.tsx will handle state reversion
+      onCancel();
+    }
   }
 
   // Count how many of each startup are in hand
@@ -74,7 +89,7 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel })
           </h2>
           {onCancel && (
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
               title="Cancel and return to placement"
             >

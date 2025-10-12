@@ -36,6 +36,8 @@ export function Game({
   const [pendingTile, setPendingTile] = useState<Coord | null>(null);
   const [pendingState, setPendingState] = useState<GameState | null>(null);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [stateBeforePlacement, setStateBeforePlacement] = useState<GameState | null>(null);
+  const [selectedTile, setSelectedTile] = useState<Coord | null>(null); // Manually selected tile from hand
 
   const cur = state.players[state.turnIndex];
   const isMyTurn = isMultiplayer ? cur.id === playerId : true;
@@ -59,29 +61,68 @@ export function Game({
     };
   }, [socket, isMultiplayer]);
 
+  // Handler for selecting a tile from the hand tray
+  const handleTileSelection = (coord: Coord) => {
+    if (state.stage !== "play") return;
+    if (isMultiplayer && !isMyTurn) return;
+
+    const player = state.players[state.turnIndex];
+    if (!player.hand.includes(coord)) return;
+
+    // Toggle selection: if already selected, deselect; otherwise select
+    if (selectedTile === coord) {
+      setSelectedTile(null);
+    } else {
+      setSelectedTile(coord);
+    }
+  };
+
   const placeTile = (coord: Coord) => {
     if (state.stage !== "play") return;
     if (isMultiplayer && !isMyTurn) return; // Prevent action if not your turn
 
-    // Calculate the next state
+    const player = state.players[state.turnIndex];
+
+    // Only allow placing if this tile is selected
+    if (selectedTile !== coord) {
+      // If clicking a tile in hand, select it instead
+      if (player.hand.includes(coord)) {
+        handleTileSelection(coord);
+      }
+      return;
+    }
+
+    // Store a snapshot of the state before placement for potential cancellation
+    setStateBeforePlacement(structuredClone(state));
+
+    // Calculate the next state (commits tile placement but not hand removal/draw)
     const next = handleTilePlacement(state, coord);
 
     // Store pending placement and show highlight
     setPendingTile(coord);
     setPendingState(next);
 
-    // If tile is unclaimed (not part of any startup), show confirmation
-    if (!state.board[coord].startupId && next.stage === "play") {
+    // Clear selection since we're placing
+    setSelectedTile(null);
+
+    // Show confirmation for isolated tiles, or let modal handle confirmation for other actions
+    // The modals themselves will handle the cancellation
+    if (next.stage === "buy" && !next.pendingFoundTile && !next.mergerContext) {
+      // Isolated tile placement - show confirmation
       setShowConfirmation(true);
     } else {
-      // If it triggers founding/merger/buy, just transition (user can cancel from modal)
+      // Founding, expansion, or merger - show the respective modal
+      // The modal will handle confirmation/cancellation
       applyTilePlacement(next);
     }
   };
 
   const confirmTilePlacement = () => {
     if (pendingState) {
-      applyTilePlacement(pendingState);
+      const { completeTileTransaction } = require("./state/gameLogic");
+      const confirmedState = structuredClone(pendingState);
+      completeTileTransaction(confirmedState);
+      applyTilePlacement(confirmedState);
       setShowConfirmation(false);
       setPendingTile(null);
       setPendingState(null);
@@ -130,11 +171,17 @@ export function Game({
 
   // Handler to cancel modal and return to place phase
   const cancelModalAndReturnToPlay = () => {
-    // Reset to previous state (before tile placement)
-    setPendingTile(null);
-    setPendingState(null);
-    setShowConfirmation(false);
-    // State remains unchanged, user can try again
+    // Restore the state from before the tile was placed
+    if (stateBeforePlacement) {
+      // Clear pending state
+      setPendingTile(null);
+      setPendingState(null);
+      setShowConfirmation(false);
+
+      // Restore the previous state
+      handleStateUpdate(stateBeforePlacement);
+      setStateBeforePlacement(null);
+    }
   };
 
   useEffect(() => {
@@ -150,13 +197,14 @@ export function Game({
       <div className="flex gap-4">
         {/* Player Summary */}
         <div className="flex-1">
-          {isMultiplayer ? (
+          <PlayerSummary state={state} currentPlayerId={playerId} />
+          {/* {isMultiplayer ? (
             <PlayerSummary state={state} currentPlayerId={playerId} />
           ) : (
             <div className="bg-white rounded-lg shadow p-3">
               <PlayerStatusPanel state={state} />
             </div>
-          )}
+          )} */}
         </div>
 
         {/* Game Log - upper right corner */}
@@ -171,10 +219,10 @@ export function Game({
         onPlace={placeTile}
         startups={state.startups}
         currentHand={myPlayer?.hand || []}
-        highlightedTile={pendingTile}
+        highlightedTile={pendingTile || selectedTile}
         players={state.players}
       />
-      {myPlayer && <PlayerHand name={myPlayer.name} hand={myPlayer.hand} onPlace={placeTile} />}
+      {myPlayer && <PlayerHand name={myPlayer.name} hand={myPlayer.hand} onSelect={handleTileSelection} selectedTile={selectedTile} />}
 
       {/* Tile placement confirmation modal */}
       {showConfirmation && pendingTile && (
@@ -203,7 +251,7 @@ export function Game({
       {(!isMultiplayer || isMyTurn) && (
         <>
           {state.stage === "mergerPayout" && (
-            <MergerPayoutModal state={state} onUpdate={handleStateUpdate} />
+            <MergerPayoutModal state={state} onUpdate={handleStateUpdate} onCancel={cancelModalAndReturnToPlay} />
           )}
           {state.stage === "mergerLiquidation" && (
             <MergerLiquidationModal state={state} onUpdate={handleStateUpdate} />

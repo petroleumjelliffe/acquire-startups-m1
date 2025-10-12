@@ -1,8 +1,8 @@
 // src/components/FoundStartupModal.tsx
 import React from "react";
 import { GameState } from "../state/gameTypes";
-import { foundStartup, grantFoundingShare } from "../state/gameLogic";
-import { Coord, floodFillUnclaimed, getAdjacentCoords } from "../utils/gameHelpers";
+import { foundStartup, completeTileTransaction } from "../state/gameLogic";
+import { Coord } from "../utils/gameHelpers";
 
 interface FoundStartupModalProps {
   state: GameState;
@@ -27,6 +27,9 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
     //found the new startup that player selected
     foundStartup(newState, startupId, foundingTile);
 
+    // Complete the tile transaction (remove from hand, draw new tile)
+    completeTileTransaction(newState);
+
     //floodfill the unclaimed tiles connected to the founding tile
     // floodFillUnclaimed([foundingTile], newState.board);
 
@@ -36,6 +39,13 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
     //proceed to buy phase
     // newState.stage = "buy"; // proceed to buy phase
     onUpdate(newState);
+  }
+
+  function handleCancel() {
+    if (onCancel) {
+      // Just call onCancel - Game.tsx will handle state reversion
+      onCancel();
+    }
   }
 
   // Group by tier for display
@@ -53,7 +63,7 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
           </h2>
           {onCancel && (
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
               title="Cancel and return to placement"
             >
