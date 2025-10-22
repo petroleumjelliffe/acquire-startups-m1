@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { getRandomEmojiName } from '../utils/emojiNames';
+import { saveGameSession } from '../utils/gameSession';
 
 interface RoomPlayer {
   id: string;
@@ -21,7 +22,7 @@ export const WaitingRoom: React.FC<{
   onGameStart: (gameState: any) => void;
   initialRoomId?: string;
 }> = ({ onGameStart, initialRoomId }) => {
-  const { socket, isConnected, playerId } = useSocket();
+  const { socket, isConnected, playerId, isReconnecting } = useSocket();
   const [playerName, setPlayerName] = useState(getRandomEmojiName());
   const [roomId, setRoomId] = useState(initialRoomId || '');
   const [room, setRoom] = useState<WaitingRoomData | null>(null);
@@ -63,6 +64,14 @@ export const WaitingRoom: React.FC<{
           setRoom(response.room);
           setMode('inRoom');
           setError('');
+
+          // Save game session for reconnection
+          saveGameSession({
+            gameId: response.room.gameId,
+            playerId,
+            playerName: playerName.trim(),
+            joinedAt: Date.now(),
+          });
         } else {
           setError(response.error || 'Failed to create room');
         }
@@ -84,6 +93,14 @@ export const WaitingRoom: React.FC<{
           setRoom(response.room);
           setMode('inRoom');
           setError('');
+
+          // Save game session for reconnection
+          saveGameSession({
+            gameId: roomId.trim(),
+            playerId,
+            playerName: playerName.trim(),
+            joinedAt: Date.now(),
+          });
         } else {
           setError(response.error || 'Failed to join room');
         }
@@ -113,12 +130,18 @@ export const WaitingRoom: React.FC<{
   const isHost = room?.hostId === playerId;
   const canStart = isHost && room && room.players.length >= 2 && room.players.length <= 6;
 
-  if (!isConnected) {
+  if (!isConnected || isReconnecting) {
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-xl">
-          <h2 className="text-2xl font-bold mb-4">Connecting to server...</h2>
-          <div className="animate-pulse">⚫ Not connected</div>
+          <h2 className="text-2xl font-bold mb-4">
+            {isReconnecting ? 'Reconnecting to server...' : 'Connecting to server...'}
+          </h2>
+          <div className="animate-pulse flex items-center justify-center gap-2">
+            <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce" />
+            <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-100" />
+            <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-200" />
+          </div>
         </div>
       </div>
     );

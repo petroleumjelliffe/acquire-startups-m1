@@ -13,6 +13,7 @@ import { MergerLiquidationModal } from "./components/MergerLiquidation";
 import { PlayerSummary } from "./components/PlayerSummary";
 import { WaitingForPlayer } from "./components/WaitingForPlayer";
 import { useSocket } from "./context/SocketContext";
+import { clearGameSession } from "./utils/gameSession";
 import { useEffect } from "react";
 
 export function Game({
@@ -89,7 +90,13 @@ export function Game({
 
   useEffect(() => {
     console.log("Game state:", state.stage);
-  }, [state]);
+
+    // Clear game session when game ends (multiplayer only)
+    if (isMultiplayer && state.stage === "end") {
+      clearGameSession();
+      console.log("Game ended, session cleared");
+    }
+  }, [state, isMultiplayer]);
 
   return (
     <div className="space-y-4">
