@@ -29,7 +29,9 @@ export const PlayerSummary: React.FC<PlayerSummaryProps> = ({ state, currentPlay
       <div className="flex gap-3 flex-wrap">
         {state.players.map((player, index) => {
           const isCurrentTurn = index === state.turnIndex;
-          const isYou = player.id === currentPlayerId;
+          // In multiplayer: isYou means the logged-in player
+          // In single-player: isYou means the current turn player
+          const isYou = currentPlayerId ? player.id === currentPlayerId : isCurrentTurn;
           const isConnected = (player as any).isConnected !== false;
           const portfolioCount = getPortfolioCount(player.portfolio);
 

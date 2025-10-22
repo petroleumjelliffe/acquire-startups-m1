@@ -3,9 +3,11 @@ import React from "react";
 import { GameState } from "../state/gameTypes";
 
 export function PlayerStatusPanel({ state, currentPlayerId }: { state: GameState; currentPlayerId?: string }) {
-  // Helper to obscure cash for other players (single player shows all for now)
-  const getCashDisplay = (player: any, isCurrentPlayer: boolean) => {
-    if (!currentPlayerId || isCurrentPlayer) {
+  // Helper to obscure cash for other players
+  // In multiplayer: show only logged-in player's cash
+  // In single-player: show current turn player's cash
+  const getCashDisplay = (player: any, isYou: boolean) => {
+    if (isYou) {
       return `$${player.cash}`;
     }
     // Show n '$' characters where n = cash/2000 rounded
@@ -24,7 +26,9 @@ export function PlayerStatusPanel({ state, currentPlayerId }: { state: GameState
 
       {state.players.map((player) => {
         const isCurrentTurn = state.players[state.turnIndex].id === player.id;
-        const isYou = currentPlayerId ? player.id === currentPlayerId : true; // In single player, show all
+        // In multiplayer: isYou means the logged-in player
+        // In single-player: isYou means the current turn player
+        const isYou = currentPlayerId ? player.id === currentPlayerId : isCurrentTurn;
         const portfolioCount = getPortfolioCount(player.portfolio);
 
         return (

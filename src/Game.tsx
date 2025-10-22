@@ -197,7 +197,7 @@ export function Game({
       <div className="flex gap-4">
         {/* Player Summary */}
         <div className="flex-1">
-          <PlayerSummary state={state} currentPlayerId={playerId} />
+          <PlayerSummary state={state} currentPlayerId={isMultiplayer ? playerId : undefined} />
           {/* {isMultiplayer ? (
             <PlayerSummary state={state} currentPlayerId={playerId} />
           ) : (

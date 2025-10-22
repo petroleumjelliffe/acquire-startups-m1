@@ -35,7 +35,6 @@ export function PlayerHand({
             );
           });
         })()}
-        
       </div>
     </div>
   );
