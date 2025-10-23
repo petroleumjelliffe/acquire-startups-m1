@@ -54,23 +54,29 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    console.log('🔄 Attempting to rejoin game:', session.gameId);
+    console.log('🔄 Attempting to rejoin:', session.gameId);
     setIsReconnecting(true);
 
     socket.emit('rejoinGame', {
       gameId: session.gameId,
       playerId: session.playerId,
-    }, (response: { success: boolean; error?: string; gameState?: any }) => {
+    }, (response: { success: boolean; error?: string; gameState?: any; room?: any }) => {
       setIsReconnecting(false);
 
       if (response.success) {
-        console.log('✅ Successfully rejoined game:', session.gameId);
-        // The gameState will be handled by the parent component
-        // We don't clear the session here as the game is ongoing
+        if (response.room) {
+          console.log('✅ Successfully rejoined waiting room:', session.gameId);
+          // Trigger roomState event for WaitingRoom component to pick up
+          socket.emit('getRoomState', session.gameId);
+        } else if (response.gameState) {
+          console.log('✅ Successfully rejoined game:', session.gameId);
+          // The gameState will be handled by the parent component
+        }
+        // Don't clear the session here as the game/room is ongoing
       } else {
-        console.log('❌ Failed to rejoin game:', response.error);
-        // Clear session if game no longer exists
-        if (response.error?.includes('not found')) {
+        console.log('❌ Failed to rejoin:', response.error);
+        // Clear session if game/room no longer exists
+        if (response.error?.includes('not found') || response.error?.includes('not in')) {
           clearGameSession();
         }
       }

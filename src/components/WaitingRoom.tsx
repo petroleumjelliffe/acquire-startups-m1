@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { getRandomEmojiName } from '../utils/emojiNames';
-import { saveGameSession } from '../utils/gameSession';
+import { saveGameSession, getGameSession } from '../utils/gameSession';
+import { savePlayerName, getPlayerName } from '../utils/playerId';
 
 interface RoomPlayer {
   id: string;
@@ -23,13 +24,47 @@ export const WaitingRoom: React.FC<{
   initialRoomId?: string;
 }> = ({ onGameStart, initialRoomId }) => {
   const { socket, isConnected, playerId, isReconnecting } = useSocket();
-  const [playerName, setPlayerName] = useState(getRandomEmojiName());
+  // Try to restore player name from localStorage, or generate new one
+  const savedPlayerName = getPlayerName();
+  const [playerName, setPlayerName] = useState(savedPlayerName || getRandomEmojiName());
   const [roomId, setRoomId] = useState(initialRoomId || '');
   const [room, setRoom] = useState<WaitingRoomData | null>(null);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'menu' | 'creating' | 'joining' | 'inRoom'>(
     initialRoomId ? 'joining' : 'menu'
   );
+  const [hasAttemptedAutoJoin, setHasAttemptedAutoJoin] = useState(false);
+
+  // Auto-join room if we have initialRoomId and haven't attempted yet
+  useEffect(() => {
+    if (!socket || !isConnected || hasAttemptedAutoJoin || !initialRoomId) return;
+
+    setHasAttemptedAutoJoin(true);
+
+    // Automatically attempt to join the room
+    console.log('🔄 Auto-joining room:', initialRoomId);
+    socket.emit(
+      'joinRoom',
+      { gameId: initialRoomId, playerId, playerName },
+      (response: any) => {
+        if (response.success) {
+          setRoom(response.room);
+          setMode('inRoom');
+          setError('');
+          savePlayerName(playerName);
+          saveGameSession({
+            gameId: initialRoomId,
+            playerId,
+            playerName,
+            joinedAt: Date.now(),
+          });
+        } else {
+          setError(response.error || 'Failed to join room');
+          setMode('joining');
+        }
+      }
+    );
+  }, [socket, isConnected, hasAttemptedAutoJoin, initialRoomId, playerId, playerName]);
 
   useEffect(() => {
     if (!socket) return;
@@ -56,20 +91,22 @@ export const WaitingRoom: React.FC<{
       return;
     }
 
+    const trimmedName = playerName.trim();
     socket.emit(
       'createRoom',
-      { playerId, playerName: playerName.trim() },
+      { playerId, playerName: trimmedName },
       (response: any) => {
         if (response.success) {
           setRoom(response.room);
           setMode('inRoom');
           setError('');
 
-          // Save game session for reconnection
+          // Save player name and game session for reconnection
+          savePlayerName(trimmedName);
           saveGameSession({
             gameId: response.room.gameId,
             playerId,
-            playerName: playerName.trim(),
+            playerName: trimmedName,
             joinedAt: Date.now(),
           });
         } else {
@@ -85,20 +122,23 @@ export const WaitingRoom: React.FC<{
       return;
     }
 
+    const trimmedName = playerName.trim();
+    const trimmedRoomId = roomId.trim();
     socket.emit(
       'joinRoom',
-      { gameId: roomId.trim(), playerId, playerName: playerName.trim() },
+      { gameId: trimmedRoomId, playerId, playerName: trimmedName },
       (response: any) => {
         if (response.success) {
           setRoom(response.room);
           setMode('inRoom');
           setError('');
 
-          // Save game session for reconnection
+          // Save player name and game session for reconnection
+          savePlayerName(trimmedName);
           saveGameSession({
-            gameId: roomId.trim(),
+            gameId: trimmedRoomId,
             playerId,
-            playerName: playerName.trim(),
+            playerName: trimmedName,
             joinedAt: Date.now(),
           });
         } else {

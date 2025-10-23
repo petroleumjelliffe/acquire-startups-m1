@@ -2,6 +2,7 @@
 // Persistent player ID management using localStorage
 
 const PLAYER_ID_KEY = 'acquire-player-id';
+const PLAYER_NAME_KEY = 'acquire-player-name';
 
 /**
  * Generate a unique player ID
@@ -30,11 +31,35 @@ export function getPlayerId(): string {
 }
 
 /**
+ * Store player name in localStorage
+ */
+export function savePlayerName(name: string): void {
+  try {
+    localStorage.setItem(PLAYER_NAME_KEY, name);
+  } catch (error) {
+    console.error('Failed to save player name:', error);
+  }
+}
+
+/**
+ * Get stored player name
+ */
+export function getPlayerName(): string | null {
+  try {
+    return localStorage.getItem(PLAYER_NAME_KEY);
+  } catch (error) {
+    console.error('Failed to get player name:', error);
+    return null;
+  }
+}
+
+/**
  * Clear the stored player ID (for testing/debugging)
  */
 export function clearPlayerId(): void {
   localStorage.removeItem(PLAYER_ID_KEY);
-  console.log('Cleared player ID');
+  localStorage.removeItem(PLAYER_NAME_KEY);
+  console.log('Cleared player ID and name');
 }
 
 /**
