@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { getRandomEmojiName } from '../utils/emojiNames';
+import { saveGameSession } from '../utils/gameSession';
+import { savePlayerName, getPlayerName } from '../utils/playerId';
 
 interface RoomPlayer {
   id: string;
@@ -21,14 +23,71 @@ export const WaitingRoom: React.FC<{
   onGameStart: (gameState: any) => void;
   initialRoomId?: string;
 }> = ({ onGameStart, initialRoomId }) => {
-  const { socket, isConnected, playerId } = useSocket();
-  const [playerName, setPlayerName] = useState(getRandomEmojiName());
+  const { socket, isConnected, playerId, isReconnecting } = useSocket();
+  // Try to restore player name from localStorage, or generate new one
+  const savedPlayerName = getPlayerName();
+  const [playerName, setPlayerName] = useState(savedPlayerName || getRandomEmojiName());
   const [roomId, setRoomId] = useState(initialRoomId || '');
   const [room, setRoom] = useState<WaitingRoomData | null>(null);
   const [error, setError] = useState('');
   const [mode, setMode] = useState<'menu' | 'creating' | 'joining' | 'inRoom'>(
     initialRoomId ? 'joining' : 'menu'
   );
+  const [hasAttemptedAutoJoin, setHasAttemptedAutoJoin] = useState(false);
+
+  // Auto-join room if we have initialRoomId and haven't attempted yet
+  useEffect(() => {
+    if (!socket || !isConnected || hasAttemptedAutoJoin || !initialRoomId) return;
+
+    setHasAttemptedAutoJoin(true);
+
+    // First try to rejoin (handles both waiting rooms and started games)
+    console.log('🔄 Attempting to rejoin:', initialRoomId);
+    socket.emit(
+      'rejoinGame',
+      { gameId: initialRoomId, playerId },
+      (response: any) => {
+        if (response.success) {
+          if (response.room) {
+            // Successfully rejoined waiting room
+            console.log('✅ Rejoined waiting room');
+            setRoom(response.room);
+            setMode('inRoom');
+            setError('');
+            savePlayerName(playerName);
+          } else if (response.gameState) {
+            // Successfully rejoined started game
+            console.log('✅ Rejoined started game');
+            onGameStart(response.gameState);
+          }
+        } else {
+          // Rejoin failed - try to join as new player
+          console.log('🔄 Rejoin failed, trying to join as new player:', response.error);
+          socket.emit(
+            'joinRoom',
+            { gameId: initialRoomId, playerId, playerName },
+            (joinResponse: any) => {
+              if (joinResponse.success) {
+                setRoom(joinResponse.room);
+                setMode('inRoom');
+                setError('');
+                savePlayerName(playerName);
+                saveGameSession({
+                  gameId: initialRoomId,
+                  playerId,
+                  playerName,
+                  joinedAt: Date.now(),
+                });
+              } else {
+                setError(joinResponse.error || 'Failed to join room');
+                setMode('joining');
+              }
+            }
+          );
+        }
+      }
+    );
+  }, [socket, isConnected, hasAttemptedAutoJoin, initialRoomId, playerId, playerName, onGameStart]);
 
   useEffect(() => {
     if (!socket) return;
@@ -55,14 +114,24 @@ export const WaitingRoom: React.FC<{
       return;
     }
 
+    const trimmedName = playerName.trim();
     socket.emit(
       'createRoom',
-      { playerId, playerName: playerName.trim() },
+      { playerId, playerName: trimmedName },
       (response: any) => {
         if (response.success) {
           setRoom(response.room);
           setMode('inRoom');
           setError('');
+
+          // Save player name and game session for reconnection
+          savePlayerName(trimmedName);
+          saveGameSession({
+            gameId: response.room.gameId,
+            playerId,
+            playerName: trimmedName,
+            joinedAt: Date.now(),
+          });
         } else {
           setError(response.error || 'Failed to create room');
         }
@@ -76,14 +145,25 @@ export const WaitingRoom: React.FC<{
       return;
     }
 
+    const trimmedName = playerName.trim();
+    const trimmedRoomId = roomId.trim();
     socket.emit(
       'joinRoom',
-      { gameId: roomId.trim(), playerId, playerName: playerName.trim() },
+      { gameId: trimmedRoomId, playerId, playerName: trimmedName },
       (response: any) => {
         if (response.success) {
           setRoom(response.room);
           setMode('inRoom');
           setError('');
+
+          // Save player name and game session for reconnection
+          savePlayerName(trimmedName);
+          saveGameSession({
+            gameId: trimmedRoomId,
+            playerId,
+            playerName: trimmedName,
+            joinedAt: Date.now(),
+          });
         } else {
           setError(response.error || 'Failed to join room');
         }
@@ -113,12 +193,18 @@ export const WaitingRoom: React.FC<{
   const isHost = room?.hostId === playerId;
   const canStart = isHost && room && room.players.length >= 2 && room.players.length <= 6;
 
-  if (!isConnected) {
+  if (!isConnected || isReconnecting) {
     return (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-xl">
-          <h2 className="text-2xl font-bold mb-4">Connecting to server...</h2>
-          <div className="animate-pulse">⚫ Not connected</div>
+          <h2 className="text-2xl font-bold mb-4">
+            {isReconnecting ? 'Reconnecting to server...' : 'Connecting to server...'}
+          </h2>
+          <div className="animate-pulse flex items-center justify-center gap-2">
+            <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce" />
+            <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-100" />
+            <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-200" />
+          </div>
         </div>
       </div>
     );

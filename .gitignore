@@ -34,3 +34,6 @@ pnpm-debug.log*
 
 # Optional: coverage reports
 coverage/
+
+# Game files
+server/games/

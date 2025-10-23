@@ -87,22 +87,42 @@ io.on("connection", (socket) => {
       callback
     ) => {
       try {
-        const room = roomManager.joinRoom(
-          data.gameId,
-          data.playerId,
-          data.playerName
-        );
+        // First check if this is a waiting room
+        const room = roomManager.getRoom(data.gameId);
 
-        if (!room) {
-          callback({ success: false, error: "Room not found or full" });
+        if (room) {
+          // It's a waiting room - try to join
+          const joinedRoom = roomManager.joinRoom(
+            data.gameId,
+            data.playerId,
+            data.playerName
+          );
+
+          if (!joinedRoom) {
+            callback({ success: false, error: "Room is full (max 6 players)" });
+            return;
+          }
+
+          socket.join(data.gameId);
+          socket.data.gameId = data.gameId;
+
+          callback({ success: true, room: joinedRoom });
+          io.to(data.gameId).emit("roomState", joinedRoom);
           return;
         }
 
-        socket.join(data.gameId);
-        socket.data.gameId = data.gameId;
+        // Not a waiting room - check if it's a started game
+        const game = gameManager.getGame(data.gameId);
+        if (game) {
+          callback({
+            success: false,
+            error: "Game has already started. Use rejoin instead."
+          });
+          return;
+        }
 
-        callback({ success: true, room });
-        io.to(data.gameId).emit("roomState", room);
+        // Room doesn't exist at all
+        callback({ success: false, error: "Room doesn't exist" });
       } catch (error: any) {
         callback({ success: false, error: error.message });
       }
@@ -146,36 +166,78 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Rejoin an existing game
+  // Rejoin an existing game (or waiting room)
   socket.on(
     "rejoinGame",
     (data: { gameId: string; playerId: string }, callback) => {
       try {
-        const gameState = gameManager.playerConnected(
-          data.gameId,
-          data.playerId,
-          socket.id
-        );
+        // First check if it's a waiting room
+        const room = roomManager.getRoom(data.gameId);
+        if (room) {
+          // Player is trying to rejoin a waiting room
+          const player = room.players.find(p => p.id === data.playerId);
+
+          if (player) {
+            // Player was in this room - reconnect them
+            player.isConnected = true;
+            socket.join(data.gameId);
+            socket.data.gameId = data.gameId;
+
+            callback({ success: true, room });
+            io.to(data.gameId).emit("roomState", room);
+            console.log(`✓ Player rejoined waiting room: ${data.playerId} -> ${data.gameId}`);
+            return;
+          } else {
+            callback({
+              success: false,
+              error: "Player not in this room",
+            });
+            return;
+          }
+        }
+
+        // Check if it's a started game
+        const gameState = gameManager.getGame(data.gameId);
 
         if (!gameState) {
           callback({
             success: false,
-            error: "Game not found or player not in game",
+            error: "Game not found",
           });
           return;
         }
 
+        // Check if game has ended
+        if (gameState.isEnded || gameState.stage === "end") {
+          callback({
+            success: false,
+            error: "Game has ended",
+          });
+          return;
+        }
+
+        // Verify player is in game
+        const player = gameState.players.find(p => p.id === data.playerId);
+        if (!player) {
+          callback({
+            success: false,
+            error: "Player not in game",
+          });
+          return;
+        }
+
+        // Reconnect player
+        gameManager.playerConnected(data.gameId, data.playerId, socket.id);
         socket.join(data.gameId);
         socket.data.gameId = data.gameId;
 
         callback({ success: true, gameState });
         io.to(data.gameId).emit("playerConnected", {
           playerId: data.playerId,
-          playerName: gameState.players.find((p) => p.id === data.playerId)
-            ?.name,
+          playerName: player.name,
         });
 
-        console.log(`✓ Player rejoined: ${data.playerId} -> ${data.gameId}`);
+        console.log(`✓ Player rejoined game: ${data.playerId} -> ${data.gameId}`);
       } catch (error: any) {
         callback({ success: false, error: error.message });
       }
@@ -236,11 +298,50 @@ io.on("connection", (socket) => {
       // Update game state with new state from client
       Object.assign(gameState, data.newState);
 
+      // Auto-mark game as ended if stage is "end"
+      if (gameState.stage === "end" && !gameState.isEnded) {
+        gameState.isEnded = true;
+        console.log(`🏁 Game ${data.gameId} has ended`);
+        io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
+      }
+
       // Save and broadcast
       await gameManager.updateGame(data.gameId, gameState);
       io.to(data.gameId).emit("gameState", gameState);
     } catch (error: any) {
       console.error("State update error:", error);
+    }
+  });
+
+  // Manually end a game (host only)
+  socket.on("endGame", async (data: { gameId: string; playerId: string }, callback) => {
+    try {
+      const gameState = gameManager.getGame(data.gameId);
+
+      if (!gameState) {
+        callback({ success: false, error: "Game not found" });
+        return;
+      }
+
+      // Verify player is the first player (host)
+      if (gameState.players[0]?.id !== data.playerId) {
+        callback({ success: false, error: "Only the host can end the game" });
+        return;
+      }
+
+      // Mark game as ended
+      gameState.isEnded = true;
+      gameState.stage = "end";
+      console.log(`🏁 Game ${data.gameId} manually ended by host`);
+
+      // Save and broadcast
+      await gameManager.updateGame(data.gameId, gameState);
+      io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
+      io.to(data.gameId).emit("gameState", gameState);
+
+      callback({ success: true });
+    } catch (error: any) {
+      callback({ success: false, error: error.message });
     }
   });
 

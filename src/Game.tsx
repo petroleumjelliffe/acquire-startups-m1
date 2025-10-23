@@ -16,6 +16,7 @@ import { WaitingForPlayer } from "./components/WaitingForPlayer";
 import { YourTurnIndicator } from "./components/YourTurnIndicator";
 import { TilePlacementConfirmModal } from "./components/TilePlacementConfirmModal";
 import { useSocket } from "./context/SocketContext";
+import { clearGameSession } from "./utils/gameSession";
 import { useEffect } from "react";
 
 export function Game({
@@ -51,13 +52,22 @@ export function Game({
   useEffect(() => {
     if (!socket || !isMultiplayer) return;
 
-    socket.on('gameState', (newState: GameState) => {
+    const handleGameState = (newState: GameState) => {
       console.log('📥 Received game state update from server');
       setState(newState);
-    });
+    };
+
+    const handleGameEnded = () => {
+      console.log('🏁 Game has ended - clearing session');
+      clearGameSession();
+    };
+
+    socket.on('gameState', handleGameState);
+    socket.on('gameEnded', handleGameEnded);
 
     return () => {
-      socket.off('gameState');
+      socket.off('gameState', handleGameState);
+      socket.off('gameEnded', handleGameEnded);
     };
   }, [socket, isMultiplayer]);
 
@@ -184,9 +194,34 @@ export function Game({
     }
   };
 
+  // End game manually (host only)
+  const handleEndGame = () => {
+    if (!isMultiplayer || !socket) return;
+
+    if (window.confirm('Are you sure you want to end this game? This cannot be undone.')) {
+      socket.emit('endGame', {
+        gameId: state.gameId,
+        playerId
+      }, (response: { success: boolean; error?: string }) => {
+        if (!response.success) {
+          alert(response.error || 'Failed to end game');
+        }
+      });
+    }
+  };
+
   useEffect(() => {
     console.log("Game state:", state.stage);
-  }, [state]);
+
+    // Clear game session when game ends (multiplayer only)
+    if (isMultiplayer && state.stage === "end") {
+      clearGameSession();
+      console.log("Game ended, session cleared");
+    }
+  }, [state, isMultiplayer]);
+
+  // Check if current player is host (first player)
+  const isHost = isMultiplayer && state.players[0]?.id === playerId;
 
   return (
     <div className="space-y-4">
@@ -212,6 +247,28 @@ export function Game({
           <GameLog state={state} />
         </div>
       </div>
+
+      {/* End Game button for host */}
+      {isHost && state.stage !== "end" && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleEndGame}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold"
+          >
+            End Game
+          </button>
+        </div>
+      )}
+
+      {/* Game ended message */}
+      {state.stage === "end" && (
+        <div className="p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg text-center">
+          <h2 className="text-2xl font-bold text-yellow-800 mb-2">Game Ended</h2>
+          <p className="text-yellow-700">
+            {isMultiplayer ? "This game has ended. You can close this page." : "Game Over!"}
+          </p>
+        </div>
+      )}
 
       <h2 className="font-semibold">Current: {cur.name}</h2>
       <Board
