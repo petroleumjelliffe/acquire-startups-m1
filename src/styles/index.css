@@ -1,6 +1,18 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  /* Tile color customization variables */
+  --tile-unclaimed-bg: #f3f4f6;
+  --tile-unclaimed-hover-bg: #f9fafb;
+  --tile-placed-bg: #333333;
+  --tile-in-hand-bg: #93c5fd;  /* Lighter blue for shaded preview */
+  --tile-in-hand-hover-bg: #60a5fa;  /* Brighter on hover */
+  --tile-border: #d1d5db;
+  --tile-color: #ccc;
+}
+
 body {
   @apply bg-gray-50 text-gray-900;
 }
@@ -10,11 +22,77 @@ body {
   @apply w-8 h-8 flex items-center justify-center border rounded-sm relative transition-colors;
 }
 
+/* Tile states - using CSS variables for easy customization */
+.tile-unclaimed {
+  background-color: var(--tile-unclaimed-bg);
+  border-color: var(--tile-border);
+}
+
+button {
+  border-radius: 5px;
+  margin: 1px;
+}
+button.tile-placed span {
+  color: white;
+}
+
+button span {
+  color: var(--tile-color);
+  font-size: 2em;
+  font-weight: bolder;
+} 
+.tile-unclaimed:hover {
+  background-color: var(--tile-unclaimed-hover-bg);
+}
+
+.tile-placed {
+  background-color: var(--tile-placed-bg);
+  border-color: var(--tile-border);
+}
+
+/* Shaded preview for tiles in hand (multiplayer mode) */
+.tile-in-hand {
+  background-color: var(--tile-in-hand-bg);
+  border-color: #3b82f6;
+  border-width: 2px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.2s ease-in-out;
+}
+
+.tile-in-hand:hover {
+  background-color: var(--tile-in-hand-hover-bg);
+  opacity: 1;
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
+}
+
+.tile-in-hand span {
+  color: #1e40af;
+  font-weight: bold;
+}
+
+
+.tile-highlighted {
+  @apply ring-4 ring-blue-500 ring-opacity-50;
+}
+
 /* Overlay label */
 .startup-label {
   @apply absolute inset-0 flex items-center justify-center text-xs font-bold rounded-sm;
   background-color: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(2px);
+}
+
+/* Player name marker for last placed tile */
+.player-tile-marker {
+  @apply absolute top-0 left-0 text-[8px] font-bold px-1 py-0.5 bg-blue-600 text-white rounded-br-sm;
+  line-height: 1;
+  z-index: 10;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Startup-specific themes */
@@ -44,4 +122,32 @@ body {
 
 .startup-ZuckFace {
   @apply bg-indigo-200 border-indigo-500 text-indigo-800;
+}
+
+/* Your Turn Indicator - sticky overlay at top */
+.your-turn-indicator {
+  @apply fixed top-0 left-1/2 transform -translate-x-1/2 z-50 mt-4;
+}
+
+.your-turn-indicator-content {
+  @apply bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-pulse;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.5);
+}
+
+.your-turn-indicator-icon {
+  @apply text-2xl;
+  animation: bounce 1s infinite;
+}
+
+.your-turn-indicator-text {
+  @apply font-bold text-lg;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
 }

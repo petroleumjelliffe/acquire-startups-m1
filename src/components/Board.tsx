@@ -1,21 +1,36 @@
 import React from "react";
 import { Coord } from "../utils/gameHelpers";
-import { Startup, TileCell } from "../state/gameTypes";
+import { Startup, TileCell, Player } from "../state/gameTypes";
 
 export function Board({
   board,
   onPlace,
   currentHand,
   startups,
+  highlightedTile,
+  players,
+  showHandPreviews = true,
 }: {
-  //   board: Record<Coord, { placed: boolean }>;
   board: Record<Coord, TileCell>;
   onPlace: (c: Coord) => void;
   currentHand: Coord[];
   startups: Record<string, Startup>;
+  highlightedTile?: Coord | null;
+  players?: Player[];
+  showHandPreviews?: boolean; // true for multiplayer, false for pass-and-play
 }) {
   const rows = "ABCDEFGHI".split("");
   const cols = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  // Create a map of coord -> player name for last placed tiles
+  const lastPlacedTiles = new Map<Coord, string>();
+  if (players) {
+    players.forEach(player => {
+      if (player.lastPlacedTile) {
+        lastPlacedTiles.set(player.lastPlacedTile, player.name);
+      }
+    });
+  }
 
   return (
     <div
@@ -36,34 +51,57 @@ export function Board({
           {cols.map((c) => {
             const id = `${r}${c}` as Coord;
             const cell = board[id];
+            const isHighlighted = highlightedTile === id;
+            const playerName = lastPlacedTiles.get(id);
             const isInHand = currentHand.includes(id);
 
-            // Base color logic (if no startup yet)
-            const baseColor = cell.placed
-              ? "bg-gray-200"
-              : isInHand
-              ? "bg-blue-100 hover:bg-blue-200"
-              : "hover:bg-gray-50";
+            // Build class list using CSS classes
+            const tileClasses = [
+              "aspect-square",
+              "border",
+              "text-xs",
+              "relative",
+            ];
+
+            // Add state-based classes
+            if (cell.placed) {
+              tileClasses.push("tile-placed");
+            } else {
+              tileClasses.push("tile-unclaimed");
+
+              // Show hand preview if enabled and tile is in hand
+              if (showHandPreviews && isInHand) {
+                tileClasses.push("tile-in-hand");
+              }
+            }
 
             // Add startup class if applicable
-            const startupClass = cell.startupId
-              ? `startup-${cell.startupId}`
-              : "";
+            if (cell.startupId) {
+              tileClasses.push(`startup-${cell.startupId}`);
+            }
+
+            // Add highlight class if needed
+            if (isHighlighted) {
+              tileClasses.push("tile-highlighted");
+            }
 
             return (
               <button
                 key={id}
                 onClick={() => onPlace(id)}
                 disabled={cell.placed}
-                className={`aspect-square border text-xs relative ${baseColor} ${startupClass}`}
+                className={tileClasses.join(" ")}
                 title={id}
               >
                 {/* Tile label */}
-                {cell.placed && (
+                {/* {cell.placed && ( */}
                   <span>
-                    {r}
-                    {c}
+                    {r}-{c}
                   </span>
+                {/* )} */}
+                {/* Player name overlay for last placed tile */}
+                {playerName && (
+                  <div className="player-tile-marker">{playerName}</div>
                 )}
                 {/* Startup overlay label on founding tile */}
                 {cell.startupId &&

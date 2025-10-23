@@ -1,14 +1,16 @@
 // src/components/MergerPayoutModal.tsx
 import React from "react";
 import { GameState } from "../state/gameTypes";
-import { finalizeMergerPayout } from "../state/gameLogic";
+import { finalizeMergerPayout, completeTileTransaction } from "../state/gameLogic";
 
 export default function MergerPayoutModal({
   state,
   onUpdate,
+  onCancel,
 }: {
   state: GameState;
   onUpdate: (s: GameState) => void;
+  onCancel?: () => void;
 }) {
   const bonuses: any[] = (state as any).pendingBonuses || [];
   const survivor = state.mergerContext?.survivorId;
@@ -16,14 +18,36 @@ export default function MergerPayoutModal({
 
   function handleContinue() {
     const newState = { ...state };
+
+    // Complete the tile transaction (remove from hand, draw new tile)
+    completeTileTransaction(newState);
+
     finalizeMergerPayout(newState);
     onUpdate(newState);
+  }
+
+  function handleCancel() {
+    if (onCancel) {
+      // Just call onCancel - Game.tsx will handle state reversion
+      onCancel();
+    }
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-xl shadow-lg w-[500px]">
-        <h2 className="text-lg font-bold mb-2">Merger Resolution</h2>
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-bold flex-1">Merger Resolution</h2>
+          {onCancel && (
+            <button
+              onClick={handleCancel}
+              className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
+              title="Cancel and return to placement"
+            >
+              ×
+            </button>
+          )}
+        </div>
         <p className="text-sm text-gray-700 mb-3">
           {absorbed.join(", ")} have been absorbed into {survivor}.
         </p>

@@ -83,6 +83,14 @@ export function resolveInitialDraw(state: GameState) {
 
   for (const d of drawn) state.board[d.tile].placed = true;
 
+  // Set lastPlacedTile for each player to show the indicator during draw phase
+  for (const d of drawn) {
+    const player = state.players.find((p) => p.name === d.name);
+    if (player) {
+      player.lastPlacedTile = d.tile;
+    }
+  }
+
   const sorted = [...drawn].sort((a, b) => compareTiles(a.tile, b.tile));
   const firstName = sorted[0].name;
   const firstIndex = state.players.findIndex((p) => p.name === firstName);
@@ -153,6 +161,9 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
 
   // Place tile
   cell.placed = true;
+
+  // Track last placed tile for this player
+  player.lastPlacedTile = coord;
 
   if (adjStartups.size === 0) {
     // Found new startup?
@@ -239,13 +250,95 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     prepareMergerPayout(state, survivorId, absorbedIds);
   }
 
-  // Draw next tile
-  player.hand = player.hand.filter((t) => t !== coord);
-  const draw = state.bag.shift();
-  if (draw) player.hand.push(draw);
+  // Store the tile to be removed from hand after confirmation
+  // Don't draw a new tile yet - wait for modal confirmation
+  state.pendingTileToRemove = coord;
 
   //don't move to next player yet
   // state.turnIndex = (state.turnIndex + 1) % state.players.length;
+  return state;
+}
+
+/**
+ * Completes the tile transaction by removing the played tile from hand and drawing a new one.
+ * Call this after the player confirms their action (after modal closes).
+ */
+export function completeTileTransaction(state: GameState) {
+  if (!state.pendingTileToRemove) return;
+
+  const player = state.players[state.turnIndex];
+  const coord = state.pendingTileToRemove;
+
+  // Remove the played tile from hand
+  player.hand = player.hand.filter((t) => t !== coord);
+
+  // Draw a new tile from the bag
+  const draw = state.bag.shift();
+  if (draw) player.hand.push(draw);
+
+  // Clear the pending tile
+  state.pendingTileToRemove = undefined;
+}
+
+/**
+ * Cancels a pending tile placement by reverting board changes.
+ * Call this when a modal is cancelled.
+ */
+export function cancelTilePlacement(state: GameState) {
+  if (!state.pendingTileToRemove) return state;
+
+  const coord = state.pendingTileToRemove;
+  const player = state.players[state.turnIndex];
+
+  // Unplace the tile
+  const cell = state.board[coord];
+  cell.placed = false;
+  cell.startupId = undefined;
+
+  // Clear last placed tile indicator
+  player.lastPlacedTile = undefined;
+
+  // Remove any startup that was founded with this tile
+  if (state.pendingFoundTile === coord) {
+    // Find and unfound any startup that was founded with this tile
+    for (const startup of Object.values(state.startups)) {
+      if (startup.foundingTile === coord) {
+        startup.isFounded = false;
+        startup.foundingTile = null;
+        startup.tiles = [];
+        // Reset all tiles that were assigned to this startup
+        for (const [tileCoord, tileCell] of Object.entries(state.board)) {
+          if (tileCell.startupId === startup.id) {
+            tileCell.startupId = undefined;
+            // If this tile was placed as part of the founding, unplace it
+            if (tileCell.placed && tileCoord !== coord) {
+              // Leave other placed tiles as they were
+            }
+          }
+        }
+      }
+    }
+    state.pendingFoundTile = undefined;
+  }
+
+  // Clear merger context if there was one
+  if (state.mergerContext) {
+    // Revert any mergers that happened
+    // This is complex - for now we'll rely on not calling this during mergers
+    state.mergerContext = undefined;
+  }
+
+  // Clear pending tile
+  state.pendingTileToRemove = undefined;
+
+  // Reset stage to play
+  state.stage = "play";
+
+  // Remove the last log entry that was about this placement
+  if (state.log.length > 0) {
+    state.log.pop();
+  }
+
   return state;
 }
 

@@ -1,19 +1,21 @@
 // src/components/FoundStartupModal.tsx
 import React from "react";
 import { GameState } from "../state/gameTypes";
-import { foundStartup, grantFoundingShare } from "../state/gameLogic";
-import { Coord, floodFillUnclaimed, getAdjacentCoords } from "../utils/gameHelpers";
+import { foundStartup, completeTileTransaction } from "../state/gameLogic";
+import { Coord } from "../utils/gameHelpers";
 
 interface FoundStartupModalProps {
   state: GameState;
   foundingTile: Coord; // coordinate of the tile that triggered the founding
   onUpdate: (s: GameState) => void;
+  onCancel?: () => void;
 }
 
 export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
   state,
   foundingTile,
   onUpdate,
+  onCancel,
 }) => {
   const available = Object.values(state.startups).filter((s) => !s.isFounded);
   const founded = Object.values(state.startups).filter((s) => s.isFounded);
@@ -24,6 +26,9 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
     const newState = JSON.parse(JSON.stringify(state)) as GameState; //deep copy to avoid mutating original state
     //found the new startup that player selected
     foundStartup(newState, startupId, foundingTile);
+
+    // Complete the tile transaction (remove from hand, draw new tile)
+    completeTileTransaction(newState);
 
     //floodfill the unclaimed tiles connected to the founding tile
     // floodFillUnclaimed([foundingTile], newState.board);
@@ -36,6 +41,13 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
     onUpdate(newState);
   }
 
+  function handleCancel() {
+    if (onCancel) {
+      // Just call onCancel - Game.tsx will handle state reversion
+      onCancel();
+    }
+  }
+
   // Group by tier for display
   const tierGroups = [0,1,2].map((tier) => ({
     tier,
@@ -45,9 +57,20 @@ export const FoundStartupModal: React.FC<FoundStartupModalProps> = ({
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-white p-6 rounded-xl shadow-xl w-[700px] max-w-full">
-        <h2 className="text-xl font-bold mb-4 text-center">
-          Select a Startup to Found
-        </h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-center flex-1">
+            Select a Startup to Found
+          </h2>
+          {onCancel && (
+            <button
+              onClick={handleCancel}
+              className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
+              title="Cancel and return to placement"
+            >
+              ×
+            </button>
+          )}
+        </div>
 
         <div className="grid grid-cols-3 gap-4">
           {tierGroups.map(({ tier, startups }) => (

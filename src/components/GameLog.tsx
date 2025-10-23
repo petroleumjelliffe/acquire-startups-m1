@@ -1,17 +1,18 @@
 import React from "react";
 import { GameState } from "../state/gameTypes";
-import { PlayerStatusPanel } from "./PlayerStatusPanel";
+
 export function GameLog({ state }: { state: GameState }) {
   return (
-    <div>
-      <PlayerStatusPanel state={state} />
-      <h3 className="font-semibold">Log</h3>
-      <ul className="text-sm text-gray-700 max-h-40 overflow-auto">
+    <div className="bg-white rounded-lg shadow p-3">
+      <h3 className="font-semibold mb-2">Game Log</h3>
+      <ul className="text-sm text-gray-700 max-h-[300px] overflow-y-auto">
         {state.log
           .slice()
           .reverse()
           .map((l, i) => (
-            <li key={i}>{l}</li>
+            <li key={i} className="mb-1 border-b border-gray-100 pb-1 last:border-none">
+              {l}
+            </li>
           ))}
       </ul>
     </div>
