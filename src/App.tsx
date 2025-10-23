@@ -3,6 +3,8 @@ import { Routes, Route, useNavigate, useParams } from "react-router-dom";
 import { Game } from "./Game";
 import { SetupScreen } from "./components/SetupScreen";
 import { WaitingRoom } from "./components/WaitingRoom";
+import { ReconnectionBanner } from "./components/ReconnectionBanner";
+import { useSocket } from "./context/SocketContext";
 import type { GameState } from "./state/gameTypes";
 
 type AppMode = 'singleplayer' | 'multiplayer';
@@ -38,6 +40,25 @@ function ModeSelection({ onSelectMode }: { onSelectMode: (mode: AppMode) => void
 function RoomRoute() {
   const { roomId } = useParams<{ roomId: string }>();
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const { socket } = useSocket();
+
+  // Listen for successful rejoin (automatic reconnection)
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleGameStarted = (state: GameState) => {
+      console.log('🎮 Game started or rejoined');
+      setGameState(state);
+    };
+
+    socket.on('gameStarted', handleGameStarted);
+    socket.on('gameState', handleGameStarted); // Also catch general state updates
+
+    return () => {
+      socket.off('gameStarted', handleGameStarted);
+      socket.off('gameState', handleGameStarted);
+    };
+  }, [socket]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -66,6 +87,7 @@ export default function App() {
   } | null>(null);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const navigate = useNavigate();
+  const { socket } = useSocket();
 
   // Handle game start from waiting room (multiplayer)
   const handleMultiplayerGameStart = (multiplayerGameState: GameState) => {
@@ -77,10 +99,30 @@ export default function App() {
     setConfig({ seed, names });
   };
 
+  // Listen for automatic reconnection to game
+  useEffect(() => {
+    if (!socket || mode !== 'multiplayer') return;
+
+    const handleGameStarted = (state: GameState) => {
+      console.log('🎮 Game auto-rejoined after reconnection');
+      setGameState(state);
+    };
+
+    socket.on('gameStarted', handleGameStarted);
+    socket.on('gameState', handleGameStarted); // Also catch general state updates
+
+    return () => {
+      socket.off('gameStarted', handleGameStarted);
+      socket.off('gameState', handleGameStarted);
+    };
+  }, [socket, mode]);
+
   return (
-    <Routes>
-      {/* Direct room link - must come before catch-all */}
-      <Route path="/room/:roomId" element={<RoomRoute />} />
+    <>
+      <ReconnectionBanner />
+      <Routes>
+        {/* Direct room link - must come before catch-all */}
+        <Route path="/room/:roomId" element={<RoomRoute />} />
 
       {/* Home page */}
       <Route path="/" element={
@@ -124,6 +166,7 @@ export default function App() {
           )}
         </>
       } />
-    </Routes>
+      </Routes>
+    </>
   );
 }
