@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { getRandomEmojiName } from '../utils/emojiNames';
-import { saveGameSession, getGameSession } from '../utils/gameSession';
+import { saveGameSession } from '../utils/gameSession';
 import { savePlayerName, getPlayerName } from '../utils/playerId';
 
 interface RoomPlayer {
@@ -41,30 +41,53 @@ export const WaitingRoom: React.FC<{
 
     setHasAttemptedAutoJoin(true);
 
-    // Automatically attempt to join the room
-    console.log('🔄 Auto-joining room:', initialRoomId);
+    // First try to rejoin (handles both waiting rooms and started games)
+    console.log('🔄 Attempting to rejoin:', initialRoomId);
     socket.emit(
-      'joinRoom',
-      { gameId: initialRoomId, playerId, playerName },
+      'rejoinGame',
+      { gameId: initialRoomId, playerId },
       (response: any) => {
         if (response.success) {
-          setRoom(response.room);
-          setMode('inRoom');
-          setError('');
-          savePlayerName(playerName);
-          saveGameSession({
-            gameId: initialRoomId,
-            playerId,
-            playerName,
-            joinedAt: Date.now(),
-          });
+          if (response.room) {
+            // Successfully rejoined waiting room
+            console.log('✅ Rejoined waiting room');
+            setRoom(response.room);
+            setMode('inRoom');
+            setError('');
+            savePlayerName(playerName);
+          } else if (response.gameState) {
+            // Successfully rejoined started game
+            console.log('✅ Rejoined started game');
+            onGameStart(response.gameState);
+          }
         } else {
-          setError(response.error || 'Failed to join room');
-          setMode('joining');
+          // Rejoin failed - try to join as new player
+          console.log('🔄 Rejoin failed, trying to join as new player:', response.error);
+          socket.emit(
+            'joinRoom',
+            { gameId: initialRoomId, playerId, playerName },
+            (joinResponse: any) => {
+              if (joinResponse.success) {
+                setRoom(joinResponse.room);
+                setMode('inRoom');
+                setError('');
+                savePlayerName(playerName);
+                saveGameSession({
+                  gameId: initialRoomId,
+                  playerId,
+                  playerName,
+                  joinedAt: Date.now(),
+                });
+              } else {
+                setError(joinResponse.error || 'Failed to join room');
+                setMode('joining');
+              }
+            }
+          );
         }
       }
     );
-  }, [socket, isConnected, hasAttemptedAutoJoin, initialRoomId, playerId, playerName]);
+  }, [socket, isConnected, hasAttemptedAutoJoin, initialRoomId, playerId, playerName, onGameStart]);
 
   useEffect(() => {
     if (!socket) return;

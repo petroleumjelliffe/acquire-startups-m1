@@ -197,28 +197,44 @@ io.on("connection", (socket) => {
         }
 
         // Check if it's a started game
-        const gameState = gameManager.playerConnected(
-          data.gameId,
-          data.playerId,
-          socket.id
-        );
+        const gameState = gameManager.getGame(data.gameId);
 
         if (!gameState) {
           callback({
             success: false,
-            error: "Game not found or player not in game",
+            error: "Game not found",
           });
           return;
         }
 
+        // Check if game has ended
+        if (gameState.isEnded || gameState.stage === "end") {
+          callback({
+            success: false,
+            error: "Game has ended",
+          });
+          return;
+        }
+
+        // Verify player is in game
+        const player = gameState.players.find(p => p.id === data.playerId);
+        if (!player) {
+          callback({
+            success: false,
+            error: "Player not in game",
+          });
+          return;
+        }
+
+        // Reconnect player
+        gameManager.playerConnected(data.gameId, data.playerId, socket.id);
         socket.join(data.gameId);
         socket.data.gameId = data.gameId;
 
         callback({ success: true, gameState });
         io.to(data.gameId).emit("playerConnected", {
           playerId: data.playerId,
-          playerName: gameState.players.find((p) => p.id === data.playerId)
-            ?.name,
+          playerName: player.name,
         });
 
         console.log(`✓ Player rejoined game: ${data.playerId} -> ${data.gameId}`);
@@ -282,11 +298,50 @@ io.on("connection", (socket) => {
       // Update game state with new state from client
       Object.assign(gameState, data.newState);
 
+      // Auto-mark game as ended if stage is "end"
+      if (gameState.stage === "end" && !gameState.isEnded) {
+        gameState.isEnded = true;
+        console.log(`🏁 Game ${data.gameId} has ended`);
+        io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
+      }
+
       // Save and broadcast
       await gameManager.updateGame(data.gameId, gameState);
       io.to(data.gameId).emit("gameState", gameState);
     } catch (error: any) {
       console.error("State update error:", error);
+    }
+  });
+
+  // Manually end a game (host only)
+  socket.on("endGame", async (data: { gameId: string; playerId: string }, callback) => {
+    try {
+      const gameState = gameManager.getGame(data.gameId);
+
+      if (!gameState) {
+        callback({ success: false, error: "Game not found" });
+        return;
+      }
+
+      // Verify player is the first player (host)
+      if (gameState.players[0]?.id !== data.playerId) {
+        callback({ success: false, error: "Only the host can end the game" });
+        return;
+      }
+
+      // Mark game as ended
+      gameState.isEnded = true;
+      gameState.stage = "end";
+      console.log(`🏁 Game ${data.gameId} manually ended by host`);
+
+      // Save and broadcast
+      await gameManager.updateGame(data.gameId, gameState);
+      io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
+      io.to(data.gameId).emit("gameState", gameState);
+
+      callback({ success: true });
+    } catch (error: any) {
+      callback({ success: false, error: error.message });
     }
   });
 

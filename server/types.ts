@@ -1,23 +1,19 @@
 // server/types.ts
 // Shared types between server and client
 
-import type { GameState } from "../src/state/gameTypes.js";
+import type { GameState, Player } from "../src/state/gameTypes.js";
+
+export interface MultiplayerPlayer extends Player {
+  // All properties inherited from Player (id, name, cash, hand, portfolio)
+  // isConnected and socketId are already optional in Player
+}
 
 export interface MultiplayerGameState extends GameState {
   gameId: string;
   players: MultiplayerPlayer[];
   createdAt: number;
   lastUpdated: number;
-}
-
-export interface MultiplayerPlayer {
-  id: string; // Persistent UUID
-  name: string;
-  hand: string[];
-  cash: number;
-  portfolio: Record<string, number>;
-  isConnected: boolean;
-  socketId?: string; // Current socket connection ID
+  isEnded?: boolean; // True when game has been manually ended or reached end stage
 }
 
 export interface RoomPlayer {

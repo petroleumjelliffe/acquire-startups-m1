@@ -35,8 +35,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [playerId] = useState(getPlayerId());
   const hasAttemptedRejoin = useRef(false);
 
-  // Attempt to rejoin the game session
+  // Attempt to rejoin the game session (only when NOT navigating to a room URL)
   const attemptRejoinGame = useCallback((socket: Socket) => {
+    // Check if we're on a room URL path - if so, let WaitingRoom handle the rejoin
+    const isRoomUrl = window.location.pathname.includes('/room/');
+    if (isRoomUrl) {
+      console.log('ℹ️ On room URL, letting WaitingRoom handle rejoin');
+      return;
+    }
+
     const session = getGameSession();
 
     if (!session) {
@@ -54,7 +61,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    console.log('🔄 Attempting to rejoin:', session.gameId);
+    console.log('🔄 Attempting to rejoin from SocketContext:', session.gameId);
     setIsReconnecting(true);
 
     socket.emit('rejoinGame', {
@@ -66,11 +73,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (response.success) {
         if (response.room) {
           console.log('✅ Successfully rejoined waiting room:', session.gameId);
-          // Trigger roomState event for WaitingRoom component to pick up
-          socket.emit('getRoomState', session.gameId);
+          // Navigate to the room URL
+          window.location.href = `/room/${session.gameId}`;
         } else if (response.gameState) {
           console.log('✅ Successfully rejoined game:', session.gameId);
-          // The gameState will be handled by the parent component
+          // Navigate to the room URL
+          window.location.href = `/room/${session.gameId}`;
         }
         // Don't clear the session here as the game/room is ongoing
       } else {
