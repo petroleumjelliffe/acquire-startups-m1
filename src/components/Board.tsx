@@ -9,6 +9,7 @@ export function Board({
   startups,
   highlightedTile,
   players,
+  showHandPreviews = true,
 }: {
   board: Record<Coord, TileCell>;
   onPlace: (c: Coord) => void;
@@ -16,6 +17,7 @@ export function Board({
   startups: Record<string, Startup>;
   highlightedTile?: Coord | null;
   players?: Player[];
+  showHandPreviews?: boolean; // true for multiplayer, false for pass-and-play
 }) {
   const rows = "ABCDEFGHI".split("");
   const cols = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -51,6 +53,7 @@ export function Board({
             const cell = board[id];
             const isHighlighted = highlightedTile === id;
             const playerName = lastPlacedTiles.get(id);
+            const isInHand = currentHand.includes(id);
 
             // Build class list using CSS classes
             const tileClasses = [
@@ -65,6 +68,11 @@ export function Board({
               tileClasses.push("tile-placed");
             } else {
               tileClasses.push("tile-unclaimed");
+
+              // Show hand preview if enabled and tile is in hand
+              if (showHandPreviews && isInHand) {
+                tileClasses.push("tile-in-hand");
+              }
             }
 
             // Add startup class if applicable

@@ -93,37 +93,62 @@ export function Game({
 
     const player = state.players[state.turnIndex];
 
-    // Only allow placing if this tile is selected
-    if (selectedTile !== coord) {
-      // If clicking a tile in hand, select it instead
-      if (player.hand.includes(coord)) {
-        handleTileSelection(coord);
+    // MULTIPLAYER MODE: Click to play directly (hand preview shows where you can click)
+    if (isMultiplayer) {
+      // Must be a tile in your hand
+      if (!player.hand.includes(coord)) return;
+
+      // Store a snapshot of the state before placement for potential cancellation
+      setStateBeforePlacement(structuredClone(state));
+
+      // Calculate the next state (commits tile placement but not hand removal/draw)
+      const next = handleTilePlacement(state, coord);
+
+      // Store pending placement and show highlight
+      setPendingTile(coord);
+      setPendingState(next);
+
+      // Show confirmation for isolated tiles, or let modal handle confirmation for other actions
+      if (next.stage === "buy" && !next.pendingFoundTile && !next.mergerContext) {
+        // Isolated tile placement - show confirmation
+        setShowConfirmation(true);
+      } else {
+        // Founding, expansion, or merger - show the respective modal
+        applyTilePlacement(next);
       }
-      return;
     }
+    // PASS-AND-PLAY MODE: Must select from hand first, then click on board
+    else {
+      // Only allow placing if this tile is selected
+      if (selectedTile !== coord) {
+        // If clicking a tile in hand, select it instead
+        if (player.hand.includes(coord)) {
+          handleTileSelection(coord);
+        }
+        return;
+      }
 
-    // Store a snapshot of the state before placement for potential cancellation
-    setStateBeforePlacement(structuredClone(state));
+      // Store a snapshot of the state before placement for potential cancellation
+      setStateBeforePlacement(structuredClone(state));
 
-    // Calculate the next state (commits tile placement but not hand removal/draw)
-    const next = handleTilePlacement(state, coord);
+      // Calculate the next state (commits tile placement but not hand removal/draw)
+      const next = handleTilePlacement(state, coord);
 
-    // Store pending placement and show highlight
-    setPendingTile(coord);
-    setPendingState(next);
+      // Store pending placement and show highlight
+      setPendingTile(coord);
+      setPendingState(next);
 
-    // Clear selection since we're placing
-    setSelectedTile(null);
+      // Clear selection since we're placing
+      setSelectedTile(null);
 
-    // Show confirmation for isolated tiles, or let modal handle confirmation for other actions
-    // The modals themselves will handle the cancellation
-    if (next.stage === "buy" && !next.pendingFoundTile && !next.mergerContext) {
-      // Isolated tile placement - show confirmation
-      setShowConfirmation(true);
-    } else {
-      // Founding, expansion, or merger - show the respective modal
-      // The modal will handle confirmation/cancellation
-      applyTilePlacement(next);
+      // Show confirmation for isolated tiles, or let modal handle confirmation for other actions
+      if (next.stage === "buy" && !next.pendingFoundTile && !next.mergerContext) {
+        // Isolated tile placement - show confirmation
+        setShowConfirmation(true);
+      } else {
+        // Founding, expansion, or merger - show the respective modal
+        applyTilePlacement(next);
+      }
     }
   };
 
@@ -278,6 +303,7 @@ export function Game({
         currentHand={myPlayer?.hand || []}
         highlightedTile={pendingTile || selectedTile}
         players={state.players}
+        showHandPreviews={isMultiplayer}
       />
       {myPlayer && <PlayerHand name={myPlayer.name} hand={myPlayer.hand} onSelect={handleTileSelection} selectedTile={selectedTile} />}
 

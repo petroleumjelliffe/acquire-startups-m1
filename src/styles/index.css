@@ -7,8 +7,8 @@
   --tile-unclaimed-bg: #f3f4f6;
   --tile-unclaimed-hover-bg: #f9fafb;
   --tile-placed-bg: #333333;
-  --tile-in-hand-bg: #549cfa;
-  --tile-in-hand-hover-bg: #bfdbfe;
+  --tile-in-hand-bg: #93c5fd;  /* Lighter blue for shaded preview */
+  --tile-in-hand-hover-bg: #60a5fa;  /* Brighter on hover */
   --tile-border: #d1d5db;
   --tile-color: #ccc;
 }
@@ -50,21 +50,26 @@ button span {
   border-color: var(--tile-border);
 }
 
+/* Shaded preview for tiles in hand (multiplayer mode) */
 .tile-in-hand {
   background-color: var(--tile-in-hand-bg);
-  border-color: var(--tile-border);
+  border-color: #3b82f6;
+  border-width: 2px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: all 0.2s ease-in-out;
 }
 
 .tile-in-hand:hover {
   background-color: var(--tile-in-hand-hover-bg);
-
-  box-shadow: var(--tile-in-hand-bg) 0px 0px 6px 10px inset;
-  border: var(--tile-in-hand-bg);
-  transition: ease-in-out 0.3s;
-  
+  opacity: 1;
+  transform: scale(1.05);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.5);
 }
-.tile-in-hand:hover span {
-  color: var(--tile-in-hand-bg)
+
+.tile-in-hand span {
+  color: #1e40af;
+  font-weight: bold;
 }
 
 
