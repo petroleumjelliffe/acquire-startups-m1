@@ -27,9 +27,10 @@ Largely the same as the board game
 * Game ends when no more tiles can be played, because there are no spaces left that won'tconnect 2 unmergable Startups
 
 # Play Now
-[Start New Game](pettroleumjelliffe.github.io/acquire-startups-m1/)
+[Start New Game](https://petroleumjelliffe.github.io/acquire-startups-m1/)
 
 # How it was built
 * This was largely vibe coded with Claude.ai, in React Typescript
+* Server is hosted on Render.com
 * Play tested it locally on multiple browsers, and Online with family over Facetime.
-* TOok steps to make the Pass & Play version try to respect the "hidden hand tiles" but obviously that's where the Online mode is a better fit
+* Took steps to make the Pass & Play version try to respect the "hidden hand tiles" but obviously that's where the Online mode is a better fit
