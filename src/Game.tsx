@@ -330,15 +330,34 @@ export function Game({
         <DrawModal state={state} setState={handleStateUpdate} />
       )}
 
+      {/* Merger Payout: Show to all players in multiplayer (read-only for non-turn players) */}
+      {state.stage === "mergerPayout" && (
+        <MergerPayoutModal
+          state={state}
+          onUpdate={handleStateUpdate}
+          onCancel={cancelModalAndReturnToPlay}
+          isReadOnly={isMultiplayer && !isMyTurn}
+          currentPlayerName={isMultiplayer ? cur.name : undefined}
+        />
+      )}
+
+      {/* Merger Liquidation: Show only to the current liquidating player */}
+      {state.stage === "mergerLiquidation" && (() => {
+        const currentLiquidationPlayerId = state.mergerContext?.shareholderQueue[
+          state.mergerContext?.currentShareholderIndex ?? 0
+        ];
+        const shouldShow = isMultiplayer
+          ? playerId === currentLiquidationPlayerId
+          : isMyTurn;
+
+        return shouldShow && (
+          <MergerLiquidationModal state={state} onUpdate={handleStateUpdate} />
+        );
+      })()}
+
       {/* Other modals: only show if it's your turn */}
       {(!isMultiplayer || isMyTurn) && (
         <>
-          {state.stage === "mergerPayout" && (
-            <MergerPayoutModal state={state} onUpdate={handleStateUpdate} onCancel={cancelModalAndReturnToPlay} />
-          )}
-          {state.stage === "mergerLiquidation" && (
-            <MergerLiquidationModal state={state} onUpdate={handleStateUpdate} />
-          )}
           {state.stage === "foundStartup" && state.pendingFoundTile && (
             <FoundStartupModal
               state={state}
