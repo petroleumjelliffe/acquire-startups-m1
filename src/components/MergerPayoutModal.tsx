@@ -7,10 +7,14 @@ export default function MergerPayoutModal({
   state,
   onUpdate,
   onCancel,
+  isReadOnly = false,
+  currentPlayerName,
 }: {
   state: GameState;
   onUpdate: (s: GameState) => void;
   onCancel?: () => void;
+  isReadOnly?: boolean;
+  currentPlayerName?: string;
 }) {
   const bonuses: any[] = (state as any).pendingBonuses || [];
   const survivor = state.mergerContext?.survivorId;
@@ -38,7 +42,7 @@ export default function MergerPayoutModal({
       <div className="bg-white p-6 rounded-xl shadow-lg w-[500px]">
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-lg font-bold flex-1">Merger Resolution</h2>
-          {onCancel && (
+          {onCancel && !isReadOnly && (
             <button
               onClick={handleCancel}
               className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
@@ -71,12 +75,19 @@ export default function MergerPayoutModal({
           </tbody>
         </table>
 
-        <button
-          className="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700"
-          onClick={handleContinue}
-        >
-          Continue
-        </button>
+        {/* Show appropriate button based on read-only state */}
+        {isReadOnly ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded px-4 py-3 text-sm text-yellow-800">
+            Waiting for <strong>{currentPlayerName}</strong> to continue...
+          </div>
+        ) : (
+          <button
+            className="bg-blue-600 text-white rounded px-4 py-2 hover:bg-blue-700"
+            onClick={handleContinue}
+          >
+            Continue
+          </button>
+        )}
       </div>
     </div>
   );

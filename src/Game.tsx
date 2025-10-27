@@ -317,12 +317,37 @@ export function Game({
       )}
 
       {/* Waiting overlay when it's not your turn in multiplayer */}
-      {isMultiplayer && !isMyTurn && (
-        <WaitingForPlayer
-          playerName={cur.name}
-          isConnected={cur.isConnected !== false}
-        />
-      )}
+      {isMultiplayer && (() => {
+        // During mergerLiquidation, show waiting screen if not the current liquidator
+        if (state.stage === "mergerLiquidation") {
+          const currentLiquidationPlayerId = state.mergerContext?.shareholderQueue[
+            state.mergerContext?.currentShareholderIndex ?? 0
+          ];
+          const currentLiquidator = state.players.find(p => p.id === currentLiquidationPlayerId);
+
+          if (playerId !== currentLiquidationPlayerId) {
+            return (
+              <WaitingForPlayer
+                playerName={currentLiquidator?.name || "player"}
+                isConnected={currentLiquidator?.isConnected !== false}
+              />
+            );
+          }
+          return null;
+        }
+
+        // During other stages, show waiting screen if not your turn
+        if (!isMyTurn) {
+          return (
+            <WaitingForPlayer
+              playerName={cur.name}
+              isConnected={cur.isConnected !== false}
+            />
+          );
+        }
+
+        return null;
+      })()}
 
       {/* Only show modals if it's your turn in multiplayer, or always in singleplayer */}
       {/* Special case for draw stage: only first player executes in multiplayer */}
@@ -330,15 +355,34 @@ export function Game({
         <DrawModal state={state} setState={handleStateUpdate} />
       )}
 
+      {/* Merger Payout: Show to all players in multiplayer (only host can dismiss) */}
+      {state.stage === "mergerPayout" && (
+        <MergerPayoutModal
+          state={state}
+          onUpdate={handleStateUpdate}
+          onCancel={cancelModalAndReturnToPlay}
+          isReadOnly={isMultiplayer && !isHost}
+          currentPlayerName={isMultiplayer ? (isHost ? undefined : state.players[0]?.name) : undefined}
+        />
+      )}
+
+      {/* Merger Liquidation: Show only to the current liquidating player */}
+      {state.stage === "mergerLiquidation" && (() => {
+        const currentLiquidationPlayerId = state.mergerContext?.shareholderQueue[
+          state.mergerContext?.currentShareholderIndex ?? 0
+        ];
+        const shouldShow = isMultiplayer
+          ? playerId === currentLiquidationPlayerId
+          : isMyTurn;
+
+        return shouldShow && (
+          <MergerLiquidationModal state={state} onUpdate={handleStateUpdate} />
+        );
+      })()}
+
       {/* Other modals: only show if it's your turn */}
       {(!isMultiplayer || isMyTurn) && (
         <>
-          {state.stage === "mergerPayout" && (
-            <MergerPayoutModal state={state} onUpdate={handleStateUpdate} onCancel={cancelModalAndReturnToPlay} />
-          )}
-          {state.stage === "mergerLiquidation" && (
-            <MergerLiquidationModal state={state} onUpdate={handleStateUpdate} />
-          )}
           {state.stage === "foundStartup" && state.pendingFoundTile && (
             <FoundStartupModal
               state={state}

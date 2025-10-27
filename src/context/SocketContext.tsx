@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { getPlayerId } from '../utils/playerId';
+import { getPlayerId, getPlayerName } from '../utils/playerId';
 import { getRandomEmojiName } from '../utils/emojiNames';
 import { getGameSession, clearGameSession } from '../utils/gameSession';
 
@@ -107,8 +107,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setIsConnected(true);
       setReconnectionAttempts(0);
 
-      // Register player with persistent ID and random emoji name
-      newSocket.emit('registerPlayer', playerId, getRandomEmojiName());
+      // Determine player name: prefer saved name, fall back to session name, or generate new
+      const session = getGameSession();
+      const savedName = getPlayerName();
+      const playerName = savedName || session?.playerName || getRandomEmojiName();
+
+      console.log('🔌 Registering player with name:', playerName, savedName ? '(saved)' : session?.playerName ? '(from session)' : '(new)');
+
+      // Register player with persistent ID and stored/session name
+      newSocket.emit('registerPlayer', playerId, playerName);
 
       // After registration, attempt to rejoin if we have a session
       // Use a small delay to ensure registration completes first
@@ -128,10 +135,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.log('⚠️ Disconnected from server:', reason);
       setIsConnected(false);
 
-      // Reset rejoin flag so we can rejoin after reconnecting
-      if (reason === 'io server disconnect' || reason === 'transport close') {
-        hasAttemptedRejoin.current = false;
-      }
+      // Reset rejoin flag on any disconnect so we can rejoin after reconnecting
+      // This ensures we always attempt to rejoin when connection is restored
+      hasAttemptedRejoin.current = false;
     });
 
     newSocket.on('reconnect_attempt', (attempt) => {
