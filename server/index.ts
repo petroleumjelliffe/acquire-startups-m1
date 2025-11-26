@@ -5,7 +5,8 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import { GameManager } from "./gameManager.js";
+// import { GameManager } from "./gameManager.js";
+import { GameManagerXState as GameManager } from "./gameManagerXState.js";
 import { RoomManager } from "./roomManager.js";
 import { initPersistence } from "./persistence.js";
 import {
