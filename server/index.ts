@@ -51,6 +51,16 @@ app.get("/test", (req, res) => {
   res.sendFile("test.html", { root: "server" });
 });
 
+// Helper function to subscribe to game actor and broadcast changes
+function subscribeToGameActor(gameId: string) {
+  const unsubscribe = gameManager.subscribeToGame(gameId, (gameState) => {
+    io.to(gameId).emit("gameState", gameState);
+  });
+
+  // Store unsubscribe function to clean up later if needed
+  return unsubscribe;
+}
+
 // Socket.io connection handling
 io.on("connection", (socket) => {
   console.log(`🔌 Client connected: ${socket.id}`);
@@ -158,6 +168,9 @@ io.on("connection", (socket) => {
         player.isConnected = true;
       }
 
+      // Subscribe to actor changes for broadcasting
+      subscribeToGameActor(data.gameId);
+
       callback({ success: true, gameState });
       io.to(data.gameId).emit("gameStarted", gameState);
 
@@ -232,6 +245,9 @@ io.on("connection", (socket) => {
         socket.join(data.gameId);
         socket.data.gameId = data.gameId;
 
+        // Subscribe to actor changes for this game (if not already subscribed)
+        subscribeToGameActor(data.gameId);
+
         callback({ success: true, gameState });
         io.to(data.gameId).emit("playerConnected", {
           playerId: data.playerId,
@@ -263,15 +279,15 @@ io.on("connection", (socket) => {
       }
 
       // Client has already validated turn and calculated new state
-      // Trust the client's game logic (for now - could add server-side validation later)
       console.log(`✓ Tile placed: ${data.coord} by ${player.name}`);
 
-      // Update game state with new state from client
-      Object.assign(gameState, data.newState);
-
-      // Save and broadcast
-      await gameManager.updateGame(data.gameId, gameState);
-      io.to(data.gameId).emit("gameState", gameState);
+      // Send event to actor (actor will handle state update and broadcast via subscription)
+      gameManager.sendEvent(data.gameId, {
+        type: "TILE_PLACED",
+        playerId: data.playerId,
+        coord: data.coord,
+        newState: data.newState,
+      });
     } catch (error: any) {
       console.error("Tile placement error:", error);
     }
@@ -296,19 +312,32 @@ io.on("connection", (socket) => {
 
       console.log(`✓ State update from ${player.name} (stage: ${data.newState.stage})`);
 
-      // Update game state with new state from client
-      Object.assign(gameState, data.newState);
+      // Map stage to appropriate XState event
+      let eventType: "STARTUP_FOUNDED" | "SHARES_PURCHASED" | "SHARES_LIQUIDATED" | "TILE_PLACED";
+
+      if (data.newState.stage === "buy" || data.newState.stage === "play") {
+        // Could be from buy modal or advancing turn
+        eventType = "SHARES_PURCHASED";
+      } else if (data.newState.stage === "foundStartup") {
+        eventType = "STARTUP_FOUNDED";
+      } else if (data.newState.stage === "mergerLiquidation" || data.newState.stage === "mergerPayout") {
+        eventType = "SHARES_LIQUIDATED";
+      } else {
+        eventType = "TILE_PLACED";
+      }
+
+      // Send event to actor
+      gameManager.sendEvent(data.gameId, {
+        type: eventType,
+        playerId: data.playerId,
+        newState: data.newState,
+      } as any);
 
       // Auto-mark game as ended if stage is "end"
-      if (gameState.stage === "end" && !gameState.isEnded) {
-        gameState.isEnded = true;
+      if (data.newState.stage === "end") {
         console.log(`🏁 Game ${data.gameId} has ended`);
         io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
       }
-
-      // Save and broadcast
-      await gameManager.updateGame(data.gameId, gameState);
-      io.to(data.gameId).emit("gameState", gameState);
     } catch (error: any) {
       console.error("State update error:", error);
     }
@@ -330,15 +359,16 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Mark game as ended
-      gameState.isEnded = true;
-      gameState.stage = "end";
       console.log(`🏁 Game ${data.gameId} manually ended by host`);
 
-      // Save and broadcast
-      await gameManager.updateGame(data.gameId, gameState);
+      // Send END_GAME event to actor
+      gameManager.sendEvent(data.gameId, {
+        type: "END_GAME",
+        playerId: data.playerId,
+      });
+
+      // Broadcast game ended
       io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
-      io.to(data.gameId).emit("gameState", gameState);
 
       callback({ success: true });
     } catch (error: any) {
