@@ -32,6 +32,9 @@ const PORT = process.env.PORT || 3001;
 const gameManager = new GameManager();
 const roomManager = new RoomManager();
 
+// Track disconnect timers to prevent flashing on quick reconnects
+const disconnectTimers = new Map<string, NodeJS.Timeout>();
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -185,6 +188,15 @@ io.on("connection", (socket) => {
     "rejoinGame",
     (data: { gameId: string; playerId: string }, callback) => {
       try {
+        // Cancel any pending disconnect timer for this player
+        const timerKey = `${data.gameId}:${data.playerId}`;
+        const pendingTimer = disconnectTimers.get(timerKey);
+        if (pendingTimer) {
+          clearTimeout(pendingTimer);
+          disconnectTimers.delete(timerKey);
+          console.log(`⏱️  Cancelled disconnect timer for ${data.playerId}`);
+        }
+
         // First check if it's a waiting room
         const room = roomManager.getRoom(data.gameId);
         if (room) {
@@ -427,16 +439,28 @@ io.on("connection", (socket) => {
         roomManager.leaveRoom(gameId, playerId);
         io.to(gameId).emit("roomState", roomManager.getRoom(gameId));
       } else {
-        // Active game
-        const gameState = gameManager.playerDisconnected(gameId, socket.id);
-        if (gameState) {
-          io.to(gameId).emit("playerDisconnected", {
-            playerId,
-            playerName:
-              socket.data.playerName ||
-              gameState.players.find((p) => p.socketId === socket.id)?.name,
-          });
-        }
+        // Active game - add grace period before broadcasting disconnection
+        const timerKey = `${gameId}:${playerId}`;
+
+        // Set a timer to mark player as disconnected after 3 seconds
+        const timer = setTimeout(() => {
+          console.log(`⏱️  Grace period expired for ${playerId}, marking as disconnected`);
+
+          const gameState = gameManager.playerDisconnected(gameId, socket.id);
+          if (gameState) {
+            io.to(gameId).emit("playerDisconnected", {
+              playerId,
+              playerName:
+                socket.data.playerName ||
+                gameState.players.find((p) => p.socketId === socket.id)?.name,
+            });
+          }
+
+          disconnectTimers.delete(timerKey);
+        }, 3000); // 3 second grace period
+
+        disconnectTimers.set(timerKey, timer);
+        console.log(`⏱️  Started disconnect timer for ${playerId} (3s grace period)`);
       }
     }
   });
