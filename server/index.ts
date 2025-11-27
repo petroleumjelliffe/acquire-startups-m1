@@ -128,10 +128,20 @@ io.on("connection", (socket) => {
         // Not a waiting room - check if it's a started game
         const game = gameManager.getGame(data.gameId);
         if (game) {
-          callback({
-            success: false,
-            error: "Game has already started. Use rejoin instead."
-          });
+          // Check if game has ended
+          if (game.isEnded || game.stage === "end") {
+            callback({
+              success: false,
+              error: "Game has ended",
+              gameEnded: true,
+              finalState: game,
+            });
+          } else {
+            callback({
+              success: false,
+              error: "Game has already started. Use rejoin instead."
+            });
+          }
           return;
         }
 
@@ -238,6 +248,8 @@ io.on("connection", (socket) => {
           callback({
             success: false,
             error: "Game has ended",
+            gameEnded: true,  // Flag to indicate this is an ended game
+            finalState: gameState,  // Include final state for game over screen
           });
           return;
         }
