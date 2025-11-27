@@ -81,6 +81,26 @@ export const gameRoomMachine = setup({
       });
     },
 
+    notifyMergerPlayer: sendTo(
+      ({ context }) => {
+        const activePlayerId = (context.gameState as any).mergerContext?.activePlayerId;
+        if (!activePlayerId) return undefined;
+        return context.playerActors.get(activePlayerId);
+      },
+      { type: "MERGER_DECISION_NEEDED" }
+    ),
+
+    notifyOtherPlayersWaitForMerger: ({ context }) => {
+      const activePlayerId = (context.gameState as any).mergerContext?.activePlayerId;
+      if (!activePlayerId) return;
+
+      context.playerActors.forEach((actor, playerId) => {
+        if (playerId !== activePlayerId) {
+          actor.send({ type: "WAIT" });
+        }
+      });
+    },
+
     handlePlayerDisconnect: assign(({ context, event }) => {
       if (event.type !== "PLAYER_DISCONNECTED") return {};
 
@@ -297,7 +317,7 @@ export const gameRoomMachine = setup({
       },
     },
     mergerPayout: {
-      entry: ["notifyCurrentPlayer"],
+      entry: ["updateCurrentPlayer", "notifyCurrentPlayer"],
       on: {
         TILE_PLACED: {
           actions: ["syncGameStateFromEvent"],
@@ -324,7 +344,7 @@ export const gameRoomMachine = setup({
       },
     },
     mergerLiquidation: {
-      entry: ["notifyCurrentPlayer"],
+      entry: ["notifyMergerPlayer", "notifyOtherPlayersWaitForMerger"],
       on: {
         TILE_PLACED: {
           actions: ["syncGameStateFromEvent"],
