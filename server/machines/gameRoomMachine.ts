@@ -51,9 +51,13 @@ export const gameRoomMachine = setup({
       },
     }),
 
-    syncGameStateFromEvent: assign({
-      gameState: ({ event }) =>
-        "newState" in event ? event.newState : (undefined as any),
+    syncGameStateFromEvent: assign(({ event }) => {
+      if ("newState" in event && event.newState) {
+        console.log(`[GameRoom] Syncing new state, stage: ${event.newState.stage}`);
+        return { gameState: event.newState };
+      }
+      console.warn(`[GameRoom] Event has no newState:`, event.type);
+      return {};
     }),
 
     updateCurrentPlayer: assign({
@@ -191,6 +195,18 @@ export const gameRoomMachine = setup({
           actions: ["syncGameStateFromEvent"],
           target: "routing",
         },
+        SHARES_PURCHASED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        STARTUP_FOUNDED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        SHARES_LIQUIDATED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
         PLAYER_DISCONNECTED: {
           actions: ["handlePlayerDisconnect"],
         },
@@ -206,6 +222,18 @@ export const gameRoomMachine = setup({
           actions: ["syncGameStateFromEvent"],
           target: "routing",
         },
+        SHARES_PURCHASED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        STARTUP_FOUNDED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        SHARES_LIQUIDATED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
         PLAYER_DISCONNECTED: {
           actions: ["handlePlayerDisconnect"],
         },
@@ -217,7 +245,19 @@ export const gameRoomMachine = setup({
     foundStartup: {
       entry: ["notifyCurrentPlayer"],
       on: {
+        TILE_PLACED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        SHARES_PURCHASED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
         STARTUP_FOUNDED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        SHARES_LIQUIDATED: {
           actions: ["syncGameStateFromEvent"],
           target: "routing",
         },
@@ -232,7 +272,19 @@ export const gameRoomMachine = setup({
     buy: {
       entry: ["notifyCurrentPlayer"],
       on: {
+        TILE_PLACED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
         SHARES_PURCHASED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        STARTUP_FOUNDED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        SHARES_LIQUIDATED: {
           actions: ["syncGameStateFromEvent"],
           target: "routing",
         },
@@ -247,7 +299,19 @@ export const gameRoomMachine = setup({
     mergerPayout: {
       entry: ["notifyCurrentPlayer"],
       on: {
+        TILE_PLACED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
         SHARES_PURCHASED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        STARTUP_FOUNDED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        SHARES_LIQUIDATED: {
           actions: ["syncGameStateFromEvent"],
           target: "routing",
         },
@@ -262,6 +326,18 @@ export const gameRoomMachine = setup({
     mergerLiquidation: {
       entry: ["notifyCurrentPlayer"],
       on: {
+        TILE_PLACED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        SHARES_PURCHASED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
+        STARTUP_FOUNDED: {
+          actions: ["syncGameStateFromEvent"],
+          target: "routing",
+        },
         SHARES_LIQUIDATED: {
           actions: ["syncGameStateFromEvent"],
           target: "routing",

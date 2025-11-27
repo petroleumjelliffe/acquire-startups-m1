@@ -14,6 +14,7 @@ type GameRoomSnapshot = SnapshotFrom<typeof gameRoomMachine>;
 export class GameManagerXState {
   private gameActors: Map<string, GameRoomActor> = new Map();
   private gameSubscriptions: Map<string, () => void> = new Map();
+  private broadcastSubscriptions: Map<string, () => void> = new Map();
 
   /**
    * Initialize game manager and load saved games from disk
@@ -64,6 +65,7 @@ export class GameManagerXState {
 
     // Subscribe to state changes for persistence
     const unsubscribe = actor.subscribe((snapshot) => {
+      console.log(`[GameManager] Actor state changed for ${gameId}, stage: ${snapshot.context.gameState.stage}`);
       this.persistSnapshot(gameId, snapshot);
     });
 
@@ -244,7 +246,7 @@ export class GameManagerXState {
   }
 
   /**
-   * Subscribe to game state changes
+   * Subscribe to game state changes (only one broadcast subscription per game)
    */
   subscribeToGame(
     gameId: string,
@@ -253,10 +255,24 @@ export class GameManagerXState {
     const actor = this.gameActors.get(gameId);
     if (!actor) return null;
 
+    // Check if already subscribed
+    if (this.broadcastSubscriptions.has(gameId)) {
+      console.log(`[GameManager] Game ${gameId} already has broadcast subscription`);
+      return this.broadcastSubscriptions.get(gameId) || null;
+    }
+
+    console.log(`[GameManager] Setting up broadcast subscription for ${gameId}`);
     const subscription = actor.subscribe((snapshot) => {
+      console.log(`[GameManager] Broadcasting state for ${gameId}, stage: ${snapshot.context.gameState.stage}`);
       callback(snapshot.context.gameState as MultiplayerGameState);
     });
 
-    return () => subscription.unsubscribe();
+    const unsubscribe = () => {
+      subscription.unsubscribe();
+      this.broadcastSubscriptions.delete(gameId);
+    };
+
+    this.broadcastSubscriptions.set(gameId, unsubscribe);
+    return unsubscribe;
   }
 }
