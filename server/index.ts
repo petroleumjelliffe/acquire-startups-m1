@@ -5,7 +5,8 @@ import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import { GameManager } from "./gameManager.js";
+// import { GameManager } from "./gameManager.js";
+import { GameManagerXState as GameManager } from "./gameManagerXState.js";
 import { RoomManager } from "./roomManager.js";
 import { initPersistence } from "./persistence.js";
 import {
@@ -31,6 +32,9 @@ const PORT = process.env.PORT || 3001;
 const gameManager = new GameManager();
 const roomManager = new RoomManager();
 
+// Track disconnect timers to prevent flashing on quick reconnects
+const disconnectTimers = new Map<string, NodeJS.Timeout>();
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -49,6 +53,16 @@ app.get("/health", (req, res) => {
 app.get("/test", (req, res) => {
   res.sendFile("test.html", { root: "server" });
 });
+
+// Helper function to subscribe to game actor and broadcast changes
+function subscribeToGameActor(gameId: string) {
+  const unsubscribe = gameManager.subscribeToGame(gameId, (gameState) => {
+    io.to(gameId).emit("gameState", gameState);
+  });
+
+  // Store unsubscribe function to clean up later if needed
+  return unsubscribe;
+}
 
 // Socket.io connection handling
 io.on("connection", (socket) => {
@@ -114,10 +128,20 @@ io.on("connection", (socket) => {
         // Not a waiting room - check if it's a started game
         const game = gameManager.getGame(data.gameId);
         if (game) {
-          callback({
-            success: false,
-            error: "Game has already started. Use rejoin instead."
-          });
+          // Check if game has ended
+          if (game.isEnded || game.stage === "end") {
+            callback({
+              success: false,
+              error: "Game has ended",
+              gameEnded: true,
+              finalState: game,
+            });
+          } else {
+            callback({
+              success: false,
+              error: "Game has already started. Use rejoin instead."
+            });
+          }
           return;
         }
 
@@ -157,6 +181,9 @@ io.on("connection", (socket) => {
         player.isConnected = true;
       }
 
+      // Subscribe to actor changes for broadcasting
+      subscribeToGameActor(data.gameId);
+
       callback({ success: true, gameState });
       io.to(data.gameId).emit("gameStarted", gameState);
 
@@ -171,6 +198,15 @@ io.on("connection", (socket) => {
     "rejoinGame",
     (data: { gameId: string; playerId: string }, callback) => {
       try {
+        // Cancel any pending disconnect timer for this player
+        const timerKey = `${data.gameId}:${data.playerId}`;
+        const pendingTimer = disconnectTimers.get(timerKey);
+        if (pendingTimer) {
+          clearTimeout(pendingTimer);
+          disconnectTimers.delete(timerKey);
+          console.log(`⏱️  Cancelled disconnect timer for ${data.playerId}`);
+        }
+
         // First check if it's a waiting room
         const room = roomManager.getRoom(data.gameId);
         if (room) {
@@ -212,6 +248,8 @@ io.on("connection", (socket) => {
           callback({
             success: false,
             error: "Game has ended",
+            gameEnded: true,  // Flag to indicate this is an ended game
+            finalState: gameState,  // Include final state for game over screen
           });
           return;
         }
@@ -230,6 +268,9 @@ io.on("connection", (socket) => {
         gameManager.playerConnected(data.gameId, data.playerId, socket.id);
         socket.join(data.gameId);
         socket.data.gameId = data.gameId;
+
+        // Subscribe to actor changes for this game (if not already subscribed)
+        subscribeToGameActor(data.gameId);
 
         callback({ success: true, gameState });
         io.to(data.gameId).emit("playerConnected", {
@@ -262,15 +303,15 @@ io.on("connection", (socket) => {
       }
 
       // Client has already validated turn and calculated new state
-      // Trust the client's game logic (for now - could add server-side validation later)
       console.log(`✓ Tile placed: ${data.coord} by ${player.name}`);
 
-      // Update game state with new state from client
-      Object.assign(gameState, data.newState);
-
-      // Save and broadcast
-      await gameManager.updateGame(data.gameId, gameState);
-      io.to(data.gameId).emit("gameState", gameState);
+      // Send event to actor (actor will handle state update and broadcast via subscription)
+      gameManager.sendEvent(data.gameId, {
+        type: "TILE_PLACED",
+        playerId: data.playerId,
+        coord: data.coord,
+        newState: data.newState,
+      });
     } catch (error: any) {
       console.error("Tile placement error:", error);
     }
@@ -295,19 +336,32 @@ io.on("connection", (socket) => {
 
       console.log(`✓ State update from ${player.name} (stage: ${data.newState.stage})`);
 
-      // Update game state with new state from client
-      Object.assign(gameState, data.newState);
+      // Map stage to appropriate XState event
+      let eventType: "STARTUP_FOUNDED" | "SHARES_PURCHASED" | "SHARES_LIQUIDATED" | "TILE_PLACED";
+
+      if (data.newState.stage === "buy" || data.newState.stage === "play") {
+        // Could be from buy modal or advancing turn
+        eventType = "SHARES_PURCHASED";
+      } else if (data.newState.stage === "foundStartup") {
+        eventType = "STARTUP_FOUNDED";
+      } else if (data.newState.stage === "mergerLiquidation" || data.newState.stage === "mergerPayout") {
+        eventType = "SHARES_LIQUIDATED";
+      } else {
+        eventType = "TILE_PLACED";
+      }
+
+      // Send event to actor
+      gameManager.sendEvent(data.gameId, {
+        type: eventType,
+        playerId: data.playerId,
+        newState: data.newState,
+      } as any);
 
       // Auto-mark game as ended if stage is "end"
-      if (gameState.stage === "end" && !gameState.isEnded) {
-        gameState.isEnded = true;
+      if (data.newState.stage === "end") {
         console.log(`🏁 Game ${data.gameId} has ended`);
         io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
       }
-
-      // Save and broadcast
-      await gameManager.updateGame(data.gameId, gameState);
-      io.to(data.gameId).emit("gameState", gameState);
     } catch (error: any) {
       console.error("State update error:", error);
     }
@@ -329,15 +383,16 @@ io.on("connection", (socket) => {
         return;
       }
 
-      // Mark game as ended
-      gameState.isEnded = true;
-      gameState.stage = "end";
       console.log(`🏁 Game ${data.gameId} manually ended by host`);
 
-      // Save and broadcast
-      await gameManager.updateGame(data.gameId, gameState);
+      // Send END_GAME event to actor
+      gameManager.sendEvent(data.gameId, {
+        type: "END_GAME",
+        playerId: data.playerId,
+      });
+
+      // Broadcast game ended
       io.to(data.gameId).emit("gameEnded", { gameId: data.gameId });
-      io.to(data.gameId).emit("gameState", gameState);
 
       callback({ success: true });
     } catch (error: any) {
@@ -396,16 +451,28 @@ io.on("connection", (socket) => {
         roomManager.leaveRoom(gameId, playerId);
         io.to(gameId).emit("roomState", roomManager.getRoom(gameId));
       } else {
-        // Active game
-        const gameState = gameManager.playerDisconnected(gameId, socket.id);
-        if (gameState) {
-          io.to(gameId).emit("playerDisconnected", {
-            playerId,
-            playerName:
-              socket.data.playerName ||
-              gameState.players.find((p) => p.socketId === socket.id)?.name,
-          });
-        }
+        // Active game - add grace period before broadcasting disconnection
+        const timerKey = `${gameId}:${playerId}`;
+
+        // Set a timer to mark player as disconnected after 3 seconds
+        const timer = setTimeout(() => {
+          console.log(`⏱️  Grace period expired for ${playerId}, marking as disconnected`);
+
+          const gameState = gameManager.playerDisconnected(gameId, socket.id);
+          if (gameState) {
+            io.to(gameId).emit("playerDisconnected", {
+              playerId,
+              playerName:
+                socket.data.playerName ||
+                gameState.players.find((p) => p.socketId === socket.id)?.name,
+            });
+          }
+
+          disconnectTimers.delete(timerKey);
+        }, 3000); // 3 second grace period
+
+        disconnectTimers.set(timerKey, timer);
+        console.log(`⏱️  Started disconnect timer for ${playerId} (3s grace period)`);
       }
     }
   });

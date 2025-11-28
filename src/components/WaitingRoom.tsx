@@ -30,10 +30,11 @@ export const WaitingRoom: React.FC<{
   const [roomId, setRoomId] = useState(initialRoomId || '');
   const [room, setRoom] = useState<WaitingRoomData | null>(null);
   const [error, setError] = useState('');
-  const [mode, setMode] = useState<'menu' | 'creating' | 'joining' | 'inRoom'>(
+  const [mode, setMode] = useState<'menu' | 'creating' | 'joining' | 'inRoom' | 'gameEnded'>(
     initialRoomId ? 'joining' : 'menu'
   );
   const [hasAttemptedAutoJoin, setHasAttemptedAutoJoin] = useState(false);
+  const [endedGameState, setEndedGameState] = useState<any>(null);
 
   // Auto-join room if we have initialRoomId and haven't attempted yet
   useEffect(() => {
@@ -61,6 +62,14 @@ export const WaitingRoom: React.FC<{
             onGameStart(response.gameState);
           }
         } else {
+          // Check if game has ended
+          if (response.gameEnded) {
+            console.log('🏁 Game has ended');
+            setEndedGameState(response.finalState);
+            setMode('gameEnded');
+            return;
+          }
+
           // Rejoin failed - try to join as new player
           console.log('🔄 Rejoin failed, trying to join as new player:', response.error);
           socket.emit(
@@ -79,8 +88,15 @@ export const WaitingRoom: React.FC<{
                   joinedAt: Date.now(),
                 });
               } else {
-                setError(joinResponse.error || 'Failed to join room');
-                setMode('joining');
+                // Check if this is an ended game
+                if (joinResponse.gameEnded) {
+                  console.log('🏁 Game has ended');
+                  setEndedGameState(joinResponse.finalState);
+                  setMode('gameEnded');
+                } else {
+                  setError(joinResponse.error || 'Failed to join room');
+                  setMode('joining');
+                }
               }
             }
           );
@@ -205,6 +221,56 @@ export const WaitingRoom: React.FC<{
             <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-100" />
             <div className="w-4 h-4 bg-gray-400 rounded-full animate-bounce delay-200" />
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show game-over screen if game has ended
+  if (mode === 'gameEnded' && endedGameState) {
+    // Calculate winner
+    const sortedPlayers = [...endedGameState.players].sort((a, b) => b.cash - a.cash);
+    const winner = sortedPlayers[0];
+
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+        <div className="bg-white p-8 rounded-xl shadow-xl w-[600px] max-w-full">
+          <h2 className="text-3xl font-bold mb-6 text-center">🏁 Game Over</h2>
+
+          <div className="mb-6 p-6 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border-2 border-yellow-300">
+            <div className="text-center">
+              <div className="text-sm text-gray-600 mb-1">Winner</div>
+              <div className="text-2xl font-bold text-yellow-700">🏆 {winner.name}</div>
+              <div className="text-lg text-gray-700 mt-1">${winner.cash.toLocaleString()}</div>
+            </div>
+          </div>
+
+          <div className="mb-6">
+            <h3 className="font-semibold mb-3 text-gray-700">Final Standings</h3>
+            <div className="space-y-2">
+              {sortedPlayers.map((player, index) => (
+                <div
+                  key={player.id}
+                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-500 font-semibold w-6">#{index + 1}</span>
+                    <span className="font-medium">{player.name}</span>
+                  </div>
+                  <span className="font-semibold text-green-700">
+                    ${player.cash.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={() => window.location.href = '/'}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+          >
+            Return to Main Menu
+          </button>
         </div>
       </div>
     );
