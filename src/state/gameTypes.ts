@@ -5,6 +5,7 @@ export type Stage =
   | "dealHands"
   | "play"
   | "foundStartup"
+  | "chooseSurvivor"
   | "buy"
   | "mergerPayout"
   | "mergerLiquidation"
@@ -76,6 +77,9 @@ export interface GameState {
   currentBuyCount?: number; //how many shares bought this turn
   mergerContext?: MergerContext;
   pendingFoundTile?: Coord; //when in foundStartup stage, which tile is being used to found
+  pendingMergerTile?: Coord; //when in chooseSurvivor stage, which tile triggered the merger
+  pendingTiedStartups?: string[]; //when in chooseSurvivor stage, which startups are tied
+  pendingMergerStartups?: string[]; //when in chooseSurvivor stage, all touching startup IDs
   pendingTileToRemove?: Coord; //tile that was placed but not yet removed from hand/drawn
   lastAction?: string; //for UI hints
   pendingLiquidations?: string[]; //playerId -> shares to liquidate

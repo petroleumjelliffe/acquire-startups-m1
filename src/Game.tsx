@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import type { GameState } from "./state/gameTypes";
 import { createInitialGame } from "./state/gameInit";
-import { handleTilePlacement } from "./state/gameLogic";
+import { handleTilePlacement, completeSurvivorSelection } from "./state/gameLogic";
 import { Board } from "./components/Board";
 import { PlayerHand } from "./components/PlayerHand";
 import { GameLog } from "./components/GameLog";
@@ -10,6 +10,7 @@ import { DrawModal } from "./components/DrawModal";
 import { BuyModal } from "./components/BuyModal";
 import { MergerPayoutModal, FoundStartupModal } from "./components"; //barrelfile
 import { MergerLiquidationModal } from "./components/MergerLiquidation";
+import { SurvivorSelectionModal } from "./components/SurvivorSelectionModal";
 import { PlayerSummary } from "./components/PlayerSummary";
 import { PlayerStatusPanel } from "./components/PlayerStatusPanel";
 import { WaitingForPlayer } from "./components/WaitingForPlayer";
@@ -388,6 +389,19 @@ export function Game({
               state={state}
               foundingTile={state.pendingFoundTile}
               onUpdate={handleStateUpdate}
+              onCancel={cancelModalAndReturnToPlay}
+            />
+          )}
+          {state.stage === "chooseSurvivor" && state.pendingTiedStartups && state.pendingMergerTile && (
+            <SurvivorSelectionModal
+              state={state}
+              tiedStartupIds={state.pendingTiedStartups}
+              placedTile={state.pendingMergerTile}
+              onSelect={(survivorId) => {
+                const newState = structuredClone(state);
+                completeSurvivorSelection(newState, survivorId);
+                handleStateUpdate(newState);
+              }}
               onCancel={cancelModalAndReturnToPlay}
             />
           )}

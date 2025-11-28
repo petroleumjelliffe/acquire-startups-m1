@@ -225,29 +225,33 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
 
     const top = sizes[0];
     const next = sizes[1];
-    let survivorId = top.id;
 
+    // Check if there's a tie - if so, show modal to choose survivor
     if (next && top.size === next.size) {
       const tied = sizes.filter((s) => s.size === top.size).map((s) => s.id);
-      const choice = window.prompt(
-        `Choose survivor: ${tied.join(", ")}`,
-        tied[0]
+
+      // Set stage to chooseSurvivor and store pending merger info
+      state.stage = "chooseSurvivor";
+      state.pendingMergerTile = coord;
+      state.pendingTiedStartups = tied;
+      state.pendingMergerStartups = touchingIds;
+    } else {
+      // No tie - proceed with automatic survivor selection
+      const survivorId = top.id;
+
+      // Claim adjacent unclaimed before merging
+      const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
+      for (const g of group) state.board[g].startupId = survivorId;
+
+      const absorbedIds = touchingIds.filter((id) => id !== survivorId);
+      mergeStartups(state, survivorId, absorbedIds);
+      state.log.push(
+        `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
       );
-      survivorId = tied.includes(choice || "") ? choice! : tied[0];
+
+      state.stage = "mergerPayout";
+      prepareMergerPayout(state, survivorId, absorbedIds);
     }
-
-    // Claim adjacent unclaimed before merging
-    const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
-    for (const g of group) state.board[g].startupId = survivorId;
-
-    const absorbedIds = touchingIds.filter((id) => id !== survivorId);
-    mergeStartups(state, survivorId, absorbedIds);
-    state.log.push(
-      `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
-    );
-
-    state.stage = "mergerPayout";
-    prepareMergerPayout(state, survivorId, absorbedIds);
   }
 
   // Store the tile to be removed from hand after confirmation
@@ -355,6 +359,53 @@ export function returnBrandToAvailable(state: GameState, id: string) {
   // if (state.startups[id]) return; // still active
   state.startups[id].isFounded = false;
   state.startups[id].foundingTile = null;
+}
+
+/**
+ * Completes a merger with a chosen survivor after user selects in modal.
+ * Called from SurvivorSelectionModal after user confirms their choice.
+ */
+export function completeSurvivorSelection(state: GameState, survivorId: string) {
+  const coord = state.pendingMergerTile;
+  const touchingIds = state.pendingMergerStartups;
+
+  if (!coord || !touchingIds) {
+    console.error("Missing pending merger data");
+    return;
+  }
+
+  const player = state.players[state.turnIndex];
+
+  // Get adjacent coords for unclaimed tiles
+  const adj = getAdjacentCoords(coord);
+  const adjUnclaimed: Coord[] = [];
+  for (const n of adj) {
+    const c = state.board[n];
+    if (c?.placed && !c.startupId) {
+      adjUnclaimed.push(n);
+    }
+  }
+
+  // Claim adjacent unclaimed before merging
+  const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
+  for (const g of group) state.board[g].startupId = survivorId;
+
+  const absorbedIds = touchingIds.filter((id) => id !== survivorId);
+  mergeStartups(state, survivorId, absorbedIds);
+  state.log.push(
+    `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
+  );
+
+  // Complete the tile transaction (remove from hand, draw new tile)
+  completeTileTransaction(state);
+
+  // Clear pending merger data
+  state.pendingMergerTile = undefined;
+  state.pendingTiedStartups = undefined;
+  state.pendingMergerStartups = undefined;
+
+  state.stage = "mergerPayout";
+  prepareMergerPayout(state, survivorId, absorbedIds);
 }
 
 export function chooseFoundingBrand(
@@ -675,6 +726,26 @@ export function prepareMergerPayout(
   (state as any).pendingBonuses = allBonuses;
 }
 
+/**
+ * Builds shareholder queue starting from current player and wrapping around.
+ * Only includes players who own shares in the given startup.
+ */
+function buildShareholderQueue(state: GameState, startupId: string): string[] {
+  const shareholders: string[] = [];
+  const numPlayers = state.players.length;
+
+  // Start from current turn player and wrap around
+  for (let i = 0; i < numPlayers; i++) {
+    const playerIndex = (state.turnIndex + i) % numPlayers;
+    const player = state.players[playerIndex];
+    if ((player.portfolio[startupId] || 0) > 0) {
+      shareholders.push(player.id);
+    }
+  }
+
+  return shareholders;
+}
+
 export function finalizeMergerPayout(state: GameState) {
   const bonuses: BonusResult[] = (state as any).pendingBonuses || [];
 
@@ -700,10 +771,8 @@ export function finalizeMergerPayout(state: GameState) {
   ctx.currentLiquidationIndex = 0;
   const firstAbsorbed = ctx.absorbedIds[0];
 
-  // Build shareholder queue for first absorbed startup
-  const shareholders = state.players
-    .filter((p) => (p.portfolio[firstAbsorbed] || 0) > 0)
-    .map((p) => p.id);
+  // Build shareholder queue starting from current player
+  const shareholders = buildShareholderQueue(state, firstAbsorbed);
 
   ctx.shareholderQueue = shareholders;
   ctx.currentShareholderIndex = 0;
@@ -745,9 +814,8 @@ export function advanceToNextAbsorbedStartup(state: GameState) {
   if (ctx.currentLiquidationIndex < ctx.absorbedIds.length) {
     // Process next absorbed startup
     const nextAbsorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
-    const shareholders = state.players
-      .filter((p) => (p.portfolio[nextAbsorbed] || 0) > 0)
-      .map((p) => p.id);
+    // Build shareholder queue starting from current player
+    const shareholders = buildShareholderQueue(state, nextAbsorbed);
 
     ctx.shareholderQueue = shareholders;
     ctx.currentShareholderIndex = 0;
