@@ -51,6 +51,41 @@ export function JoinRoomPage() {
     );
   };
 
+  const handleJoinAsSpectator = () => {
+    if (!socket || !playerName.trim() || !roomId.trim()) {
+      setError('Please enter your name and room ID');
+      return;
+    }
+
+    setIsJoining(true);
+    const trimmedName = playerName.trim();
+    const trimmedRoomId = roomId.trim();
+
+    socket.emit(
+      'joinAsSpectator',
+      { gameId: trimmedRoomId, spectatorId: playerId, spectatorName: trimmedName },
+      (response: any) => {
+        if (response.success) {
+          // Save player name and game session for reconnection as spectator
+          savePlayerName(trimmedName);
+          saveGameSession({
+            gameId: trimmedRoomId,
+            playerId,
+            playerName: trimmedName,
+            joinedAt: Date.now(),
+            isSpectator: true,
+          });
+
+          // Navigate to the room
+          navigate(`/room/${trimmedRoomId}`);
+        } else {
+          setError(response.error || 'Failed to join as spectator');
+          setIsJoining(false);
+        }
+      }
+    );
+  };
+
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -117,7 +152,14 @@ export function JoinRoomPage() {
             disabled={!playerName.trim() || !roomId.trim() || isJoining}
             className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            {isJoining ? 'Joining...' : 'Join Room'}
+            {isJoining ? 'Joining...' : 'Join as Player'}
+          </button>
+          <button
+            onClick={handleJoinAsSpectator}
+            disabled={!playerName.trim() || !roomId.trim() || isJoining}
+            className="w-full px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            {isJoining ? 'Joining...' : 'Join as Spectator'}
           </button>
           <button
             onClick={() => navigate('/online')}

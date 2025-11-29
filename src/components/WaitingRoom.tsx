@@ -12,9 +12,17 @@ interface RoomPlayer {
   isConnected: boolean;
 }
 
+interface Spectator {
+  id: string;
+  name: string;
+  socketId: string;
+  joinedAt: number;
+}
+
 interface WaitingRoomData {
   gameId: string;
   players: RoomPlayer[];
+  spectators: Spectator[];
   hostId: string;
   createdAt: number;
 }
@@ -207,7 +215,8 @@ export const WaitingRoom: React.FC<{
   };
 
   const isHost = room?.hostId === playerId;
-  const canStart = isHost && room && room.players.length >= 2 && room.players.length <= 6;
+  const isSpectator = room?.spectators?.some(s => s.id === playerId);
+  const canStart = isHost && !isSpectator && room && room.players.length >= 2 && room.players.length <= 6;
 
   if (!isConnected || isReconnecting) {
     return (
@@ -334,6 +343,30 @@ export const WaitingRoom: React.FC<{
             </div>
           </div>
 
+          {room.spectators && room.spectators.length > 0 && (
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3 text-gray-600">
+                Spectators ({room.spectators.length})
+              </h3>
+              <div className="space-y-2">
+                {room.spectators.map((spectator) => (
+                  <div
+                    key={spectator.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full bg-gray-400" />
+                      <span className="font-medium text-gray-700">{spectator.name}</span>
+                      {spectator.id === playerId && (
+                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">You (Spectating)</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">
               {error}
@@ -348,6 +381,10 @@ export const WaitingRoom: React.FC<{
               >
                 Start Game
               </button>
+            ) : isSpectator ? (
+              <div className="flex-1 px-6 py-3 bg-purple-100 text-purple-700 rounded-lg text-center font-semibold">
+                Spectating - Waiting for host to start...
+              </div>
             ) : isHost ? (
               <div className="flex-1 px-6 py-3 bg-gray-300 text-gray-600 rounded-lg text-center font-semibold">
                 Waiting for players... (Need 2-6)

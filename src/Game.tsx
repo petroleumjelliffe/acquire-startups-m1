@@ -17,7 +17,7 @@ import { WaitingForPlayer } from "./components/WaitingForPlayer";
 import { YourTurnIndicator } from "./components/YourTurnIndicator";
 import { TilePlacementConfirmModal } from "./components/TilePlacementConfirmModal";
 import { useSocket } from "./context/SocketContext";
-import { clearGameSession } from "./utils/gameSession";
+import { clearGameSession, getGameSession } from "./utils/gameSession";
 import { useEffect } from "react";
 
 export function Game({
@@ -41,12 +41,17 @@ export function Game({
   const [stateBeforePlacement, setStateBeforePlacement] = useState<GameState | null>(null);
   const [selectedTile, setSelectedTile] = useState<Coord | null>(null); // Manually selected tile from hand
 
+  // Check if current user is a spectator
+  const session = getGameSession();
+  const isSpectator = isMultiplayer && session?.isSpectator === true;
+
   const cur = state.players[state.turnIndex];
-  const isMyTurn = isMultiplayer ? cur.id === playerId : true;
+  const isMyTurn = isMultiplayer ? (cur.id === playerId && !isSpectator) : true;
 
   // In multiplayer, find your own player (not necessarily the current turn player)
+  // Spectators don't have a player in the game
   const myPlayer = isMultiplayer
-    ? state.players.find(p => p.id === playerId)
+    ? (isSpectator ? null : state.players.find(p => p.id === playerId))
     : cur;
 
   // Listen for game state updates from server (multiplayer only)
@@ -246,11 +251,25 @@ export function Game({
     }
   }, [state, isMultiplayer]);
 
-  // Check if current player is host (first player)
-  const isHost = isMultiplayer && state.players[0]?.id === playerId;
+  // Check if current player is host (first player) and not a spectator
+  const isHost = isMultiplayer && !isSpectator && state.players[0]?.id === playerId;
 
   return (
     <div className="space-y-4">
+      {/* Spectator Mode Banner */}
+      {isSpectator && (
+        <div className="sticky top-0 z-50 p-3 bg-purple-600 text-white text-center font-semibold shadow-lg">
+          <div className="flex items-center justify-center gap-2">
+            <span>👁️ Spectator Mode</span>
+            {(state as any).spectators && (
+              <span className="text-purple-200 text-sm">
+                • {(state as any).spectators.length} spectator{(state as any).spectators.length !== 1 ? 's' : ''} watching
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Your Turn Indicator - sticky at top */}
       {isMultiplayer && isMyTurn && state.stage === "play" && <YourTurnIndicator />}
 

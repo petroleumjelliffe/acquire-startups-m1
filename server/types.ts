@@ -8,9 +8,17 @@ export interface MultiplayerPlayer extends Player {
   // isConnected and socketId are already optional in Player
 }
 
+export interface Spectator {
+  id: string;
+  name: string;
+  socketId: string;
+  joinedAt: number;
+}
+
 export interface MultiplayerGameState extends GameState {
   gameId: string;
   players: MultiplayerPlayer[];
+  spectators: Spectator[];
   createdAt: number;
   lastUpdated: number;
   isEnded?: boolean; // True when game has been manually ended or reached end stage
@@ -26,6 +34,7 @@ export interface RoomPlayer {
 export interface WaitingRoom {
   gameId: string;
   players: RoomPlayer[];
+  spectators: Spectator[];
   hostId: string;
   createdAt: number;
 }

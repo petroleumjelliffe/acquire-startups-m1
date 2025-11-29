@@ -13,6 +13,7 @@ interface SocketContextType {
   playerId: string;
   isReconnecting: boolean;
   reconnectionAttempts: number;
+  isSpectator: boolean;
 }
 
 const SocketContext = createContext<SocketContextType>({
@@ -21,6 +22,7 @@ const SocketContext = createContext<SocketContextType>({
   playerId: '',
   isReconnecting: false,
   reconnectionAttempts: 0,
+  isSpectator: false,
 });
 
 export const useSocket = () => useContext(SocketContext);
@@ -33,6 +35,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [reconnectionAttempts, setReconnectionAttempts] = useState(0);
   const [playerId] = useState(getPlayerId());
+  const [isSpectator, setIsSpectator] = useState(false);
   const hasAttemptedRejoin = useRef(false);
 
   // Attempt to rejoin the game session (only when NOT navigating to a room URL)
@@ -61,16 +64,22 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    console.log('🔄 Attempting to rejoin from SocketContext:', session.gameId);
+    console.log('🔄 Attempting to rejoin from SocketContext:', session.gameId, session.isSpectator ? '(as spectator)' : '');
     setIsReconnecting(true);
 
     socket.emit('rejoinGame', {
       gameId: session.gameId,
       playerId: session.playerId,
-    }, (response: { success: boolean; error?: string; gameState?: any; room?: any }) => {
+      isSpectator: session.isSpectator,
+    }, (response: { success: boolean; error?: string; gameState?: any; room?: any; isSpectator?: boolean }) => {
       setIsReconnecting(false);
 
       if (response.success) {
+        // Update spectator state from response
+        if (response.isSpectator) {
+          setIsSpectator(true);
+        }
+
         if (response.room) {
           console.log('✅ Successfully rejoined waiting room:', session.gameId);
           // Navigate to the room URL
@@ -177,7 +186,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       isConnected,
       playerId,
       isReconnecting,
-      reconnectionAttempts
+      reconnectionAttempts,
+      isSpectator
     }}>
       {children}
     </SocketContext.Provider>

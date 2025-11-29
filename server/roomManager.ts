@@ -2,7 +2,7 @@
 // Manage waiting rooms before games start
 
 import { v4 as uuidv4 } from "uuid";
-import type { WaitingRoom, RoomPlayer } from "./types.js";
+import type { WaitingRoom, RoomPlayer, Spectator } from "./types.js";
 
 export class RoomManager {
   private rooms: Map<string, WaitingRoom> = new Map();
@@ -23,6 +23,7 @@ export class RoomManager {
           isConnected: true,
         },
       ],
+      spectators: [],
       hostId,
       createdAt: Date.now(),
     };
@@ -75,6 +76,43 @@ export class RoomManager {
   }
 
   /**
+   * Join an existing room as a spectator
+   * Spectators can join full rooms and don't count toward the 6-player limit
+   */
+  joinRoomAsSpectator(
+    gameId: string,
+    spectatorId: string,
+    spectatorName: string,
+    socketId: string
+  ): WaitingRoom | null {
+    const room = this.rooms.get(gameId);
+
+    if (!room) {
+      console.log(`✗ Room not found: ${gameId}`);
+      return null;
+    }
+
+    // Check if spectator already in room
+    const existingSpectator = room.spectators.find((s) => s.id === spectatorId);
+    if (existingSpectator) {
+      existingSpectator.socketId = socketId;
+      console.log(`✓ Spectator reconnected to room: ${spectatorName} -> ${gameId}`);
+      return room;
+    }
+
+    // Add new spectator
+    room.spectators.push({
+      id: spectatorId,
+      name: spectatorName,
+      socketId,
+      joinedAt: Date.now(),
+    });
+
+    console.log(`✓ Spectator joined room: ${spectatorName} -> ${gameId}`);
+    return room;
+  }
+
+  /**
    * Leave a waiting room
    */
   leaveRoom(gameId: string, playerId: string): void {
@@ -107,6 +145,19 @@ export class RoomManager {
       this.rooms.delete(gameId);
       console.log(`✓ Deleted empty room: ${gameId}`);
     }
+  }
+
+  /**
+   * Remove a spectator from a waiting room
+   */
+  leaveRoomAsSpectator(gameId: string, spectatorId: string): void {
+    const room = this.rooms.get(gameId);
+
+    if (!room) return;
+
+    // Remove spectator from room
+    room.spectators = room.spectators.filter((s) => s.id !== spectatorId);
+    console.log(`✓ Spectator left room: ${spectatorId} -> ${gameId}`);
   }
 
   /**

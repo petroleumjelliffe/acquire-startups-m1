@@ -2,7 +2,7 @@
 // XState-powered game manager that uses actor model
 
 import { createActor, type ActorRefFrom, type SnapshotFrom } from "xstate";
-import type { MultiplayerGameState, MultiplayerPlayer } from "./types.js";
+import type { MultiplayerGameState, MultiplayerPlayer, Spectator } from "./types.js";
 import { saveGame, loadAllGames } from "./persistence.js";
 import { createInitialGame } from "../src/state/gameInit.js";
 import { gameRoomMachine } from "./machines/gameRoomMachine.js";
@@ -34,6 +34,11 @@ export class GameManagerXState {
         p.isConnected = false;
         p.socketId = undefined;
       });
+
+      // Initialize spectators array if not present (backward compatibility)
+      if (!state.spectators) {
+        state.spectators = [];
+      }
 
       // Create actor from saved state
       this.createActorFromState(gameId, state);
@@ -117,6 +122,7 @@ export class GameManagerXState {
       ...baseState,
       gameId,
       players: multiplayerPlayers,
+      spectators: [],
       createdAt: Date.now(),
       lastUpdated: Date.now(),
     };
@@ -214,6 +220,55 @@ export class GameManagerXState {
     });
 
     return this.getGame(gameId);
+  }
+
+  /**
+   * Add spectator to an active game
+   */
+  spectatorJoined(
+    gameId: string,
+    spectatorId: string,
+    spectatorName: string,
+    socketId: string
+  ): MultiplayerGameState | null {
+    const gameState = this.getGame(gameId);
+    if (!gameState) return null;
+
+    // Check if spectator already exists
+    const existingSpectator = gameState.spectators.find((s) => s.id === spectatorId);
+    if (existingSpectator) {
+      // Update socketId on reconnection
+      existingSpectator.socketId = socketId;
+      console.log(`✓ Spectator reconnected to game: ${spectatorName} -> ${gameId}`);
+    } else {
+      // Add new spectator
+      gameState.spectators.push({
+        id: spectatorId,
+        name: spectatorName,
+        socketId,
+        joinedAt: Date.now(),
+      });
+      console.log(`✓ Spectator joined game: ${spectatorName} -> ${gameId}`);
+    }
+
+    // Update game state
+    this.updateGame(gameId, gameState);
+    return gameState;
+  }
+
+  /**
+   * Remove spectator from an active game
+   */
+  spectatorLeft(gameId: string, spectatorId: string): MultiplayerGameState | null {
+    const gameState = this.getGame(gameId);
+    if (!gameState) return null;
+
+    gameState.spectators = gameState.spectators.filter((s) => s.id !== spectatorId);
+    console.log(`✓ Spectator left game: ${spectatorId} -> ${gameId}`);
+
+    // Update game state
+    this.updateGame(gameId, gameState);
+    return gameState;
   }
 
   /**

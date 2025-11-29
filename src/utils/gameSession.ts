@@ -8,6 +8,7 @@ export interface GameSession {
   playerId: string;
   playerName: string;
   joinedAt: number;
+  isSpectator?: boolean;
 }
 
 /**

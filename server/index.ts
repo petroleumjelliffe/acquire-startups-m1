@@ -153,6 +153,95 @@ io.on("connection", (socket) => {
     }
   );
 
+  // Join as spectator (waiting room or active game)
+  socket.on(
+    "joinAsSpectator",
+    (
+      data: { gameId: string; spectatorId: string; spectatorName: string },
+      callback
+    ) => {
+      try {
+        // First check if it's a waiting room
+        const room = roomManager.getRoom(data.gameId);
+
+        if (room) {
+          // Join waiting room as spectator
+          const joinedRoom = roomManager.joinRoomAsSpectator(
+            data.gameId,
+            data.spectatorId,
+            data.spectatorName,
+            socket.id
+          );
+
+          if (!joinedRoom) {
+            callback({ success: false, error: "Room not found" });
+            return;
+          }
+
+          socket.join(data.gameId);
+          socket.data.gameId = data.gameId;
+          socket.data.spectatorId = data.spectatorId;
+          socket.data.isSpectator = true;
+
+          callback({ success: true, room: joinedRoom, isSpectator: true });
+          io.to(data.gameId).emit("roomState", joinedRoom);
+          console.log(`✓ Spectator joined waiting room: ${data.spectatorName} -> ${data.gameId}`);
+          return;
+        }
+
+        // Check if it's a started game
+        const game = gameManager.getGame(data.gameId);
+        if (game) {
+          // Check if game has ended
+          if (game.isEnded || game.stage === "end") {
+            callback({
+              success: false,
+              error: "Game has ended",
+              gameEnded: true,
+              finalState: game,
+            });
+            return;
+          }
+
+          // Join active game as spectator
+          const updatedGame = gameManager.spectatorJoined(
+            data.gameId,
+            data.spectatorId,
+            data.spectatorName,
+            socket.id
+          );
+
+          if (!updatedGame) {
+            callback({ success: false, error: "Failed to join as spectator" });
+            return;
+          }
+
+          socket.join(data.gameId);
+          socket.data.gameId = data.gameId;
+          socket.data.spectatorId = data.spectatorId;
+          socket.data.isSpectator = true;
+
+          // Subscribe to actor changes for this game (if not already subscribed)
+          subscribeToGameActor(data.gameId);
+
+          callback({ success: true, gameState: updatedGame, isSpectator: true });
+          io.to(data.gameId).emit("spectatorJoined", {
+            spectatorId: data.spectatorId,
+            spectatorName: data.spectatorName,
+          });
+
+          console.log(`✓ Spectator joined game: ${data.spectatorName} -> ${data.gameId}`);
+          return;
+        }
+
+        // Room doesn't exist at all
+        callback({ success: false, error: "Room doesn't exist" });
+      } catch (error: any) {
+        callback({ success: false, error: error.message });
+      }
+    }
+  );
+
   // Start game from waiting room
   socket.on("startGame", (data: { gameId: string; playerId: string }, callback) => {
     try {
@@ -196,9 +285,9 @@ io.on("connection", (socket) => {
   // Rejoin an existing game (or waiting room)
   socket.on(
     "rejoinGame",
-    (data: { gameId: string; playerId: string }, callback) => {
+    (data: { gameId: string; playerId: string; isSpectator?: boolean }, callback) => {
       try {
-        // Cancel any pending disconnect timer for this player
+        // Cancel any pending disconnect timer for this player/spectator
         const timerKey = `${data.gameId}:${data.playerId}`;
         const pendingTimer = disconnectTimers.get(timerKey);
         if (pendingTimer) {
@@ -210,6 +299,23 @@ io.on("connection", (socket) => {
         // First check if it's a waiting room
         const room = roomManager.getRoom(data.gameId);
         if (room) {
+          // Check if rejoining as spectator
+          if (data.isSpectator) {
+            const spectator = room.spectators.find(s => s.id === data.playerId);
+            if (spectator) {
+              spectator.socketId = socket.id;
+              socket.join(data.gameId);
+              socket.data.gameId = data.gameId;
+              socket.data.spectatorId = data.playerId;
+              socket.data.isSpectator = true;
+
+              callback({ success: true, room, isSpectator: true });
+              io.to(data.gameId).emit("roomState", room);
+              console.log(`✓ Spectator rejoined waiting room: ${data.playerId} -> ${data.gameId}`);
+              return;
+            }
+          }
+
           // Player is trying to rejoin a waiting room
           const player = room.players.find(p => p.id === data.playerId);
 
@@ -252,6 +358,25 @@ io.on("connection", (socket) => {
             finalState: gameState,  // Include final state for game over screen
           });
           return;
+        }
+
+        // Check if rejoining as spectator
+        if (data.isSpectator) {
+          const spectator = gameState.spectators.find(s => s.id === data.playerId);
+          if (spectator) {
+            spectator.socketId = socket.id;
+            socket.join(data.gameId);
+            socket.data.gameId = data.gameId;
+            socket.data.spectatorId = data.playerId;
+            socket.data.isSpectator = true;
+
+            // Subscribe to actor changes for this game (if not already subscribed)
+            subscribeToGameActor(data.gameId);
+
+            callback({ success: true, gameState, isSpectator: true });
+            console.log(`✓ Spectator rejoined game: ${data.playerId} -> ${data.gameId}`);
+            return;
+          }
         }
 
         // Verify player is in game
@@ -441,10 +566,42 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const gameId = socket.data.gameId;
     const playerId = socket.data.playerId;
+    const spectatorId = socket.data.spectatorId;
+    const isSpectator = socket.data.isSpectator;
 
     console.log(`🔌 Client disconnected: ${socket.id}`);
 
     if (gameId) {
+      // Check if this is a spectator
+      if (isSpectator && spectatorId) {
+        // Handle spectator disconnection
+        const room = roomManager.getRoom(gameId);
+        if (room) {
+          // Spectator in waiting room
+          roomManager.leaveRoomAsSpectator(gameId, spectatorId);
+          io.to(gameId).emit("roomState", roomManager.getRoom(gameId));
+        } else {
+          // Spectator in active game - add grace period
+          const timerKey = `${gameId}:${spectatorId}`;
+
+          const timer = setTimeout(() => {
+            console.log(`⏱️  Grace period expired for spectator ${spectatorId}, removing from game`);
+
+            const gameState = gameManager.spectatorLeft(gameId, spectatorId);
+            if (gameState) {
+              io.to(gameId).emit("spectatorLeft", { spectatorId });
+            }
+
+            disconnectTimers.delete(timerKey);
+          }, 3000); // 3 second grace period
+
+          disconnectTimers.set(timerKey, timer);
+          console.log(`⏱️  Started disconnect timer for spectator ${spectatorId} (3s grace period)`);
+        }
+        return;
+      }
+
+      // Handle player disconnection
       // Check if this is a waiting room or active game
       const room = roomManager.getRoom(gameId);
       if (room) {
