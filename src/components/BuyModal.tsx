@@ -81,17 +81,17 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel })
   }, {} as Record<string, number>);
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-[900px] max-w-full flex flex-col max-h-[90vh]">
+    <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+      <div className="bg-white rounded-t-xl shadow-2xl w-full flex flex-col max-h-[40vh] pointer-events-auto">
         {/* Static Header */}
-        <div className="flex justify-between items-center p-6 pb-4 border-b flex-shrink-0">
-          <h2 className="text-2xl font-bold text-center flex-1">
+        <div className="flex justify-between items-center px-4 py-3 border-b flex-shrink-0">
+          <h2 className="text-lg font-bold text-center flex-1">
             {player.name}: Buy Shares
           </h2>
           {onCancel && (
             <button
               onClick={handleCancel}
-              className="text-gray-500 hover:text-gray-700 font-bold text-2xl leading-none px-2"
+              className="text-gray-500 hover:text-gray-700 font-bold text-xl leading-none px-2"
               title="Cancel and return to placement"
             >
               ×
@@ -100,26 +100,22 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel })
         </div>
 
         {/* Scrollable Content */}
-        <div className="overflow-y-auto flex-1 px-6 py-4">
-          {/* Cash display */}
-          <div className="text-center mb-6">
-            <div className="text-lg">
-              <span className="font-semibold">Cash Available:</span>{" "}
-              <span className={remainingCash < 0 ? "text-red-600 font-bold" : "text-green-600 font-bold"}>
-                ${remainingCash.toLocaleString()}
-              </span>
-            </div>
-            <div className="text-sm text-gray-600 mt-1">
-              Selected: {selectedShares.length}/3 shares (${totalCost.toLocaleString()})
-            </div>
+        <div className="overflow-y-auto flex-1 px-4 py-3">
+          {/* Cash display - compact */}
+          <div className="text-center mb-3">
+            <span className="text-sm font-semibold">Cash: </span>
+            <span className={remainingCash < 0 ? "text-red-600 font-bold text-sm" : "text-green-600 font-bold text-sm"}>
+              ${remainingCash.toLocaleString()}
+            </span>
+            <span className="text-xs text-gray-600 ml-3">
+              ({selectedShares.length}/3 selected)
+            </span>
           </div>
 
-          {/* Available startups as card stacks */}
-          <div className="mb-6">
-            <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">
-              Available Startups
-            </h3>
-            <div className="flex gap-4 justify-center flex-wrap">
+          {/* Single row layout: Available startups + Selected shares */}
+          <div className="flex gap-3 items-start justify-center">
+            {/* Available startups - smaller cards, no stack effect */}
+            <div className="flex gap-2">
               {buyables.map((startup) => {
                 const isAffordable = startup.price <= remainingCash;
                 const sharesInHand = handCounts[startup.id] || 0;
@@ -133,29 +129,23 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel })
                     onClick={() => canBuyMore && addShareToHand(startup.id, startup.price)}
                     disabled={!canBuyMore}
                     className={`
-                      relative w-32 h-40 rounded-lg border-2 shadow-md
-                      transition-all duration-200
+                      w-20 h-24 rounded-md border-2 shadow
+                      transition-all duration-200 startup-${startup.id}
                       ${canBuyMore
-                        ? 'hover:shadow-lg hover:scale-105 cursor-pointer'
-                        : 'opacity-60 cursor-not-allowed grayscale'
+                        ? 'hover:shadow-md hover:scale-105 cursor-pointer'
+                        : 'opacity-50 cursor-not-allowed grayscale'
                       }
                     `}
                   >
-                    {/* Stack effect */}
-                    <div className={`absolute inset-0 rounded-lg border-2 -translate-x-1 -translate-y-1 opacity-60 startup-${startup.id}`}></div>
-                    <div className={`absolute inset-0 rounded-lg border-2 -translate-x-0.5 -translate-y-0.5 opacity-80 startup-${startup.id}`}></div>
-
-                    {/* Main card content */}
-                    <div className={`relative h-full flex flex-col items-center justify-between p-3 rounded-lg border-2 startup-${startup.id}`}>
+                    <div className="h-full flex flex-col items-center justify-between p-1.5">
                       <div className="text-center flex-1 flex items-center">
-                        <div className="font-bold text-sm leading-tight">{startup.id}</div>
+                        <div className="font-semibold text-xs leading-tight">{startup.id}</div>
                       </div>
-
-                      <div className="text-center space-y-1">
-                        <div className="text-xs opacity-75">
+                      <div className="text-center">
+                        <div className="text-[10px] opacity-75">
                           {startup.availableShares - sharesInHand} left
                         </div>
-                        <div className="font-bold text-lg">
+                        <div className="font-bold text-sm">
                           ${startup.price}
                         </div>
                       </div>
@@ -163,64 +153,66 @@ export const BuyModal: React.FC<BuyModalProps> = ({ state, onUpdate, onCancel })
                   </button>
                 );
               })}
-            </div>
-            {buyables.length === 0 && (
-              <div className="text-center text-gray-500 py-8">
-                No startups available for purchase
-              </div>
-            )}
-          </div>
-
-          {/* Selected shares hand */}
-          <div className="mb-6 min-h-[180px]">
-            <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">
-              Your Selection
-            </h3>
-            <div className="flex gap-4 justify-center items-center min-h-[140px] p-4 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              {selectedShares.length === 0 ? (
-                <div className="text-gray-400 text-center">
-                  Click a startup above to add shares to your hand
+              {buyables.length === 0 && (
+                <div className="text-xs text-gray-500 py-4 px-2">
+                  No startups available
                 </div>
-              ) : (
-                selectedShares.map((share, index) => (
+              )}
+            </div>
+
+            {/* Divider */}
+            <div className="h-24 w-px bg-gray-300 mx-1"></div>
+
+            {/* Selected shares - smaller */}
+            <div className="flex gap-2 min-w-[260px]">
+              {[0, 1, 2].map((slotIndex) => {
+                const share = selectedShares[slotIndex];
+                return share ? (
                   <button
-                    key={index}
-                    onClick={() => removeShareFromHand(index)}
+                    key={slotIndex}
+                    onClick={() => removeShareFromHand(slotIndex)}
                     className={`
-                      w-24 h-32 rounded-lg border-2
-                      shadow-md hover:shadow-lg
+                      w-20 h-24 rounded-md border-2
+                      shadow hover:shadow-md
                       transition-all duration-200 hover:scale-105
                       cursor-pointer
                       startup-${share.id}
                     `}
                   >
-                    <div className="h-full flex flex-col items-center justify-between p-2">
+                    <div className="h-full flex flex-col items-center justify-between p-1.5">
                       <div className="text-center flex-1 flex items-center">
-                        <div className="font-bold text-xs leading-tight">{share.id}</div>
+                        <div className="font-semibold text-xs leading-tight">{share.id}</div>
                       </div>
                       <div className="font-bold text-sm">
                         ${share.price}
                       </div>
                     </div>
                   </button>
-                ))
-              )}
+                ) : (
+                  <div
+                    key={slotIndex}
+                    className="w-20 h-24 rounded-md border-2 border-dashed border-gray-300 bg-gray-50 flex items-center justify-center"
+                  >
+                    <span className="text-gray-400 text-xs">Slot {slotIndex + 1}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* Static Footer */}
-        <div className="flex justify-between items-center p-6 pt-4 border-t flex-shrink-0">
+        {/* Static Footer - compact */}
+        <div className="flex justify-between items-center px-4 py-2 border-t flex-shrink-0">
           <button
             onClick={handleSkip}
-            className="px-6 py-2 border-2 border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+            className="px-4 py-1.5 border-2 border-gray-300 rounded hover:bg-gray-100 transition-colors text-sm"
           >
             Skip
           </button>
           <button
             onClick={handleConfirm}
             disabled={selectedShares.length === 0 || remainingCash < 0}
-            className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
+            className={`px-4 py-1.5 rounded font-semibold transition-colors text-sm ${
               selectedShares.length === 0 || remainingCash < 0
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                 : "bg-blue-600 text-white hover:bg-blue-700"

@@ -8,31 +8,24 @@ interface WaitingForPlayerProps {
 
 export const WaitingForPlayer: React.FC<WaitingForPlayerProps> = ({ playerName, isConnected }) => {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40 pointer-events-none">
-      <div className="bg-white p-6 rounded-xl shadow-2xl max-w-md pointer-events-auto">
-        <div className="text-center">
-          <div className="mb-4">
-            <div className="inline-flex items-center gap-3">
-              <div className={`w-4 h-4 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`} />
-              <h3 className="text-xl font-bold">
-                {isConnected ? 'Waiting for' : 'Player offline'}
-              </h3>
-            </div>
+    <div className="fixed top-16 left-0 right-0 z-40 flex justify-center px-4">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-b-xl shadow-2xl max-w-md w-full">
+        <div className="flex items-center justify-center gap-3">
+          <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-white animate-pulse' : 'bg-gray-300'}`} />
+
+          <div className="flex-1 text-center">
+            <span className="font-semibold">{playerName}</span>
+            <span className="mx-2">•</span>
+            <span className="text-blue-100 text-sm">
+              {isConnected ? "Taking their turn" : "Offline"}
+            </span>
           </div>
 
-          <p className="text-2xl font-semibold text-gray-800 mb-2">{playerName}</p>
-
-          <p className="text-sm text-gray-600">
-            {isConnected
-              ? "It's their turn to play"
-              : "Waiting for them to reconnect..."}
-          </p>
-
           {isConnected && (
-            <div className="mt-4 flex justify-center gap-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="flex gap-1">
+              <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-1.5 h-1.5 bg-white rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           )}
         </div>
