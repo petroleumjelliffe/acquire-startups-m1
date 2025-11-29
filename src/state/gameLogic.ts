@@ -122,6 +122,72 @@ export function allHandsFull(state: GameState) {
 // TILE PLACEMENT LOGIC
 //----------------------------------------------------
 
+/**
+ * Check if a tile is unplayable (would cause merger between 2+ safe chains).
+ * A tile is unplayable if placing it would connect 2 or more safe chains (>=11 tiles each).
+ */
+export function isUnplayableTile(state: GameState, coord: Coord): boolean {
+  const cell = state.board[coord];
+  if (cell.placed) return false; // Already placed tiles are not unplayable
+
+  const adj = getAdjacentCoords(coord);
+  const adjStartups = new Set<string>();
+
+  for (const n of adj) {
+    const c = state.board[n];
+    if (!c?.placed) continue;
+    if (c.startupId) adjStartups.add(c.startupId);
+  }
+
+  // Check if placing would merge 2+ startups
+  if (adjStartups.size >= 2) {
+    const touching = [...adjStartups];
+    const safeChains = touching.filter((id) => getStartupSize(state, id) >= 11);
+    // Unplayable if it would merge 2+ safe chains
+    return safeChains.length > 1;
+  }
+
+  return false;
+}
+
+/**
+ * Trade an unplayable tile for a new one.
+ * The unplayable tile is removed from hand and NOT returned to the bag.
+ * A new tile is drawn if available.
+ */
+export function tradeUnplayableTile(
+  state: GameState,
+  playerId: string,
+  coord: Coord
+): boolean {
+  const player = state.players.find((p) => p.id === playerId);
+  if (!player) return false;
+
+  // Verify tile is in player's hand
+  if (!player.hand.includes(coord)) return false;
+
+  // Verify tile is actually unplayable
+  if (!isUnplayableTile(state, coord)) return false;
+
+  // Remove tile from hand (don't return to bag)
+  player.hand = player.hand.filter((t) => t !== coord);
+
+  // Draw a new tile if available
+  const newTile = state.bag.shift();
+  if (newTile) {
+    player.hand.push(newTile);
+    state.log.push(
+      `${player.name} traded unplayable tile ${coord} for ${newTile}.`
+    );
+  } else {
+    state.log.push(
+      `${player.name} traded unplayable tile ${coord} (no tiles remaining).`
+    );
+  }
+
+  return true;
+}
+
 export function handleTilePlacement(state: GameState, coord: Coord): GameState {
   const player = state.players[state.turnIndex];
   const cell = state.board[coord];

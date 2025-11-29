@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import type { GameState } from "./state/gameTypes";
 import { createInitialGame } from "./state/gameInit";
-import { handleTilePlacement, completeSurvivorSelection } from "./state/gameLogic";
+import { handleTilePlacement, completeSurvivorSelection, isUnplayableTile, tradeUnplayableTile } from "./state/gameLogic";
 import { Board } from "./components/Board";
 import { PlayerHand } from "./components/PlayerHand";
 import { GameLog } from "./components/GameLog";
@@ -80,6 +80,20 @@ export function Game({
     const player = state.players[state.turnIndex];
     if (!player.hand.includes(coord)) return;
 
+    // Check if tile is unplayable - if so, trade it instead of selecting
+    if (isUnplayableTile(state, coord)) {
+      const newState = structuredClone(state);
+      const success = tradeUnplayableTile(newState, player.id, coord);
+      if (success) {
+        handleStateUpdate(newState);
+        // Clear selection if the traded tile was selected
+        if (selectedTile === coord) {
+          setSelectedTile(null);
+        }
+      }
+      return;
+    }
+
     // Toggle selection: if already selected, deselect; otherwise select
     if (selectedTile === coord) {
       setSelectedTile(null);
@@ -98,6 +112,16 @@ export function Game({
     if (isMultiplayer) {
       // Must be a tile in your hand
       if (!player.hand.includes(coord)) return;
+
+      // Check if tile is unplayable - if so, trade it instead
+      if (isUnplayableTile(state, coord)) {
+        const newState = structuredClone(state);
+        const success = tradeUnplayableTile(newState, player.id, coord);
+        if (success) {
+          handleStateUpdate(newState);
+        }
+        return;
+      }
 
       // Store a snapshot of the state before placement for potential cancellation
       setStateBeforePlacement(structuredClone(state));
@@ -306,7 +330,7 @@ export function Game({
         players={state.players}
         showHandPreviews={isMultiplayer}
       />
-      {myPlayer && <PlayerHand name={myPlayer.name} hand={myPlayer.hand} onSelect={handleTileSelection} selectedTile={selectedTile} />}
+      {myPlayer && <PlayerHand name={myPlayer.name} hand={myPlayer.hand} onSelect={handleTileSelection} selectedTile={selectedTile} gameState={state} />}
 
       {/* Tile placement confirmation modal */}
       {showConfirmation && pendingTile && (
