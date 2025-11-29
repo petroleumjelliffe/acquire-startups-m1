@@ -1064,3 +1064,254 @@ export function finalizeAllLiquidations(state: GameState) {
   state.stage = "buy"; // or next phase depending on your flow
   state.log.push(`All liquidations complete. Returning to buy phase.`);
 }
+
+//----------------------------------------------------
+// END GAME LOGIC
+//----------------------------------------------------
+
+/**
+ * Check if the game should end:
+ * - One chain has > 40 tiles
+ * - All chains are safe (>=11 tiles) and no playable tiles remain
+ */
+export function shouldGameEnd(state: GameState): boolean {
+  const activeStartups = getActiveStartups(state);
+
+  // Check if any chain has > 40 tiles
+  for (const startup of activeStartups) {
+    const size = getStartupSize(state, startup.id);
+    if (size > 40) {
+      return true;
+    }
+  }
+
+  // Check if all chains are safe
+  const allSafe = activeStartups.every(s => getStartupSize(state, s.id) >= 11);
+
+  if (allSafe && activeStartups.length > 0) {
+    // Check if current player has any playable tiles
+    const currentPlayer = state.players[state.turnIndex];
+    const hasPlayableTiles = currentPlayer.hand.some(coord => {
+      // A tile is playable if it doesn't merge two safe chains
+      const adj = getAdjacentCoords(coord);
+      const adjStartups = new Set<string>();
+
+      for (const n of adj) {
+        const c = state.board[n];
+        if (c?.placed && c.startupId) {
+          adjStartups.add(c.startupId);
+        }
+      }
+
+      // If touching 2+ safe chains, not playable
+      if (adjStartups.size >= 2) {
+        const touching = [...adjStartups];
+        const safeChains = touching.filter(id => getStartupSize(state, id) >= 11);
+        if (safeChains.length > 1) {
+          return false; // Not playable
+        }
+      }
+
+      return true; // Playable
+    });
+
+    if (!hasPlayableTiles) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Calculate end game bonuses for all active chains.
+ * Similar to merger payout logic but for all remaining chains.
+ */
+export function calculateEndGameBonuses(state: GameState) {
+  const activeStartups = getActiveStartups(state);
+  const endGameBonuses: Array<{
+    startupId: string;
+    bonuses: BonusResult[];
+  }> = [];
+
+  for (const startup of activeStartups) {
+    const startupId = startup.id;
+    const size = getStartupSize(state, startupId);
+    const price = getSharePrice(state, startupId);
+
+    const holdings = state.players
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        shares: p.portfolio[startupId] || 0,
+      }))
+      .filter((h) => h.shares > 0)
+      .sort((a, b) => b.shares - a.shares);
+
+    if (holdings.length === 0) continue;
+
+    const bonuses: BonusResult[] = [];
+    const majorityShares = holdings[0].shares;
+    const majorityHolders = holdings.filter((h) => h.shares === majorityShares);
+    const minorityShares = Math.max(
+      0,
+      ...holdings.filter((h) => h.shares < majorityShares).map((h) => h.shares)
+    );
+    const minorityHolders = holdings.filter(
+      (h) => h.shares === minorityShares && h.shares < majorityShares
+    );
+
+    const majBonus = price * 10;
+    const minBonus = price * 5;
+
+    if (majorityHolders.length > 1) {
+      // Split majority and minority bonuses among tied majority holders
+      const split = Math.floor((majBonus + minBonus) / majorityHolders.length);
+      for (const h of majorityHolders) {
+        bonuses.push({
+          playerId: h.id,
+          playerName: h.name,
+          amount: split,
+          type: "majority",
+        });
+      }
+    } else {
+      // Award majority bonus
+      for (const h of majorityHolders) {
+        bonuses.push({
+          playerId: h.id,
+          playerName: h.name,
+          amount: majBonus,
+          type: "majority",
+        });
+      }
+      // Award minority bonus
+      if (minorityHolders.length > 0) {
+        const minSplit = minorityHolders.length > 1
+          ? Math.floor(minBonus / minorityHolders.length)
+          : minBonus;
+        for (const h of minorityHolders) {
+          bonuses.push({
+            playerId: h.id,
+            playerName: h.name,
+            amount: minSplit,
+            type: "minority",
+          });
+        }
+      }
+    }
+
+    endGameBonuses.push({
+      startupId,
+      bonuses,
+    });
+  }
+
+  state.endGameBonuses = endGameBonuses;
+  state.log.push("Calculating end game bonuses for all active chains...");
+}
+
+/**
+ * Calculate final scores for all players.
+ */
+export function calculateFinalScores(state: GameState) {
+  const finalScores = state.players.map((player) => {
+    const cashBefore = player.cash;
+
+    // Calculate stock value
+    let stockValue = 0;
+    for (const [startupId, shares] of Object.entries(player.portfolio)) {
+      if (shares > 0) {
+        const startup = state.startups[startupId];
+        if (startup?.isFounded) {
+          const price = getSharePrice(state, startupId);
+          stockValue += shares * price;
+        }
+      }
+    }
+
+    // Calculate total bonuses for this player
+    let bonusTotal = 0;
+    if (state.endGameBonuses) {
+      for (const chainBonus of state.endGameBonuses) {
+        for (const bonus of chainBonus.bonuses) {
+          if (bonus.playerId === player.id) {
+            bonusTotal += bonus.amount;
+          }
+        }
+      }
+    }
+
+    const finalCash = cashBefore + stockValue + bonusTotal;
+
+    return {
+      playerId: player.id,
+      playerName: player.name,
+      cashBefore,
+      stockValue,
+      bonusTotal,
+      finalCash,
+    };
+  });
+
+  // Sort by final cash descending
+  finalScores.sort((a, b) => b.finalCash - a.finalCash);
+
+  state.finalScores = finalScores;
+
+  // Determine winner(s)
+  const highestScore = finalScores[0].finalCash;
+  state.winners = finalScores
+    .filter(s => s.finalCash === highestScore)
+    .map(s => s.playerId);
+
+  state.log.push("Final scores calculated.");
+}
+
+/**
+ * Award end game bonuses to players.
+ */
+export function awardEndGameBonuses(state: GameState) {
+  if (!state.endGameBonuses) return;
+
+  for (const chainBonus of state.endGameBonuses) {
+    for (const bonus of chainBonus.bonuses) {
+      const player = state.players.find((p) => p.id === bonus.playerId);
+      if (player) {
+        player.cash += bonus.amount;
+        state.log.push(
+          `${player.name} received $${bonus.amount} ${bonus.type} bonus for ${chainBonus.startupId}.`
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Initiate end game sequence.
+ * Called when end game conditions are met or end game button is clicked.
+ */
+export function initiateEndGame(state: GameState) {
+  state.log.push("Game ending...");
+
+  // Calculate end game bonuses
+  calculateEndGameBonuses(state);
+
+  // Transition to end game bonuses stage
+  state.stage = "endGameBonuses";
+}
+
+/**
+ * Finalize end game after bonuses have been shown.
+ * Awards bonuses, calculates final scores, and transitions to game over.
+ */
+export function finalizeEndGame(state: GameState) {
+  // Award the bonuses to players
+  awardEndGameBonuses(state);
+
+  // Calculate final scores
+  calculateFinalScores(state);
+
+  // Transition to game over screen
+  state.stage = "gameOver";
+}

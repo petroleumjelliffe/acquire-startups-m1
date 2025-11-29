@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import type { GameState } from "./state/gameTypes";
 import { createInitialGame } from "./state/gameInit";
-import { handleTilePlacement, completeSurvivorSelection } from "./state/gameLogic";
+import { handleTilePlacement, completeSurvivorSelection, shouldGameEnd, initiateEndGame } from "./state/gameLogic";
 import { Board } from "./components/Board";
 import { PlayerHand } from "./components/PlayerHand";
 import { GameLog } from "./components/GameLog";
 import { Coord } from "./utils/gameHelpers";
 import { DrawModal } from "./components/DrawModal";
 import { BuyModal } from "./components/BuyModal";
-import { MergerPayoutModal, FoundStartupModal } from "./components"; //barrelfile
+import { MergerPayoutModal, FoundStartupModal, EndGameBonusModal, GameOverScreen } from "./components"; //barrelfile
 import { MergerLiquidationModal } from "./components/MergerLiquidation";
 import { SurvivorSelectionModal } from "./components/SurvivorSelectionModal";
 import { PlayerSummary } from "./components/PlayerSummary";
@@ -220,27 +220,28 @@ export function Game({
     }
   };
 
-  // End game manually (host only)
+  // End game manually
   const handleEndGame = () => {
-    if (!isMultiplayer || !socket) return;
-
-    if (window.confirm('Are you sure you want to end this game? This cannot be undone.')) {
-      socket.emit('endGame', {
-        gameId: state.gameId,
-        playerId
-      }, (response: { success: boolean; error?: string }) => {
-        if (!response.success) {
-          alert(response.error || 'Failed to end game');
-        }
-      });
+    if (window.confirm('Are you sure you want to end this game? This will calculate final scores.')) {
+      const newState = structuredClone(state);
+      initiateEndGame(newState);
+      handleStateUpdate(newState);
     }
   };
 
   useEffect(() => {
     console.log("Game state:", state.stage);
 
+    // Check for end game conditions when in play or buy stage
+    if ((state.stage === "play" || state.stage === "buy") && shouldGameEnd(state)) {
+      // Automatically trigger end game
+      const newState = structuredClone(state);
+      initiateEndGame(newState);
+      handleStateUpdate(newState);
+    }
+
     // Clear game session when game ends (multiplayer only)
-    if (isMultiplayer && state.stage === "end") {
+    if (isMultiplayer && (state.stage === "end" || state.stage === "gameOver")) {
       clearGameSession();
       console.log("Game ended, session cleared");
     }
@@ -274,25 +275,17 @@ export function Game({
         </div>
       </div>
 
-      {/* End Game button for host */}
-      {isHost && state.stage !== "end" && (
+      {/* End Game button */}
+      {state.stage !== "end" && state.stage !== "endGameBonuses" && state.stage !== "gameOver" && (
         <div className="flex justify-end">
           <button
             onClick={handleEndGame}
             className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold"
+            disabled={isMultiplayer && !isHost}
+            title={isMultiplayer && !isHost ? "Only the host can end the game" : ""}
           >
             End Game
           </button>
-        </div>
-      )}
-
-      {/* Game ended message */}
-      {state.stage === "end" && (
-        <div className="p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg text-center">
-          <h2 className="text-2xl font-bold text-yellow-800 mb-2">Game Ended</h2>
-          <p className="text-yellow-700">
-            {isMultiplayer ? "This game has ended. You can close this page." : "Game Over!"}
-          </p>
         </div>
       )}
 
@@ -413,6 +406,21 @@ export function Game({
             />
           )}
         </>
+      )}
+
+      {/* End Game Bonuses Modal - show to all players */}
+      {state.stage === "endGameBonuses" && (
+        <EndGameBonusModal
+          state={state}
+          onUpdate={handleStateUpdate}
+          isReadOnly={isMultiplayer && !isHost}
+          currentPlayerName={isMultiplayer ? (isHost ? undefined : state.players[0]?.name) : undefined}
+        />
+      )}
+
+      {/* Game Over Screen - show to all players */}
+      {state.stage === "gameOver" && (
+        <GameOverScreen state={state} />
       )}
     </div>
   );

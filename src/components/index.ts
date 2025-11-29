@@ -7,3 +7,5 @@ export { PlayerHand } from "./PlayerHand";
 export { Board } from "./Board";
 export { YourTurnIndicator } from "./YourTurnIndicator";
 export { TilePlacementConfirmModal } from "./TilePlacementConfirmModal";
+export { default as EndGameBonusModal } from "./EndGameBonusModal";
+export { default as GameOverScreen } from "./GameOverScreen";

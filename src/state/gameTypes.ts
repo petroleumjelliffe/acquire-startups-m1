@@ -11,6 +11,8 @@ export type Stage =
   | "mergerLiquidation"
   | "liquidation"
   | "liquidationPrompt"
+  | "endGameBonuses"
+  | "gameOver"
   | "end";
 
   export interface TileCell {
@@ -87,4 +89,22 @@ export interface GameState {
   gameId?: string; // Multiplayer: unique game instance ID
   createdAt?: number; // Multiplayer: timestamp when game was created
   lastUpdated?: number; // Multiplayer: timestamp of last state update
+  endGameBonuses?: Array<{
+    startupId: string;
+    bonuses: Array<{
+      playerId: string;
+      playerName: string;
+      amount: number;
+      type: "majority" | "minority";
+    }>;
+  }>;
+  finalScores?: Array<{
+    playerId: string;
+    playerName: string;
+    cashBefore: number;
+    stockValue: number;
+    bonusTotal: number;
+    finalCash: number;
+  }>;
+  winners?: string[]; // Array of player IDs who won
 }
