@@ -34,7 +34,7 @@ export interface MergerContext {
 
   payoutQueue: string[]; //player ids in order
   currentChoiceIndex: number; //index in payoutQueue
-  sharePrice: number;
+  absorbedPrices: Record<string, number>; // Pre-merger prices for each absorbed startup
 
   currentLiquidationIndex: number;
   shareholderQueue: string[]; // ordered player IDs
