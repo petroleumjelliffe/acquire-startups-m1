@@ -61,7 +61,7 @@ export function createMergerContext(
     // payout phase defaults
     payoutQueue: [],
     currentChoiceIndex: 0,
-    sharePrice: 0,
+    absorbedPrices: {}, // Pre-merger prices for each absorbed startup
 
     // liquidation phase defaults
     currentLiquidationIndex: -1,
@@ -239,18 +239,25 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       // No tie - proceed with automatic survivor selection
       const survivorId = top.id;
 
+      const absorbedIds = touchingIds.filter((id) => id !== survivorId);
+
+      // ✅ FIX: Capture pre-merger prices BEFORE modifying board state
+      const absorbedPrices: Record<string, number> = {};
+      for (const absorbedId of absorbedIds) {
+        absorbedPrices[absorbedId] = getSharePrice(state, absorbedId);
+      }
+
       // Claim adjacent unclaimed before merging
       const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
       for (const g of group) state.board[g].startupId = survivorId;
 
-      const absorbedIds = touchingIds.filter((id) => id !== survivorId);
       mergeStartups(state, survivorId, absorbedIds);
       state.log.push(
         `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
       );
 
       state.stage = "mergerPayout";
-      prepareMergerPayout(state, survivorId, absorbedIds);
+      prepareMergerPayout(state, survivorId, absorbedIds, absorbedPrices);
     }
   }
 
@@ -386,11 +393,18 @@ export function completeSurvivorSelection(state: GameState, survivorId: string) 
     }
   }
 
+  const absorbedIds = touchingIds.filter((id) => id !== survivorId);
+
+  // ✅ FIX: Capture pre-merger prices BEFORE modifying board state
+  const absorbedPrices: Record<string, number> = {};
+  for (const absorbedId of absorbedIds) {
+    absorbedPrices[absorbedId] = getSharePrice(state, absorbedId);
+  }
+
   // Claim adjacent unclaimed before merging
   const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
   for (const g of group) state.board[g].startupId = survivorId;
 
-  const absorbedIds = touchingIds.filter((id) => id !== survivorId);
   mergeStartups(state, survivorId, absorbedIds);
   state.log.push(
     `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
@@ -405,7 +419,7 @@ export function completeSurvivorSelection(state: GameState, survivorId: string) 
   state.pendingMergerStartups = undefined;
 
   state.stage = "mergerPayout";
-  prepareMergerPayout(state, survivorId, absorbedIds);
+  prepareMergerPayout(state, survivorId, absorbedIds, absorbedPrices);
 }
 
 export function chooseFoundingBrand(
@@ -657,12 +671,14 @@ export function endBuyPhase(state: GameState) {
 export function prepareMergerPayout(
   state: GameState,
   survivorId: string,
-  absorbedIds: string[]
+  absorbedIds: string[],
+  absorbedPrices: Record<string, number>
 ) {
   const allBonuses: BonusResult[] = [];
 
   for (const absorbedId of absorbedIds) {
-    const price = getSharePrice(state, absorbedId);
+    // ✅ FIX: Use pre-merger price from passed-in prices
+    const price = absorbedPrices[absorbedId];
 
     const holdings = state.players
       .map((p) => ({
@@ -720,6 +736,8 @@ export function prepareMergerPayout(
 
   // Store merger context for UI
   state.mergerContext = createMergerContext(survivorId, absorbedIds);
+  // ✅ FIX: Store pre-merger prices in merger context
+  state.mergerContext.absorbedPrices = absorbedPrices;
   state.stage = "mergerPayout";
 
   // Save the computed bonuses for the modal
@@ -974,7 +992,9 @@ export function handleLiquidationChoice(
   const absorbed = state.startups[absorbedId];
   const survivor = state.startups[survivorId];
   const shares = player.portfolio[absorbedId] || 0;
-  const price = getSharePrice(state, absorbedId);
+
+  // ✅ FIX: Use pre-merger price from merger context
+  const price = state.mergerContext?.absorbedPrices[absorbedId] || getSharePrice(state, absorbedId);
 
   switch (choice) {
     case "sell": {
@@ -1039,16 +1059,27 @@ export function completeLiquidation(state: GameState, absorbedId: string) {
   const absorbed = state.startups[absorbedId];
   if (!absorbed) return;
 
+  // ✅ FIX: Count how many shares are held by players (not sold or traded)
+  const heldShares = state.players.reduce(
+    (sum, p) => sum + (p.portfolio[absorbedId] || 0),
+    0
+  );
+
   absorbed.isFounded = false;
   absorbed.foundingTile = null;
-  absorbed.availableShares = absorbed.totalShares;
+
+  // ✅ FIX: Only reset available shares accounting for held shares
+  // This preserves held shares in player portfolios
+  absorbed.availableShares = absorbed.totalShares - heldShares;
 
   // Remove all tiles from board for this startup
   for (const cell of Object.values(state.board)) {
     if (cell.startupId === absorbedId) cell.startupId = undefined;
   }
 
-  state.log.push(`${absorbedId} has been liquidated.`);
+  state.log.push(`${absorbedId} has been liquidated. ${heldShares} share(s) held by players.`);
+
+  // ✅ NOTE: We do NOT clear player portfolios here - held shares persist!
 
   // Proceed to next liquidation if any remain
   nextLiquidation(state);
