@@ -794,7 +794,7 @@ export function finalizeMergerPayout(state: GameState) {
 
   ctx.shareholderQueue = shareholders;
   ctx.currentShareholderIndex = 0;
-  ctx.sharePrice = getSharePrice(state, firstAbsorbed);
+  // Note: Pre-merger price already stored in ctx.absorbedPrices[firstAbsorbed]
 
   if (shareholders.length > 0) {
     ctx.activePlayerId = shareholders[0];
@@ -837,7 +837,7 @@ export function advanceToNextAbsorbedStartup(state: GameState) {
 
     ctx.shareholderQueue = shareholders;
     ctx.currentShareholderIndex = 0;
-    ctx.sharePrice = getSharePrice(state, nextAbsorbed);
+    // Note: Pre-merger price already stored in ctx.absorbedPrices[nextAbsorbed]
 
     if (shareholders.length > 0) {
       ctx.activePlayerId = shareholders[0];
@@ -872,7 +872,8 @@ export function completePlayerMergerLiquidation(
 
   const player = state.players.find((p) => p.id === playerId)!;
   const survivor = state.startups[ctx.survivorId];
-  const sharePrice = ctx.sharePrice;
+  // ✅ FIX: Use pre-merger price from merger context
+  const sharePrice = ctx.absorbedPrices[absorbedId] || 0;
 
   const tradeCost = trade * 2;
   const sellGain = sell * sharePrice;
