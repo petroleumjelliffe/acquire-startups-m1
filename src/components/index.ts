@@ -7,3 +7,4 @@ export { PlayerHand } from "./PlayerHand";
 export { Board } from "./Board";
 export { YourTurnIndicator } from "./YourTurnIndicator";
 export { TilePlacementConfirmModal } from "./TilePlacementConfirmModal";
+export { PlayerTray } from "./tray";
