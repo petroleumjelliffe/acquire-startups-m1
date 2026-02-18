@@ -1,24 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { GameState } from "./state/gameTypes";
 import { createInitialGame } from "./state/gameInit";
 import { handleTilePlacement, completeSurvivorSelection } from "./state/gameLogic";
 import { Board } from "./components/Board";
-import { PlayerHand } from "./components/PlayerHand";
 import { GameLog } from "./components/GameLog";
 import { Coord } from "./utils/gameHelpers";
 import { DrawModal } from "./components/DrawModal";
-import { BuyModal } from "./components/BuyModal";
-import { MergerPayoutModal, FoundStartupModal } from "./components"; //barrelfile
+import { MergerPayoutModal, FoundStartupModal, PlayerTray } from "./components"; //barrelfile
 import { MergerLiquidationModal } from "./components/MergerLiquidation";
 import { SurvivorSelectionModal } from "./components/SurvivorSelectionModal";
 import { PlayerSummary } from "./components/PlayerSummary";
-import { PlayerStatusPanel } from "./components/PlayerStatusPanel";
 import { WaitingForPlayer } from "./components/WaitingForPlayer";
 import { YourTurnIndicator } from "./components/YourTurnIndicator";
 import { TilePlacementConfirmModal } from "./components/TilePlacementConfirmModal";
 import { useSocket } from "./context/SocketContext";
 import { clearGameSession } from "./utils/gameSession";
-import { useEffect } from "react";
 
 export function Game({
   seed,
@@ -297,16 +293,30 @@ export function Game({
       )}
 
       <h2 className="font-semibold">Current: {cur.name}</h2>
-      <Board
-        board={state.board}
-        onPlace={placeTile}
-        startups={state.startups}
-        currentHand={myPlayer?.hand || []}
-        highlightedTile={pendingTile || selectedTile}
-        players={state.players}
-        showHandPreviews={isMultiplayer}
-      />
-      {myPlayer && <PlayerHand name={myPlayer.name} hand={myPlayer.hand} onSelect={handleTileSelection} selectedTile={selectedTile} />}
+      <div className="pb-48"> {/* Padding for PlayerTray */}
+        <Board
+          board={state.board}
+          onPlace={placeTile}
+          startups={state.startups}
+          currentHand={myPlayer?.hand || []}
+          highlightedTile={pendingTile || selectedTile}
+          players={state.players}
+          showHandPreviews={isMultiplayer}
+        />
+      </div>
+
+      {/* Player Tray - fixed at bottom */}
+      {myPlayer && (
+        <PlayerTray
+          state={state}
+          onUpdate={handleStateUpdate}
+          isMultiplayer={isMultiplayer}
+          playerId={playerId}
+          selectedTile={selectedTile}
+          onTileSelect={handleTileSelection}
+          onCancel={cancelModalAndReturnToPlay}
+        />
+      )}
 
       {/* Tile placement confirmation modal */}
       {showConfirmation && pendingTile && (
@@ -405,13 +415,7 @@ export function Game({
               onCancel={cancelModalAndReturnToPlay}
             />
           )}
-          {state.stage === "buy" && (
-            <BuyModal
-              state={state}
-              onUpdate={handleStateUpdate}
-              onCancel={cancelModalAndReturnToPlay}
-            />
-          )}
+          {/* BuyModal replaced by PlayerTray */}
         </>
       )}
     </div>
