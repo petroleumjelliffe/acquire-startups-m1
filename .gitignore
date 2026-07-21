@@ -37,3 +37,6 @@ coverage/
 
 # Game files
 server/games/
+
+# work trees
+.worktrees/
