@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Acquire — Layout Prototype</title>
+<style>
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:#111827; background:#f9fafb;
+    height:100dvh; overflow:hidden; display:grid; grid-template-rows:auto 1fr;
+    font-size:14px; line-height:1.4;
+  }
+  button{font:inherit; color:inherit;}
+  select{font:inherit; color:inherit;}
+  button:focus-visible, select:focus-visible, input:focus-visible{outline:2px solid #3b82f6; outline-offset:1px;}
+
+  /* ---------- Header ---------- */
+  .topbar{
+    border-bottom:1px solid #e5e7eb; background:#fff;
+    padding:8px 16px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  }
+  .brand{font-weight:700; font-size:14px;}
+  .field{display:flex; align-items:center; gap:4px; font-size:14px;}
+  .field select{padding:2px 4px; border-radius:4px; border:1px solid #d1d5db; background:#fff;}
+  .check-field{display:flex; align-items:center; gap:4px; font-size:14px; cursor:pointer;}
+  .reset-btn{margin-left:auto; padding:4px 12px; border:1px solid #d1d5db; border-radius:4px; background:#fff; cursor:pointer; font-size:13px;}
+  .reset-btn:hover{background:#f3f4f6;}
+
+  /* ---------- Main layout ---------- */
+  .main{overflow:hidden; position:relative;}
+  .main.side{display:grid; grid-template-columns:1fr 320px;}
+  .main.bottom{display:grid; grid-template-rows:1fr auto;}
+
+  .board-wrap{overflow:hidden; display:flex; align-items:center; justify-content:center; padding:16px;}
+  .board{
+    display:grid; grid-template-columns:22px repeat(12,1fr); gap:1px;
+    height:100%; max-width:100%; aspect-ratio:13/10;
+  }
+  .board .colhead, .board .rowhead{
+    display:flex; align-items:center; justify-content:center; font-size:11px; color:#4b5563;
+  }
+  .cell{
+    position:relative; border:1px solid #d1d5db; font-size:11px; color:#374151;
+    display:flex; align-items:center; justify-content:center; padding:0; background:#f3f4f6;
+  }
+  .cell.placed{background:#333333; color:#fff;}
+  .cell.hand{
+    cursor:pointer; background:#93c5fd; border:2px solid #3b82f6; color:#1e40af; font-weight:700; opacity:.85;
+  }
+  .cell.hand:hover{background:#60a5fa; opacity:1;}
+  .cell.selected{outline:3px solid #2563eb; outline-offset:-3px; z-index:2;}
+  .cell.founded .coord{opacity:0;}
+  .cell.founded:hover .coord, .cell.founded:focus-visible .coord{opacity:1;}
+  .cell .tile-owner{
+    position:absolute; top:1px; right:1px; z-index:3;
+    font-size:8px; font-weight:700; line-height:1; padding:1px 2px; border-radius:2px;
+    background:rgba(255,255,255,0.85); color:#111827;
+  }
+  .cell .founder-label{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center; overflow:hidden;
+    background:rgba(255,255,255,0.6);
+  }
+  .cell .founder-label span{
+    font-size:9px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:94%;
+  }
+
+  /* startup brand colors — exact match to src/styles/index.css */
+  .brand-Gobble{background:#fecaca; border-color:#d90000; color:#991b1b;}
+  .brand-Scrapple{background:#fed7aa; border-color:#e08e00; color:#9a3412;}
+  .brand-PaperfulPost{background:#bbf7d0; border-color:#00e00f; color:#166534;}
+  .brand-WrecksonMobil{background:#bfdbfe; border-color:#6790e7; color:#1e40af;}
+  .brand-Messla{background:#fecdd3; border-color:#ffadaf; color:#9f1239;}
+  .brand-CamCrooned{background:#f5d0fe; border-color:#e000ce; color:#86198f;}
+  .brand-ZuckFace{background:#d1fae5; border-color:#87dba3; color:#065f46;}
+  .brand-Cash{background:#dcfce7; border-color:#16a34a; color:#15803d;}   /* "Cash" as a brand (liquidation sell) */
+
+  /* ---------- Panel ---------- */
+  .panel{display:flex; flex-direction:column; gap:14px; padding:16px; overflow-y:auto;}
+  .main.side .panel{border-left:1px solid #e5e7eb;}
+  .main.bottom .panel{border-top:1px solid #e5e7eb; flex-direction:row; align-items:flex-start; gap:24px; max-height:38vh;}
+  .main.bottom .panel > .players-block{flex:0 0 180px;}
+  .main.bottom .panel > .stepstack{flex:0 0 170px;}
+  .main.bottom .panel > .active-step{flex:1; min-width:260px;}
+
+  .block-title{font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.03em; margin-bottom:4px;}
+
+  /* players (roster now in sidebar) */
+  .players-block{display:flex; flex-direction:column; gap:4px;}
+  .player-row{
+    display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:6px;
+    border:1px solid #e5e7eb; font-size:13px; flex-wrap:wrap;
+  }
+  .player-row.active{border-color:#3b82f6; background:#eff6ff;}
+  .player-dot{width:8px; height:8px; border-radius:50%; background:#22c55e; flex:none;}
+  .player-row .nm{font-weight:600;}
+  .player-row .turn-tag{font-size:10px; font-weight:700; text-transform:uppercase; color:#2563eb; letter-spacing:.03em;}
+  .player-row .csh{margin-left:auto;}
+  .player-row .chips{flex-basis:100%; display:flex; flex-wrap:wrap; gap:4px; margin-top:2px;}
+
+  .stepstack{display:flex; flex-direction:column; gap:12px;}
+  .step-block{display:flex; flex-direction:column; gap:3px;}
+  .step-block .stage-label{display:flex; align-items:center; gap:8px;}
+  .step-undo{border:none; background:none; color:#9ca3af; cursor:pointer; font:inherit; font-size:11px; text-transform:none; letter-spacing:normal; font-weight:500; padding:0;}
+  .step-undo:hover{color:#2563eb; text-decoration:underline;}
+  .step-done{font-size:13px; color:#4b5563;}
+  .step-done b{color:#111827; font-weight:600;}
+
+  .active-step{display:flex; flex-direction:column; gap:12px; font-size:14px; padding-top:10px; border-top:1px solid #e5e7eb;}
+  .active-step p{margin:0;}
+  .active-step .hint{font-size:12px; color:#6b7280;}
+  .stage-label{font-size:12px; color:#6b7280; font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+
+  .option-row{display:flex; flex-wrap:wrap; gap:8px; align-items:flex-start;}
+
+  /* ---- brand indicator: a company's identity (filled). distinct from a stock card (a share). ---- */
+  .brand{
+    display:inline-flex; align-items:center; gap:5px; border-width:1px; border-style:solid;
+    border-radius:4px; padding:3px 9px; font-size:14px; font-weight:600;
+    line-height:1.35; vertical-align:middle;
+  }
+  button.brand{cursor:pointer;}
+  .brand.selected{outline:2px solid #2563eb; outline-offset:1px;}
+  .brand.disabled, .brand:disabled{opacity:.5; cursor:not-allowed;}
+  .brand.sm{font-size:12px; padding:1px 7px;}
+
+  /* ---- stock card: one share of a brand (outlined). + count → a stack. ---- */
+  .stock{
+    display:inline-flex; align-items:center; gap:5px;
+    border:1px solid; border-radius:4px; padding:3px 8px;
+    font-size:14px; font-weight:500; background:none; cursor:default;
+    vertical-align:middle; line-height:1.35; text-align:left;
+  }
+  button.stock{cursor:pointer;}
+  .stock.selected{outline:2px solid #2563eb; outline-offset:1px;}
+  .stock.disabled, .stock:disabled{opacity:.5; cursor:not-allowed;}
+  .stock.sm{font-size:12px; padding:1px 6px; gap:4px;}
+  .stock.muted{border-color:#e5e7eb; color:#9ca3af;}
+  .stock .x{width:14px; height:14px; border-radius:50%; background:rgba(0,0,0,0.12); display:flex; align-items:center; justify-content:center; font-size:10px; margin:0 -3px 0 1px;}
+
+  /* ---- stock stack = a stock card + a share count outside it ---- */
+  .stock-stack{display:inline-flex; align-items:center; gap:4px; vertical-align:middle;}
+  .stock-stack.disabled{opacity:.55;}
+  .stock-stack-body{display:inline-flex; align-items:center; gap:6px; font:inherit; color:inherit; background:none; border:1px solid transparent; border-radius:8px; padding:4px;}
+  .stock-stack.sm .stock-stack-body{gap:5px; padding:2px;}
+  button.stock-stack-body{cursor:pointer;}
+  button.stock-stack-body:hover{background:#f3f4f6; border-color:#e5e7eb;}
+  .stock-stack .stack-qty{font-variant-numeric:tabular-nums; font-weight:600; color:#374151;}
+  .stock-stack.sm .stack-qty{font-size:12px;}
+  .stock-stack .stack-qty.zero{color:#9ca3af;}
+  .stack-x{width:18px; height:18px; border:none; border-radius:50%; background:rgba(0,0,0,0.12); color:inherit; cursor:pointer; font-size:12px; line-height:1; display:inline-flex; align-items:center; justify-content:center; padding:0;}
+  .stack-x:hover{background:rgba(0,0,0,0.22);}
+
+  /* ---- liquidation: queue of holders + held / sell / trade stacks ---- */
+  .liq-lanes{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;}
+  .liq-queue{display:flex; flex-wrap:wrap; gap:8px;}
+  .liq-queue-item{display:inline-flex; align-items:center; gap:5px; padding:4px 8px; border:1px solid #e5e7eb; border-radius:6px; font-size:12px; color:#6b7280;}
+  .liq-queue-item.current{border-color:#3b82f6; background:#eff6ff; color:#111827; font-weight:600;}
+  .liq-queue-item.done{opacity:.5;}
+  .liq-queue-item.done::before{content:"✓"; margin-right:1px;}
+  .liq-lane{display:flex; flex-direction:column; gap:6px; align-items:flex-start;}
+  .liq-lane-label{font-size:12px; color:#6b7280; font-weight:600;}
+  .liq-reset{border:none; background:none; color:#2563eb; cursor:pointer; font:inherit; text-decoration:underline; padding:0; margin-left:4px;}
+
+
+  /* ---- tile: inline (hand / log). board cells are the board-size variant. ---- */
+  .tile{
+    display:inline-flex; align-items:center; justify-content:center;
+    border:1px solid #3b82f6; border-radius:4px; padding:3px 9px;
+    font-size:14px; font-weight:600; background:none; color:#1d4ed8;
+    line-height:1.35; vertical-align:middle;
+  }
+  button.tile{cursor:pointer;}
+  .tile.selectable:hover{background:#eff6ff;}
+  .tile.selected{outline:2px solid #2563eb; outline-offset:1px;}
+  .tile.placed{background:#333; color:#fff; border-color:#333;}
+
+  /* ---- cash: money. green in, red out. ---- */
+  .cash{font-variant-numeric:tabular-nums; font-weight:600; color:#15803d;}
+  .cash.neg{color:#b91c1c;}
+  .cash.zero{color:#9ca3af;}
+
+  /* ---- price: a stock's value. neutral base; change tinted up-green / down-red. ---- */
+  .price{font-variant-numeric:tabular-nums; color:#6b7280; font-weight:500;}
+  .price .price-arrow{margin:0 3px; font-weight:700;}
+  .price .price-next{font-weight:600;}
+  .price .price-arrow.up, .price .price-next.up{color:#15803d;}
+  .price .price-arrow.down, .price .price-next.down{color:#b91c1c;}
+
+  .primary-btn{background:#2563eb; color:#fff; border:none; border-radius:4px; padding:5px 14px; font-size:14px; cursor:pointer; align-self:flex-start;}
+  .primary-btn:disabled{opacity:.5; cursor:not-allowed;}
+
+  table.data{width:100%; font-size:12px; border-collapse:collapse;}
+  table.data th{text-align:left; color:#4b5563; font-weight:600; padding:3px 6px; border-bottom:1px solid #e5e7eb;}
+  table.data td{padding:3px 6px; border-bottom:1px solid #e5e7eb;}
+  table.data th:not(:first-child), table.data td:not(:first-child){text-align:right;}
+
+  .bonus-line{font-size:14px;}
+  .bonus-line b{color:#15803d;}
+
+  .buy-total{font-size:14px; font-weight:600;}
+  .hold-note{font-size:12px; color:#6b7280;}
+
+  ol.standings{margin:0; padding-left:20px;}
+  ol.standings li{font-size:14px; padding:2px 0;}
+
+  /* ---------- Component gallery ---------- */
+  .gallery{position:absolute; inset:0; background:#fff; z-index:30; overflow:auto; padding:24px 28px;}
+  .gallery h2{font-size:12px; text-transform:uppercase; letter-spacing:.04em; color:#6b7280; margin:26px 0 10px; font-weight:700;}
+  .gallery h2:first-of-type{margin-top:8px;}
+  .gallery .row{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end;}
+  .gallery .swatch{display:flex; flex-direction:column; gap:5px; align-items:flex-start;}
+  .gallery .swatch small{font-size:11px; color:#9ca3af;}
+  .gallery-close{position:absolute; top:16px; right:20px;}
+  .phase-showcases{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start;}
+  .phase-showcase{border:1px solid #e5e7eb; border-radius:8px; padding:0 16px 16px; width:340px; background:#fff; pointer-events:none;}
+  .phase-showcase-label{font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:#9ca3af; font-weight:700; padding:12px 0 2px;}
+  .phase-showcase .active-step{border-top:none; padding-top:4px;}
+
+  /* ---------- Pass-and-play overlay ---------- */
+  .reveal-overlay{
+    position:absolute; inset:0; background:rgba(255,255,255,0.96); z-index:20;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+  }
+  .reveal-overlay .pass-name{font-size:18px; font-weight:700; color:#1f2937;}
+  .reveal-overlay button{
+    background:#2563eb; color:#fff; border:none; border-radius:8px; padding:12px 24px; font-size:14px; font-weight:600; cursor:pointer;
+  }
+  .reveal-overlay button:hover{background:#1d4ed8;}
+</style>
+
+<div class="topbar">
+  <div class="brand">Prototype</div>
+
+  <label class="field">Layout:
+    <select id="layoutSelect">
+      <option value="side">Side panel</option>
+      <option value="bottom">Bottom panel</option>
+    </select>
+  </label>
+
+  <label class="check-field">
+    <input type="checkbox" id="passPlayToggle" />
+    Pass-and-play mode
+  </label>
+
+  <button class="reset-btn" id="galleryBtn">◧ Components</button>
+  <button class="reset-btn" id="resetBtn">↺ Reset turn</button>
+</div>
+
+<div class="main side" id="main">
+  <div class="board-wrap"><div class="board" id="board"></div></div>
+  <div class="panel" id="panel"></div>
+</div>
+
+<script>
+/* ============================================================
+   Static config
+   ============================================================ */
+const ROWS = "ABCDEFGHI".split("");
+const COLS = Array.from({length:12},(_,i)=>i+1);
+
+const STARTUPS = {
+  Gobble:{tier:2}, Scrapple:{tier:2}, PaperfulPost:{tier:0}, CamCrooned:{tier:1},
+  Messla:{tier:0}, ZuckFace:{tier:1}, WrecksonMobil:{tier:1},
+};
+
+const THRESHOLDS = [2,3,4,5,6,11,21,31,41];
+const TIER_PRICES = [
+  [200,300,400,500,600,700,800,900,1000],
+  [300,400,500,600,700,800,900,1000,1100],
+  [400,500,600,700,800,900,1000,1100,1200],
+];
+function priceIndexForSize(size){ let idx=0; for(let i=0;i<THRESHOLDS.length;i++) if(size>=THRESHOLDS[i]) idx=i; return idx; }
+function sharePrice(tier,size){ return TIER_PRICES[tier][priceIndexForSize(size)]; }
+
+/* orthogonal neighbours of a coord like "E10" */
+function neighbors(coord){
+  const r = coord[0], c = parseInt(coord.slice(1),10);
+  const ri = ROWS.indexOf(r), out = [];
+  if(ri>0) out.push(ROWS[ri-1]+c);
+  if(ri<ROWS.length-1) out.push(ROWS[ri+1]+c);
+  if(c>1) out.push(r+(c-1));
+  if(c<12) out.push(r+(c+1));
+  return out;
+}
+
+/* ============================================================
+   Game state — a real, mutable single-turn machine
+   ============================================================ */
+let game, ui;
+
+/* ---- undo: a snapshot before each step; undo reverts to that static state ---- */
+let history = [], curHist = -1;
+function beginAction(){ curHist = history.push(structuredClone(game)) - 1; }
+function addStep(step){ step.histIdx = curHist; game.steps.push(step); }
+function undoTo(histIdx){
+  if(histIdx < 0 || histIdx >= history.length) return;
+  game = history[histIdx];          // restore the state captured before that step
+  history.length = histIdx;         // drop that snapshot and everything after
+  ui.selectedTile = null; ui.foundChoice = null; ui.survivorChoice = null; ui.liqSell = 0; ui.liqTrade = 0;
+  render();
+}
+
+function makeStartups(){
+  const s = {};
+  Object.entries(STARTUPS).forEach(([id,info])=>{
+    s[id] = {id, tier:info.tier, tiles:[], foundingTile:null, size:0, price:0, isFounded:false, availableShares:25};
+  });
+  return s;
+}
+function emptyBoard(){ const b={}; ROWS.forEach(r=>COLS.forEach(c=>{ b[r+c]={placed:false}; })); return b; }
+
+function foundInit(g, id, tiles){
+  const st = g.startups[id];
+  tiles.forEach(t=> g.board[t] = {placed:true, startupId:id});
+  st.tiles=[...tiles]; st.foundingTile=tiles[0]; st.size=tiles.length; st.isFounded=true;
+  st.price = sharePrice(st.tier, st.size);
+}
+
+function initGame(){
+  const g = {
+    board: emptyBoard(),
+    startups: makeStartups(),
+    players: [
+      {id:"p1", name:"Alex",   cash:4200, hand:["E6","E2","E10","G6","A12","I1"], portfolio:{Messla:4, ZuckFace:2}},
+      {id:"p2", name:"Sam",    cash:5800, hand:[], portfolio:{Messla:2, ZuckFace:5}},
+      {id:"p3", name:"Jordan", cash:3100, hand:[], portfolio:{Messla:3, ZuckFace:3}},
+    ],
+    activeIdx: 0,
+    stage: "play",
+    steps: [],
+    placedTile: null,
+    pendingFound: null,
+    merger: null,
+    cart: [],
+    summary: null,
+  };
+  // Two equal chains with a mergeable gap at E6, plus a lone tile at G5.
+  foundInit(g, "Messla",   ["E3","E4","E5"]);
+  foundInit(g, "ZuckFace", ["E7","E8","E9"]);
+  g.board["G5"] = {placed:true}; // lone unaffiliated tile → G6 can found next to it
+  // available shares reflect what players already hold
+  ["Messla","ZuckFace"].forEach(id=>{
+    const held = g.players.reduce((n,p)=>n+(p.portfolio[id]||0),0);
+    g.startups[id].availableShares = 25 - held;
+  });
+  g.turnHand = [...g.players[g.activeIdx].hand];   // the turn's placeable tiles (kept for switching)
+
+  game = g;
+  ui = {
+    layout: (ui && ui.layout) || "side",
+    passPlay: (ui && ui.passPlay) || false,
+    revealed: !((ui && ui.passPlay)),
+    selectedTile: null,
+    liqSell:0, liqTrade:0,
+    survivorChoice:null, foundChoice:null,
+    gallery: (ui && ui.gallery) || false,
+  };
+}
+
+function activePlayer(){ return game.players[game.activeIdx]; }
+
+/* ---------- absorb tiles into a chain, recompute size/price ---------- */
+function absorbInto(id, tiles){
+  const st = game.startups[id];
+  st.isFounded = true;
+  tiles.forEach(t=>{
+    game.board[t] = {placed:true, startupId:id};
+    if(!st.tiles.includes(t)) st.tiles.push(t);
+  });
+  if(!st.foundingTile) st.foundingTile = st.tiles[0];
+  st.size = st.tiles.length;
+  st.price = sharePrice(st.tier, st.size);
+}
+
+/* ============================================================
+   Placement → transitions
+   ============================================================ */
+function placeTile(coord){
+  const g = game;
+  const adj = neighbors(coord).filter(n => g.board[n] && g.board[n].placed);
+  const chains = [...new Set(adj.map(n=>g.board[n].startupId).filter(Boolean))];
+  const loneAdj = adj.filter(n=> g.board[n].placed && !g.board[n].startupId);
+
+  g.board[coord] = {placed:true};
+  g.placedTile = coord;
+  ui.selectedTile = null;
+  // remove from hand; tag this player's last-placed tile
+  const p = activePlayer();
+  p.hand = p.hand.filter(h=>h!==coord);
+  p.lastPlaced = coord;
+
+  if(chains.length >= 2){
+    startMerger(coord, chains, loneAdj);
+  } else if(chains.length === 1){
+    absorbInto(chains[0], [coord, ...loneAdj]);
+    addStep({phase:"Place a tile", detail:`${tileToken(coord)} → grew ${brand(chains[0])}`});
+    g.stage = "buy";
+  } else if(loneAdj.length >= 1){
+    g.pendingFound = {tiles:[coord, ...loneAdj]};
+    addStep({phase:"Place a tile", detail:`${tileToken(coord)} → new chain`});
+    g.stage = "foundStartup";
+  } else {
+    addStep({phase:"Place a tile", detail:`${tileToken(coord)} → isolated`});
+    g.stage = "buy";
+  }
+}
+
+/* ---------- found ---------- */
+function chooseFoundBrand(id){
+  const g = game;
+  absorbInto(id, g.pendingFound.tiles);
+  const p = activePlayer();
+  p.portfolio[id] = (p.portfolio[id]||0) + 1;      // founder's free share
+  g.startups[id].availableShares -= 1;
+  addStep({phase:"Found a startup", detail:`${brand(id)} (+1 free share)`});
+  g.pendingFound = null;
+  ui.foundChoice = null;
+  g.stage = "buy";
+}
+
+/* ---------- merger ---------- */
+function startMerger(coord, chains, loneAdj){
+  const g = game;
+  const sizes = chains.map(id=>({id, size:g.startups[id].size}));
+  const maxSize = Math.max(...sizes.map(s=>s.size));
+  const largest = sizes.filter(s=>s.size===maxSize).map(s=>s.id);
+  g.merger = { chains, coord, loneAdj, tied: largest.length>1 ? largest : null, survivorId: null };
+  addStep({phase:"Place a tile", detail:`${tileToken(coord)} → merger`});
+  g.stage = "merger";
+  if(largest.length === 1) finalizeSurvivor(largest[0]);   // no tie → the victor is decided
+}
+function finalizeSurvivor(survivorId){
+  const g = game, m = g.merger;
+  m.survivorId = survivorId;
+  m.absorbedIds = m.chains.filter(id=>id!==survivorId);
+  m.absorbedPrices = {};
+  m.absorbedIds.forEach(id=> m.absorbedPrices[id] = g.startups[id].price);
+  m.bonuses = computeBonuses(m.absorbedIds);
+  addStep({phase:"Merger", detail:brand(survivorId)});
+  g.stage = "merger";   // proceed to the payout view (undo to change the victor)
+}
+function computeBonuses(absorbedIds){
+  const out = [];
+  absorbedIds.forEach(id=>{
+    const price = game.startups[id].price;
+    const holders = game.players.map(p=>({name:p.name, shares:p.portfolio[id]||0}))
+      .filter(h=>h.shares>0).sort((a,b)=>b.shares-a.shares);
+    if(!holders.length) return;
+    const top = holders[0].shares;
+    const maj = holders.filter(h=>h.shares===top);
+    if(maj.length>1){
+      const each = Math.round((price*10+price*5)/maj.length/100)*100;
+      maj.forEach(h=> out.push({absorbed:id, player:h.name, type:"majority", amount:each}));
+    } else {
+      out.push({absorbed:id, player:maj[0].name, type:"majority", amount:price*10});
+      const rest = holders.filter(h=>h.shares<top);
+      if(rest.length){
+        const min = rest[0].shares;
+        const minH = rest.filter(h=>h.shares===min);
+        const each = minH.length>1 ? Math.round(price*5/minH.length/100)*100 : price*5;
+        minH.forEach(h=> out.push({absorbed:id, player:h.name, type:"minority", amount:each}));
+      }
+    }
+  });
+  return out;
+}
+function finalizePayout(){
+  const g = game, m = g.merger;
+  m.bonuses.forEach(b=>{ const p=g.players.find(x=>x.name===b.player); if(p) p.cash += b.amount; });
+  addStep({phase:"Merger payout", detail:m.bonuses.map(b=>`${b.player} +$${b.amount}`).join(' · ') || "no shareholders"});
+  setupLiquidation();
+}
+function setupLiquidation(){
+  const g = game, m = g.merger;
+  // queue: every holder of an absorbed chain, in player order starting from the merger-maker (active player)
+  const order = g.players.map((_,i)=>g.players[(g.activeIdx+i)%g.players.length]);
+  const queue = [];
+  m.absorbedIds.forEach(absorbedId=>{
+    order.forEach(pl=>{ if((pl.portfolio[absorbedId]||0) > 0) queue.push({playerId:pl.id, absorbedId}); });
+  });
+  m.liqQueue = queue; m.liqIdx = 0; m.liqResults = [];
+  if(queue.length){
+    m.liq = queue[0];
+    ui.liqSell=0; ui.liqTrade=0;
+    g.stage = "mergerLiquidation";
+    beginAction();   // one snapshot for the whole liquidation — its single undo dismisses every player's choices
+  } else {
+    completeMerger();
+  }
+}
+/* liquidation sorting — tap actions (increment only; "reset" clears) */
+function liqRemaining(){
+  const m = game.merger, liq = m.liq, p = game.players.find(x=>x.id===liq.playerId);
+  return (p.portfolio[liq.absorbedId]||0) - ui.liqSell - ui.liqTrade;
+}
+function liqSellOne(){ if(liqRemaining() >= 1) ui.liqSell++; }         // 1 absorbed → 1 Cash card
+function liqUnsell(){ if(ui.liqSell > 0) ui.liqSell--; }               // remove: back into the stock
+function liqTradeTwo(){ if(liqRemaining() >= 2) ui.liqTrade += 2; }    // 2 absorbed → 1 survivor
+function liqUntrade(){ if(ui.liqTrade >= 2) ui.liqTrade -= 2; }        // remove: 2 back into the stock
+
+function confirmLiquidation(){
+  const g = game, m = g.merger, liq = m.liq;
+  const p = g.players.find(x=>x.id===liq.playerId);
+  const price = m.absorbedPrices[liq.absorbedId];
+  const owned = p.portfolio[liq.absorbedId]||0;
+  const sold = ui.liqSell, traded = ui.liqTrade, converted = Math.floor(traded/2);
+  p.cash += sold*price;
+  p.portfolio[liq.absorbedId] = owned - sold - traded;
+  p.portfolio[m.survivorId] = (p.portfolio[m.survivorId]||0) + converted;
+  g.startups[m.survivorId].availableShares -= converted;
+  m.liqResults.push({name:p.name, sold, traded});
+  m.liqIdx++;
+  if(m.liqIdx < m.liqQueue.length){
+    m.liq = m.liqQueue[m.liqIdx];   // next holder's turn — no separate step/snapshot
+    ui.liqSell=0; ui.liqTrade=0;
+  } else {
+    // all holders done — one consolidated step for the whole liquidation
+    addStep({phase:`Liquidate ${m.absorbedIds.join(' & ')}`, detail: m.liqResults.map(r=>`${r.name}: sold ${r.sold}, traded ${r.traded}`).join(' · ')});
+    completeMerger();
+  }
+}
+function completeMerger(){
+  const g = game, m = g.merger;
+  const allTiles = [m.coord, ...m.loneAdj];
+  m.absorbedIds.forEach(id=>{
+    allTiles.push(...g.startups[id].tiles);
+    g.startups[id].isFounded = false; g.startups[id].tiles = []; g.startups[id].size = 0;
+  });
+  absorbInto(m.survivorId, allTiles);
+  g.stage = "buy";
+}
+
+/* ---------- buy / end turn ---------- */
+function buyableStartups(){
+  return Object.values(game.startups).filter(s=>s.isFounded && s.availableShares>0)
+    .map(s=>({id:s.id, price:s.price}));
+}
+function endTurn(){
+  const g = game, p = activePlayer();
+  g.cart.forEach(it=>{ p.cash -= it.price; p.portfolio[it.id]=(p.portfolio[it.id]||0)+1; g.startups[it.id].availableShares -= 1; });
+  addStep({phase:"Buy shares", detail: g.cart.length ? boughtStacks(g.cart) : "nothing"});
+  g.cart = [];
+  g.stage = "turnComplete";
+}
+
+/* ============================================================
+   Rendering
+   ============================================================ */
+function renderBoard(){
+  const g = game;
+  // keep the hand highlighted on the board through the whole turn so the move can be switched
+  const hand = (ui.revealed && g.stage!=="turnComplete") ? activePlayer().hand : [];
+  const owners = {};   // each player's last-placed tile → their initial
+  g.players.forEach(pl=>{ if(pl.lastPlaced) owners[pl.lastPlaced] = pl.name[0]; });
+  let html = `<div></div>`;
+  COLS.forEach(c => html += `<div class="colhead">${c}</div>`);
+  ROWS.forEach(r => {
+    html += `<div class="rowhead">${r}</div>`;
+    COLS.forEach(c => {
+      const id = r+c;
+      const cell = g.board[id];
+      const startup = cell.startupId ? g.startups[cell.startupId] : null;
+      const founded = !!(startup && startup.isFounded);
+      const inHand = hand.includes(id) && !cell.placed;
+      const selected = g.placedTile === id;   // the current move — ringed so it reads as "selected"
+      const classes = ["cell"];
+      if(cell.placed) classes.push("placed");
+      if(founded) classes.push("founded", `brand-${cell.startupId}`);
+      if(inHand) classes.push("hand");
+      if(selected) classes.push("selected");
+      const clickable = inHand || selected;
+      html += `<button class="${classes.join(' ')}" ${clickable? `onclick="onBoardCellClick('${id}')"` : 'tabindex="-1"'} title="${id}">
+        <span class="coord">${id}</span>
+        ${owners[id] ? `<span class="tile-owner">${owners[id]}</span>` : ''}
+        ${founded && id===startup.foundingTile ? `<div class="founder-label"><span>${cell.startupId}</span></div>` : ''}
+      </button>`;
+    });
+  });
+  document.getElementById("board").innerHTML = html;
+}
+function onBoardCellClick(coord){ switchPlacement(coord); }
+
+/* place `coord`, or — if a tile is already placed this turn — swap to it (revert the old placement first).
+   the other hand tiles stay visible so the move can be changed; undo also reverses it. */
+function switchPlacement(coord){
+  if(game.stage==="turnComplete" || !game.turnHand || !game.turnHand.includes(coord)) return;
+  const placeStep = game.steps.find(s=>s.phase==="Place a tile");
+  if(placeStep) undoTo(placeStep.histIdx);   // revert the current placement (and everything after)
+  beginAction();
+  placeTile(coord);
+  render();
+}
+
+/* ============================================================
+   Components — atoms and containers (see README "Component system")
+   ============================================================ */
+
+/* atom: cash (money). green in, red out. */
+function cash(amount, opts={}){
+  const abs = Math.abs(amount);
+  let cls = 'cash', text;
+  if(amount===0){ cls += ' zero'; text = '$0'; }
+  else if(opts.sign==='delta'){ if(amount<0) cls += ' neg'; text = `${amount<0?'−':'+'}$${abs.toLocaleString()}`; }
+  else { if(amount<0) cls += ' neg'; text = `$${abs.toLocaleString()}`; }
+  return `<span class="${cls}">${text}</span>`;
+}
+
+/* atom: price (a stock's value). neutral base; a change shows an up/down arrow
+   and the new price both tinted green (up) / red (down). */
+function price(value, opts={}){
+  if(opts.next!=null && opts.next!==value){
+    const up = opts.next>value, dir = up ? 'up' : 'down';
+    return `<span class="price">$${value.toLocaleString()}`
+      + `<span class="price-arrow ${dir}">${up?'↑':'↓'}</span>`
+      + `<span class="price-next ${dir}">$${opts.next.toLocaleString()}</span></span>`;
+  }
+  return `<span class="price">$${value.toLocaleString()}</span>`;
+}
+
+/* atom: brand indicator (a company's identity). filled; distinct from a stock card (a share). */
+function brand(id, opts={}){
+  const {mode='static', selected=false, disabled=false, size=null, onclick=null} = opts;
+  const interactive = mode==='select';
+  const tag = interactive ? 'button' : 'span';
+  const cls = ['brand', `brand-${id}`];
+  if(selected) cls.push('selected');
+  if(disabled) cls.push('disabled');
+  if(size) cls.push(size);
+  const attrs = (interactive && onclick ? ` onclick="${onclick}"` : '') + (tag==='button' && disabled ? ' disabled' : '');
+  return `<${tag} class="${cls.join(' ')}"${attrs}>${id}</${tag}>`;
+}
+
+/* atom: stock card (one share of a brand). always shows its price. */
+function stockCard(id, opts={}){
+  const {mode='static', selected=false, disabled=false, price:pr=null, size=null, onclick=null} = opts;
+  const interactive = mode==='select' || mode==='add' || mode==='remove';
+  const tag = interactive ? 'button' : 'span';
+  const cls = ['stock', `brand-${id}`];
+  if(selected) cls.push('selected');
+  if(disabled) cls.push('disabled');
+  if(size) cls.push(size);
+  const attrs = (interactive && onclick ? ` onclick="${onclick}"` : '') + (tag==='button' && disabled ? ' disabled' : '');
+  const value = pr!=null ? pr : (game.startups[id] && game.startups[id].price);   // a stock card always shows a price
+  return `<${tag} class="${cls.join(' ')}"${attrs}>`
+    + `<span class="stock-name">${id}</span>`
+    + (value ? price(value) : '')
+    + (mode==='remove' ? `<span class="x">×</span>` : '')
+    + `</${tag}>`;
+}
+
+/* container: stock stack = a stock card + a share count OUTSIDE the card. supports 0.
+   TODO: in a pile, a stack should be tappable to increase/decrease its qty
+   (up in one pile, down in the other) instead of the +/- header buttons. */
+/* container: stock stack — the primary interactive share entity.
+   a nested stock card + a count. onClick (the body) usually increments;
+   onRemove renders a × to decrement, shown only when count > 0. */
+function stockStack(id, count, opts={}){
+  const {size=null, price:pr=null, onClick=null, onRemove=null, disabled=false} = opts;
+  const cls = ['stock-stack']; if(size) cls.push(size); if(disabled) cls.push('disabled');
+  const qcls = ['stack-qty']; if(count===0) qcls.push('zero');
+  const body = `${stockCard(id, {size, price:pr})}<span class="${qcls.join(' ')}">×${count}</span>`;
+  const bodyEl = (onClick && !disabled)
+    ? `<button class="stock-stack-body" onclick="${onClick}">${body}</button>`
+    : `<span class="stock-stack-body">${body}</span>`;
+  const x = (onRemove && count>0 && !disabled)
+    ? `<button class="stack-x" title="Remove one" onclick="${onRemove}">×</button>` : '';
+  return `<span class="${cls.join(' ')}">${bodyEl}${x}</span>`;
+}
+
+
+/* atom: tile (inline hand / log). board cells are the board-size variant in renderBoard. */
+function tile(coord, opts={}){
+  const {state='static', onclick=null} = opts;
+  const interactive = state==='selectable' || state==='selected';
+  const tag = interactive ? 'button' : 'span';
+  const cls = ['tile']; if(state!=='static') cls.push(state);
+  const attrs = interactive && onclick ? ` onclick="${onclick}"` : '';
+  return `<${tag} class="${cls.join(' ')}"${attrs}>${coord}</${tag}>`;
+}
+
+/* container: player indicator. status dot, name, cash, held stacks. */
+function player(p, opts={}){
+  const {active=false} = opts;
+  return `<div class="player-row ${active?'active':''}">
+    <span class="player-dot"></span>
+    <span class="nm">${p.name}</span>
+    ${active?'<span class="turn-tag">turn</span>':''}
+    <span class="csh">${cash(p.cash)}</span>
+    ${active?`<span class="chips">${stacksFor(p.portfolio)}</span>`:''}
+  </div>`;
+}
+function stacksFor(portfolio){
+  const entries = Object.entries(portfolio).filter(([,n])=>n>0);
+  if(!entries.length) return `<span class="stock sm muted">no shares</span>`;
+  return entries.map(([id,n])=>stockStack(id, n, {size:'sm'})).join('');
+}
+/* group bought shares (a list of {id}) into one stack per brand */
+function boughtStacks(bought){
+  const counts = {};
+  bought.forEach(b=> counts[b.id] = (counts[b.id]||0) + 1);
+  return Object.entries(counts).map(([id,n])=>stockStack(id, n)).join(' ');
+}
+
+/* log token: a placed tile. company references in the log use brand(). */
+function tileToken(coord){ return tile(coord, {state:'static'}); }
+function playersHtml(){
+  const g = game, ap = activePlayer();
+  return `<div class="players-block">
+    <div class="block-title">Players</div>
+    ${g.players.map(p=>player(p, {active: p.id===ap.id})).join('')}
+  </div>`;
+}
+
+function stepEntryHtml(step){
+  const undo = step.histIdx!=null ? `<button class="step-undo" onclick="undoTo(${step.histIdx})" title="Rewind to before this step">↺ undo</button>` : '';
+  return `<div class="step-block">
+    <div class="stage-label">${step.phase}${undo}</div>
+    <div class="step-done">✓ ${step.detail}</div>
+  </div>`;
+}
+function stepsListHtml(steps){
+  return steps.map(s=>stepEntryHtml(s)).join('');
+}
+function stepStackHtml(){
+  const g = game;
+  if(!g.steps.length) return '';
+  return `<div class="stepstack">${stepsListHtml(g.steps)}</div>`;
+}
+
+
+function capTableHtml(ids){
+  return `<table class="data">
+    <thead><tr><th>Player</th>${ids.map(id=>`<th>${id}</th>`).join('')}</tr></thead>
+    <tbody>${game.players.map(p=>`<tr><td>${p.name}</td>${ids.map(id=>`<td>${p.portfolio[id]||0}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function activeStepHtml(){
+  const g = game, ap = activePlayer();
+
+  if(g.stage==="play"){
+    return '';   // placement happens on the board (highlighted hand tiles); no panel UI
+  }
+
+  if(g.stage==="foundStartup"){
+    const available = Object.values(g.startups).filter(s=>!s.isFounded).map(s=>s.id);
+    const foundSize = g.pendingFound.tiles.length;
+    return `<div class="active-step">
+      <div class="stage-label">Found a startup</div>
+      <div class="option-row">
+        ${available.map(id=>stockCard(id, {mode:'select', price: sharePrice(g.startups[id].tier, foundSize), onclick:`beginAction(); chooseFoundBrand('${id}'); render();`})).join('')}
+      </div>
+    </div>`;
+  }
+
+  if(g.stage==="merger"){
+    const m = g.merger;
+    const title = `${m.chains.join(' & ')} Merger`;
+    // tie, no victor yet: tap a chain to pick it (proceeds straight to payout)
+    if(!m.survivorId){
+      return `<div class="active-step">
+        <div class="stage-label">${title}</div>
+        <div class="option-row">
+          ${m.tied.map(id=>stockStack(id, ap.portfolio[id]||0, {price:g.startups[id].price, onClick:`beginAction(); finalizeSurvivor('${id}'); render();`})).join('')}
+        </div>
+      </div>`;
+    }
+    // payout: the winning brand + who gets paid, then Continue under the winners
+    return `<div class="active-step">
+      <div class="stage-label">${title}</div>
+      ${brand(m.survivorId)}
+      ${m.bonuses.length ? m.bonuses.map(b=>`<div class="bonus-line">${b.type==='majority'?'Majority':'Minority'}: ${b.player} ${cash(b.amount, {sign:'delta'})}</div>`).join('') : '<div class="bonus-line">No shareholders to pay.</div>'}
+      <button class="primary-btn" onclick="beginAction(); finalizePayout(); render();">Continue</button>
+    </div>`;
+  }
+
+  if(g.stage==="mergerLiquidation"){
+    const m = g.merger, liq = m.liq;
+    const p = g.players.find(x=>x.id===liq.playerId);
+    const owned = p.portfolio[liq.absorbedId]||0;
+    const remaining = owned - ui.liqTrade - ui.liqSell;
+    const unitPrice = m.absorbedPrices[liq.absorbedId];
+    const converted = ui.liqTrade/2;
+    const canSell = remaining>=1, canTrade = remaining>=2, dirty = ui.liqSell>0 || ui.liqTrade>0;
+    const queueHtml = `<div class="liq-queue">${m.liqQueue.map((e,i)=>{
+      const qp = g.players.find(x=>x.id===e.playerId);
+      const st = i<m.liqIdx ? 'done' : (i===m.liqIdx ? 'current' : 'pending');
+      return `<span class="liq-queue-item ${st}">${qp.name} <b>×${qp.portfolio[e.absorbedId]||0}</b></span>`;
+    }).join('')}</div>`;
+    return `<div class="active-step">
+      <div class="stage-label">Liquidate ${liq.absorbedId}</div>
+      ${queueHtml}
+      <div class="liq-lanes">
+        <div class="liq-lane">
+          <div class="liq-lane-label">${p.name} holds — click to sell</div>
+          ${stockStack(liq.absorbedId, remaining, {price:unitPrice, onClick: canSell?'liqSellOne(); render();':null, disabled:!canSell})}
+        </div>
+        <div class="liq-lane">
+          <div class="liq-lane-label">Sell → Cash</div>
+          ${stockStack('Cash', ui.liqSell, {price:unitPrice, onClick: canSell?'liqSellOne(); render();':null, onRemove:'liqUnsell(); render();'})}
+        </div>
+        <div class="liq-lane">
+          <div class="liq-lane-label">Trade 2:1 → ${brand(m.survivorId)}</div>
+          ${stockStack(m.survivorId, converted, {onClick: canTrade?'liqTradeTwo(); render();':null, onRemove:'liqUntrade(); render();'})}
+        </div>
+      </div>
+      <button class="primary-btn" onclick="confirmLiquidation(); render();">${m.liqIdx < m.liqQueue.length-1 ? 'Next holder' : 'Confirm'}</button>
+      ${dirty?`<button class="liq-reset" onclick="ui.liqSell=0; ui.liqTrade=0; render();">↺ reset the sort</button>`:''}
+    </div>`;
+  }
+
+  if(g.stage==="buy"){
+    const buyable = buyableStartups();
+    const total = g.cart.reduce((s,it)=>s+it.price,0);
+    const remaining = ap.cash - total;
+    const countOf = (id)=> g.cart.filter(it=>it.id===id).length;
+    return `<div class="active-step">
+      <div class="stage-label">Buy shares (${g.cart.length}/3)</div>
+      <div class="option-row">
+        ${buyable.map(b=>{
+          const n = countOf(b.id), canAdd = g.cart.length<3 && b.price<=remaining;
+          return stockStack(b.id, n, {price:b.price, onClick: canAdd?`onAddToCart('${b.id}', ${b.price}); render();`:null, onRemove: n>0?`onRemoveBrand('${b.id}'); render();`:null, disabled: !canAdd && n===0});
+        }).join('') || '<span class="hold-note">No shares available to buy.</span>'}
+      </div>
+      <div class="buy-total">Total: ${cash(total)} &nbsp;·&nbsp; Cash after: ${cash(remaining)}</div>
+      <button class="primary-btn" onclick="beginAction(); endTurn(); render();">${g.cart.length?'Buy &amp; end turn':'Skip &amp; end turn'}</button>
+    </div>`;
+  }
+
+  if(g.stage==="turnComplete"){
+    // every step (incl. Buy) already persists in the step stack above — just offer the next turn
+    return `<div class="active-step">
+      <button class="primary-btn" onclick="startTurn()">Start new turn</button>
+    </div>`;
+  }
+
+  return '';
+}
+
+function onAddToCart(id, price){
+  if(game.cart.length>=3) return;
+  const spent = game.cart.reduce((s,it)=>s+it.price,0);
+  if(price > activePlayer().cash - spent) return;   // can't afford
+  game.cart.push({id,price});
+}
+function onRemoveBrand(id){ const i = game.cart.findIndex(it=>it.id===id); if(i>=0) game.cart.splice(i,1); }
+
+function renderPanel(){
+  document.getElementById("panel").innerHTML = `${playersHtml()}${stepStackHtml()}${activeStepHtml()}`;
+}
+
+function renderOverlay(){
+  const main = document.getElementById("main");
+  const existing = main.querySelector(".reveal-overlay");
+  if(existing) existing.remove();
+  if(ui.passPlay && !ui.revealed && game.stage==="play"){
+    const ap = activePlayer();
+    const div = document.createElement("div");
+    div.className = "reveal-overlay";
+    div.innerHTML = `<div class="pass-name">Pass to ${ap.name}</div>
+      <button onclick="ui.revealed=true; render();">I'm ${ap.name} — Reveal</button>`;
+    main.appendChild(div);
+  }
+}
+
+/* ---------- component gallery (a living reference of every state) ---------- */
+function swatch(label, html){ return `<div class="swatch">${html}<small>${label}</small></div>`; }
+
+/* render every turn phase's active-step UI as a standalone, display-only unit.
+   drives a throwaway demo game to each stage, snapshots activeStepHtml(), restores. */
+function phaseShowcase(){
+  const saved = { game, ui, history, curHist };
+  const shots = [];
+  const snap = (label)=> shots.push([label, activeStepHtml()]);
+  try {
+    curHist = -1; history = [];   // throwaway history so simulated beginAction() calls don't touch the real one
+    initGame(); placeTile('G6');                                     snap('Found a startup');
+    initGame(); placeTile('E6');                                     snap('Merger — pick victor');
+    finalizeSurvivor('Messla');                                      snap('Merger — payout');
+    finalizePayout(); if(game.stage==='mergerLiquidation'){ ui.liqSell = 1; snap('Liquidate'); }
+    initGame(); placeTile('E2'); onAddToCart('Messla', game.startups.Messla.price); snap('Buy shares');
+    endTurn();                                                       snap('Turn complete');
+  } finally {
+    game = saved.game; ui = saved.ui; history = saved.history; curHist = saved.curHist;
+  }
+  return shots.map(([label, html])=>`<div class="phase-showcase"><div class="phase-showcase-label">${label}</div>${html}</div>`).join('');
+}
+
+function galleryHtml(){
+  const rich = {name:"Alex", cash:4200, portfolio:{Messla:4, ZuckFace:2}};
+  const broke = {name:"Sam", cash:5800, portfolio:{}};
+  return `<div class="gallery">
+    <button class="reset-btn gallery-close" onclick="ui.gallery=false; render();">✕ Close</button>
+    <h2>Cash — money</h2>
+    <div class="row">
+      ${swatch("neutral", cash(4200))}
+      ${swatch("delta +", cash(4000,{sign:"delta"}))}
+      ${swatch("delta −", cash(-2000,{sign:"delta"}))}
+      ${swatch("zero", cash(0))}
+    </div>
+    <h2>Price — stock value</h2>
+    <div class="row">
+      ${swatch("flat", price(400))}
+      ${swatch("change ↑", price(300,{next:600}))}
+      ${swatch("change ↓", price(600,{next:400}))}
+    </div>
+    <h2>Brand — company identity (filled)</h2>
+    <div class="row">
+      ${swatch("static", brand("Messla"))}
+      ${swatch("select", brand("PaperfulPost",{mode:"select"}))}
+      ${swatch("selected", brand("PaperfulPost",{mode:"select",selected:true}))}
+      ${swatch("disabled", brand("PaperfulPost",{mode:"select",disabled:true}))}
+      ${swatch("small", brand("ZuckFace",{size:"sm"}))}
+    </div>
+    <h2>Stock card — a share (outlined, always priced)</h2>
+    <div class="row">
+      ${swatch("static", stockCard("Messla"))}
+      ${swatch("select", stockCard("Messla",{mode:"select"}))}
+      ${swatch("selected", stockCard("Messla",{mode:"select",selected:true}))}
+      ${swatch("disabled", stockCard("Messla",{mode:"select",disabled:true}))}
+      ${swatch("remove", stockCard("ZuckFace",{mode:"remove"}))}
+    </div>
+    <h2>Stock stack — the primary share entity (nested card + count)</h2>
+    <div class="row">
+      ${swatch("count", stockStack("Messla",4))}
+      ${swatch("zero", stockStack("Cash",0,{price:400}))}
+      ${swatch("increment", stockStack("Cash",2,{price:400, onClick:"void 0", onRemove:"void 0"}))}
+      ${swatch("small", stockStack("ZuckFace",2,{size:"sm"}))}
+      ${swatch("disabled", stockStack("Messla",0,{disabled:true}))}
+    </div>
+    <h2>"Cash" as a brand — the liquidation sell stack</h2>
+    <div class="row">
+      ${swatch("cash stack", stockStack("Cash",3,{price:400,onClick:"void 0",onRemove:"void 0"}))}
+    </div>
+    <h2>Tile</h2>
+    <div class="row">
+      ${swatch("static", tile("E6"))}
+      ${swatch("selectable", tile("E6",{state:"selectable"}))}
+      ${swatch("selected", tile("E6",{state:"selected"}))}
+      ${swatch("placed", tile("E6",{state:"placed"}))}
+    </div>
+    <h2>Player indicator</h2>
+    <div class="row" style="flex-direction:column; align-items:stretch; max-width:320px;">
+      ${player(rich,{active:true})}
+      ${player(broke,{active:false})}
+    </div>
+    <h2>Turn phases — standalone units (display only)</h2>
+    <div class="phase-showcases">${phaseShowcase()}</div>
+  </div>`;
+}
+function renderGallery(){
+  const main = document.getElementById("main");
+  const existing = main.querySelector(".gallery");
+  if(existing) existing.remove();
+  if(ui.gallery){
+    const wrap = document.createElement("div");
+    wrap.innerHTML = galleryHtml();
+    main.appendChild(wrap.firstElementChild);
+  }
+}
+
+function render(){
+  const main = document.getElementById("main");
+  main.className = "main " + ui.layout;
+  document.getElementById("layoutSelect").value = ui.layout;
+  document.getElementById("passPlayToggle").checked = ui.passPlay;
+  renderBoard();
+  renderPanel();
+  renderOverlay();
+  renderGallery();
+}
+
+/* ---------- turn lifecycle ---------- */
+function startTurn(){
+  history = []; curHist = -1;
+  initGame();               // fresh identical turn (Alex) for repeatable demo
+  render();
+}
+
+/* ---------- controls ---------- */
+document.getElementById("layoutSelect").addEventListener("change", e=>{ ui.layout = e.target.value; render(); });
+document.getElementById("passPlayToggle").addEventListener("change", e=>{
+  ui.passPlay = e.target.checked;
+  ui.revealed = !(ui.passPlay && game.stage==="play");
+  render();
+});
+document.getElementById("galleryBtn").addEventListener("click", ()=>{ ui.gallery = !ui.gallery; render(); });
+document.getElementById("resetBtn").addEventListener("click", ()=> startTurn());
+
+initGame();
+render();
+</script>

@@ -1,6 +1,6 @@
 # Acquire — Flat HTML Turn-Flow Prototype
 
-A single self-contained HTML file (`prototype-mock.html`) for iterating on the
+A single self-contained HTML file (`index.html`) for iterating on the
 UI/layout and turn flow of the Acquire startup-themed board game, **decoupled
 from the React app**. Inline CSS + JS, no build step, no dependencies, no server
 required.
@@ -15,15 +15,15 @@ required.
 
 ```bash
 # simplest: just open the file
-open prototype-mock.html
+open index.html
 
 # or serve it (clean HTTP origin, refresh to pick up edits)
 python3 -m http.server 8777
-# → http://127.0.0.1:8777/prototype-mock.html
+# → http://127.0.0.1:8777/   (index.html is the directory index)
 ```
 
 Controls (top bar): **Layout** (side panel / bottom panel), **Pass-and-play
-mode** (on/off), **Reset turn**.
+mode** (on/off), **Components** (open the component gallery), **Reset turn**.
 
 ---
 
@@ -70,12 +70,21 @@ Placing a tile routes to the right phase, then always ends at **Buy**:
 | `E2` | adjacent to Messla | **expand** → Buy |
 | `E10`| adjacent to ZuckFace | **expand** → Buy |
 | `G6` | adjacent to lone `G5` | **found** a brand → Buy |
-| `E6` | bridges Messla + ZuckFace (equal size) | **merger tie** → choose survivor → payout → liquidation → Buy |
+| `E6` | bridges Messla + ZuckFace (equal size) | **merger** (pick victor + payout) → liquidation → Buy |
 | `A12` / `I1` | touches nothing | **isolated** → Buy |
 
-The **turn-step stack** in the sidebar records each completed step as you go
-(e.g. `Placed E6 → merger`, `Survivor: ZuckFace`, `Payout: …`, `Liquidated: …`),
-and **End turn** shows a turn summary with a "Start new turn" button.
+The **turn-step stack** in the sidebar records each completed step as you go.
+Every step is headed by the **same phase label it had while active** (`PLACE A
+TILE`, `FOUND A STARTUP`, `MERGER`, …) with its result below, so a finished phase
+reads the same as a live one. There is **no separate "turn complete" summary** —
+the buy is just the last step in the stack, followed by a **Start new turn**
+button.
+
+**Undo** — every completed step carries a small **↺ undo** that rewinds the game
+to the static state captured just before that step (a `structuredClone`
+snapshot). Because any step is reversible, the flow avoids "clunky confirms":
+choices commit on click. You can undo the placed tile itself, any merger/found
+step, or the buy — right up until you start a new turn.
 
 ---
 
@@ -93,18 +102,73 @@ and **End turn** shows a turn summary with a "Start new turn" button.
   merger result.
 - **Tile hand as pills + board highlight** — hand tiles highlight their board
   cells; tap either the pill or the cell to select, then **Confirm placement**.
+- **Last-placed tile initials** — each player's most recent placement is badged
+  with their initial (`A` for Alex) in the cell corner.
 - **Board legibility** — coordinates on every cell (no dash: `A1` not `A-1`),
   hidden-until-hover on founded-startup tiles so brand color/label reads cleanly.
-- **Buy** — tap a share card to stage it as a removable pill; tap the pill to
-  unstage; running total + cash-after.
-- **Merger tie screen** — each survivor candidate shows the **active player's
-  owned shares** in that chain, plus a **"winner's future share price"** preview
-  (differs by tier even at equal size).
-- **Liquidation** — reuses the purchase-style **pile** metaphor: a **Sell** pile
-  and a **Trade 2:1** pile you sort shares into, with two **"you'll receive"**
-  cards (cash, and converted survivor stock).
+- **Buy** — tap a share card to stage it in the cart; tap a staged card (with its
+  `×`) to unstage; running total + cash-after.
+- **Merger (before/after piles)** — the tied chains show as **stock stacks**;
+  clicking one moves it into an empty **Victor** pile that displays its grown
+  **new price**, then shows the majority/minority payout inline. No survivor
+  brand-tile selectors, no future-price table, no confirm — the click commits
+  (undo reverts). A non-tie merger skips straight to the victor view.
+- **Liquidation (before/after piles)** — the **held** absorbed stock stack (tap
+  to sell one), plus two buy-cart-style piles: **Sell → Cash** (removable `Cash`
+  cards, where `Cash` is a brand showing the per-share amount) and **Trade 2:1 →
+  survivor** (removable survivor cards). Removing a card returns the shares to the
+  held stock; a **↺ reset** clears the sort.
 - **Pass-and-play** — a reveal overlay hides the board and shows "Pass to
   <player>" until that player taps to reveal.
+
+---
+
+## Component system
+
+The UI is built from a small set of **reusable render functions** (plain JS →
+HTML strings) instead of ad-hoc markup per screen. Each is one canonical look
+reused everywhere, with its variations driven by an options object — so the same
+concept (a share, a tile, money) always renders the same way whether it's a
+selector, a staged item, or a log entry.
+
+Open the **Components** button in the top bar for a live gallery of every
+component in every state (`galleryHtml()` in the source).
+
+### Atoms
+
+| Component | Signature | States |
+|-----------|-----------|--------|
+| **brand** | `brand(id, {mode, selected, disabled, size})` | a company's identity — a **filled** chip, deliberately distinct from a (share) stock card. `mode`: `static` · `select`; plus `selected`, `disabled`, `sm`. Used for log references and merger headers. `"Cash"` is registered as a brand too, so the liquidation sell card renders as a green stock card. |
+| **cash** | `cash(amount, {sign})` | `neutral` · `delta` (`+`/`−`, green in / red out) · `zero`. **Money only.** |
+| **price** | `price(value, {next})` | `flat` · `change` (`$300 ↑ $600` / `$600 ↓ $400` — up/down arrow **and** the new price tinted green-up / red-down; base stays neutral gray). A **stock's value**, deliberately *not* the green money treatment. |
+| **stockCard** | `stockCard(id, {mode, selected, disabled, price, size})` | one **share** — an **outlined** box that **always shows its price** (falls back to the startup's current price if none passed). `mode`: `static` · `select` · `add` · `remove` (`×`); plus `selected`, `disabled`, `sm` size |
+| **tile** | `tile(coord, {state})` | `static` · `selectable` · `selected` · `placed` (board cells are the board-size variant rendered in `renderBoard`) |
+
+### Containers (compose the atoms)
+
+| Component | Signature | Notes |
+|-----------|-----------|-------|
+| **stockStack** | `stockStack(id, count, {size, price, onclick, disabled})` | a `stockCard` with the share count **outside** the card (`× N`); supports a **0** state (dimmed). With `onclick` it becomes a **tappable** stack. Player holdings, merger chains/victor, and the liquidation held stack. |
+| **pile** | `pile({title, priceTag, onAdd, addDisabled, items, empty})` | a titled drop zone holding cards (optional `+` add button); powers the buy cart, the merger before/after piles, and the liquidation sell/trade piles. Staged cards always carry a **remove `×`** (`stockCard(remove)`, or `stockStack({onRemove})` for the merger victor) so any mistake is correctable in place. |
+| **player** | `player(p, {active})` | status dot · name · **cash** · held **stockStacks**; `active` adds the TURN tag + highlight |
+
+### Composition (things nest)
+
+```
+found     → stockCard(select, price)
+merger    → pile[Chains: stockStack(tap)] + pile[Victor: stockStack(newPrice)] + cash(delta)
+liquidate → stockStack(held, tap) + pile[Sell: stockCard('Cash', remove)] + pile[Trade: stockCard(remove)]
+buy       → stockCard(price)     pile → stockCard(remove)
+player    → cash + stockStack → stockCard
+board     → tile        log → tile + brand
+```
+
+`cash` appears both inside a `player` indicator and standalone in merger payouts;
+a `stockStack` shows holdings in the player row, the merger chains/victor, and the
+liquidation held stack. Two deliberate separations: money (`cash`) vs a stock's
+`price`, and a company (`brand`, filled — log references, merger headers) vs a
+share of it (`stockCard`, outlined — founded, bought, staged, sold, and the
+`Cash` sell card).
 
 ---
 
