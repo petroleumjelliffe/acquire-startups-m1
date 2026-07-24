@@ -104,9 +104,9 @@ edges behind the front card (offset down-right via `::before`/`::after`, capped 
 ### 2. Brands as `$` tickers
 Give each brand a stock-ticker abbreviation starting with `$` and render it on the
 cards instead of the full name.
-- Add `ticker` to the `STARTUPS` config. Proposed: `$G` Gobble, `$S` Scrapple,
+- Add `ticker` to the `STARTUPS` config. **Decided:** `$G` Gobble, `$S` Scrapple,
   `$PP` PaperfulPost, `$C` CamCrooned, `$M` Messla, `$Z` ZuckFace,
-  `$W` WrecksonMobil (Cash → `$$`). Keep them short and unique.
+  `$W` WrecksonMobil (Cash → `$$`).
 - `stockCard`/`stockStack` render the ticker; keep the full name available on
   hover (`title`) and spell it out where you're *learning* a company (the
   founding screen).
@@ -120,7 +120,8 @@ starting size) under price headers, instead of one flat row.
 
 ### 4. Player emoji icons
 Give each player an emoji avatar.
-- Add `emoji` to the players config (e.g. Alex 🦊, Sam 🐢, Jordan 🦁).
+- Add `emoji` to the players config. **Decided (animals):** Alex 🦊, Sam 🐢,
+  Jordan 🦁.
 - Render it in the `player` indicator (leading the name, in place of or beside
   the status dot), in the liquidation **queue** chips, and optionally beside
   player names in payout lines / log details.
