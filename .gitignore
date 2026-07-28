@@ -38,5 +38,6 @@ coverage/
 # Game files
 server/games/
 
-# work trees
+# Claude
 .worktrees/
+.claude/settings.local.json
