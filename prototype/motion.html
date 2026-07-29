@@ -55,11 +55,15 @@ const vp = document.getElementById("viewport");
 /* ---- fixtures: render the real atoms into a mock panel ---- */
 function renderT1Fixture(){
   vp.innerHTML =
-    `<div class="stepstack" id="logStack"></div>` +
+    `<div class="stepstack" id="logStack">${stepEntry({phase:"Draw", detail: tile("G5",{state:"filled"}) + " → grew"})}</div>` +
     activeStep({ label:"Place a tile",
       body:`<div class="option-row" id="row">${FIX_HAND.map(c=>tile(c,{state:"hand"})).join("")}</div>
         <div class="hint">Tap a highlighted tile.</div>` }) +
     stagingZone({ label:"Staging — commits on end turn" });
+}
+function nextStepHtml(){
+  return activeStep({ label:"Buy shares (0/3)",
+    body:`<div class="buy-grid">${["PaperfulPost","Messla","ZuckFace"].map(id=>stockCard(id,{mode:"select",price:300})).join("")}</div>` });
 }
 function renderT2Fixture(){
   vp.innerHTML =
@@ -76,20 +80,26 @@ async function play(){
     renderT1Fixture();
     const row = document.getElementById("row");
     const sel = [...row.children].find(el=> el.getAttribute("title")==="E6") || row.children[0];
-    const fromRect = await t1TileTuck(row, sel);
-    // reveal the log entry, then FLIP the tile up into it
-    const log = document.getElementById("logStack");
-    log.innerHTML = stepEntry({phase:"Place a tile", detail: tile("E6",{state:"filled"})});
-    const logTile = log.querySelector(".tile");
-    await flyTileToLog(fromRect, logTile.getBoundingClientRect(), "E6");
+    // Phase A — resolve in place: selected slides left, unused converge behind it
+    await t1TileConverge(row, sel);
+    // Phase B — push up: the completed step rises into the log as the next step rises in
+    const active = vp.querySelector(".active-step");
+    const holder = document.createElement("div");
+    holder.innerHTML = nextStepHtml();
+    const incoming = holder.firstElementChild;
+    active.parentNode.insertBefore(incoming, active.nextSibling);
+    await stepAdvance(active, incoming);
+    // settle: the same node becomes the log entry (updated in place, now pushed up)
+    active.style.transform = ""; active.style.zIndex = "";
+    document.getElementById("logStack").appendChild(active);
+    incoming.style.transform = ""; incoming.style.opacity = "";
   } else {
     renderT2Fixture();
     const slot = document.getElementById("stepSlot");
-    slot.innerHTML = activeStep({ label:"Buy shares (0/3)",
-      body:`<div class="buy-grid">${["PaperfulPost","Messla","ZuckFace"].map(id=>stockCard(id,{mode:"select",price:300})).join("")}</div>` });
+    slot.innerHTML = nextStepHtml();
     await t2Toaster(slot.querySelector(".active-step"));
   }
-  if(looping){ setTimeout(play, 500); }
+  if(looping){ setTimeout(play, 700); }
 }
 
 /* ---- scrub: start paused, drive currentTime across all animations in the viewport ---- */
@@ -97,7 +107,7 @@ let scrubAnims = [];
 function startScrub(){
   applyMotionVars();
   if(current==="t1"){ renderT1Fixture(); const row=document.getElementById("row");
-    const sel=[...row.children].find(el=>el.getAttribute("title")==="E6")||row.children[0]; t1TileTuck(row, sel); }
+    const sel=[...row.children].find(el=>el.getAttribute("title")==="E6")||row.children[0]; t1TileConverge(row, sel); }
   else { renderT2Fixture(); const slot=document.getElementById("stepSlot");
     slot.innerHTML = activeStep({label:"Buy shares (0/3)", body:`<div class="buy-grid">${stockCard("Messla",{mode:"select",price:300})}</div>`});
     t2Toaster(slot.querySelector(".active-step")); }
@@ -118,8 +128,8 @@ function renderControls(){
   c.innerHTML = `
     <h2>Transition</h2>
     <div class="row" id="pick">
-      <button data-t="t1" class="${current==="t1"?"on":""}">T1 · tile → log</button>
-      <button data-t="t2" class="${current==="t2"?"on":""}">T2 · toaster</button>
+      <button data-t="t1" class="${current==="t1"?"on":""}">T1 · tile resolve + push</button>
+      <button data-t="t2" class="${current==="t2"?"on":""}">T2 · push-up</button>
     </div>
     <div class="row">
       <button id="playBtn">▶ Replay</button>
@@ -133,9 +143,9 @@ function renderControls(){
     <h2>${current==="t1"?"T1 params":"T2 params"}</h2>
     ${current==="t1" ? `
       <label>Duration <input type="range" id="t1dur" min="0" max="800" step="20" value="${t1.dur}"><output>${t1.dur}ms</output></label>
-      <label>Slide px <input type="range" id="t1slide" min="0" max="300" step="10" value="${t1.slide}"><output>${t1.slide}</output></label>
       <label>Tuck scale <input type="range" id="t1tuck" min="0.5" max="1" step="0.05" value="${t1.tuckScale}"><output>${t1.tuckScale}</output></label>
       <label>Stagger ms <input type="range" id="t1stag" min="0" max="120" step="5" value="${t1.stagger}"><output>${t1.stagger}</output></label>
+      <p style="margin:0;color:#9ca3af;font-size:11px;">Push-up timing lives in T2.</p>
     ` : `
       <label>Duration <input type="range" id="t2dur" min="0" max="800" step="20" value="${t2.dur}"><output>${t2.dur}ms</output></label>
       <label>Rise px <input type="range" id="t2rise" min="0" max="120" step="4" value="${t2.rise}"><output>${t2.rise}</output></label>
@@ -154,7 +164,7 @@ function renderControls(){
   c.querySelector("#speed").onchange = e=>{ MOTION.speed=parseFloat(e.target.value); refreshTokens(); };
   const bind = (id, apply)=>{ const el=c.querySelector("#"+id); if(!el) return;
     el.oninput=()=>{ apply(parseFloat(el.value)); el.nextElementSibling.textContent = el.value + (id.endsWith("dur")?"ms":""); refreshTokens(); }; };
-  bind("t1dur", v=>MOTION.t1.dur=v); bind("t1slide", v=>MOTION.t1.slide=v);
+  bind("t1dur", v=>MOTION.t1.dur=v);
   bind("t1tuck", v=>MOTION.t1.tuckScale=v); bind("t1stag", v=>MOTION.t1.stagger=v);
   bind("t2dur", v=>MOTION.t2.dur=v); bind("t2rise", v=>MOTION.t2.rise=v);
   c.querySelector("#scrubStart").onclick = ()=>{ startScrub(); c.querySelector("#scrub").value=0; };

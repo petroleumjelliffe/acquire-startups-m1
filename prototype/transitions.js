@@ -6,8 +6,8 @@
    ============================================================ */
 
 const MOTION = {
-  t1: { slide: 140, tuckScale: 0.9, stagger: 30, dur: 320, ease: 'cubic-bezier(.2,.7,.3,1)' },
-  t2: { rise: 40, dur: 280, ease: 'cubic-bezier(.2,.7,.3,1)' },
+  t1: { tuckScale: 0.9, stagger: 30, dur: 320, ease: 'cubic-bezier(.2,.7,.3,1)' },   // converge
+  t2: { rise: 40, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                       // push-up / reveal
   speed: 1,   // lab-only slow-mo multiplier (1 / .5 / .25); the app leaves it at 1
 };
 
@@ -31,59 +31,62 @@ function runAnim(el, keyframes, opts){
   return anim.finished.catch(()=>{});   // swallow cancellation
 }
 
-/* T2 — reveal. The active step toasts up from behind the staging band. */
-function t2Toaster(activeStepEl){
-  if(!activeStepEl || reducedMotion()) return Promise.resolve();
+/* Step advance (T2) — every step resolves IN PLACE, then this pushes it up: the
+   outgoing (now-completed) step rises up and out of the active slot (on its way into
+   the log) while the incoming step rises from below (behind staging) to fill the slot.
+   The new step shoves the old one up. Either element may be null (first reveal has no
+   outgoing). The caller reparents the outgoing node into the log once this resolves. */
+function stepAdvance(outgoingEl, incomingEl){
+  if(reducedMotion()) return Promise.resolve();
   const { rise, dur, ease } = MOTION.t2;
-  return runAnim(activeStepEl, [
-    { transform: 'translateY(' + rise + 'px)', opacity: 0 },
-    { transform: 'translateY(0)', opacity: 1 },
-  ], { duration: dur / MOTION.speed, easing: ease });
+  const d = dur / MOTION.speed;
+  const anims = [];
+  if(outgoingEl){
+    const h = outgoingEl.getBoundingClientRect().height;
+    anims.push(runAnim(outgoingEl, [
+      { transform: 'translateY(0)' },
+      { transform: 'translateY(' + (-h) + 'px)' },
+    ], { duration: d, easing: ease, fill: 'forwards' }));   // stays visible — it becomes the log entry
+  }
+  if(incomingEl){
+    anims.push(runAnim(incomingEl, [
+      { transform: 'translateY(' + rise + 'px)', opacity: 0 },
+      { transform: 'translateY(0)', opacity: 1 },
+    ], { duration: d, easing: ease }));
+  }
+  return Promise.all(anims);
 }
 
-/* T1 (part 1) — the unused hand tiles slide toward the selected and tuck behind it
-   (descending z-index, scale down, fade), staggered; the selected slides right.
-   Resolves with the selected tile's final on-screen rect (for the FLIP-to-log). */
-function t1TileTuck(rowEl, selectedEl){
-  if(reducedMotion()) return Promise.resolve(selectedEl.getBoundingClientRect());
-  const { slide, tuckScale, stagger, dur, ease } = MOTION.t1;
+/* first reveal (no outgoing step to push up) — the toaster rise on its own. */
+function t2Toaster(activeStepEl){
+  if(!activeStepEl) return Promise.resolve();
+  return stepAdvance(null, activeStepEl);
+}
+
+/* T1 — the tile step resolves IN PLACE: the selected tile slides LEFT to the row's
+   start and the unused tiles converge BEHIND it (descending z-index, scaled + faded).
+   One step updating — no separate section. The push-up (stepAdvance) happens after. */
+function t1TileConverge(rowEl, selectedEl){
+  if(reducedMotion()) return Promise.resolve();
+  const { tuckScale, stagger, dur, ease } = MOTION.t1;
   const d = dur / MOTION.speed;
+  const rowRect = rowEl.getBoundingClientRect();
   const selRect = selectedEl.getBoundingClientRect();
   const others = Array.prototype.slice.call(rowEl.children).filter(function(el){ return el !== selectedEl; });
+  selectedEl.style.position = 'relative';
+  selectedEl.style.zIndex = String(others.length + 1);   // selected on top
+  const sel = runAnim(selectedEl, [
+    { transform: 'translateX(0)' },
+    { transform: 'translateX(' + (rowRect.left - selRect.left) + 'px)' },
+  ], { duration: d, easing: ease, fill: 'forwards' });
   const tucks = others.map(function(el, i){
     const r = el.getBoundingClientRect();
-    el.style.zIndex = String(others.length - i);
+    el.style.position = 'relative';
+    el.style.zIndex = String(others.length - i);   // behind the selected, descending
     return runAnim(el, [
       { transform: 'translateX(0) scale(1)', opacity: 1 },
-      { transform: 'translateX(' + (selRect.left - r.left) + 'px) scale(' + tuckScale + ')', opacity: 0.35 },
+      { transform: 'translateX(' + (rowRect.left - r.left) + 'px) scale(' + tuckScale + ')', opacity: 0.4 },
     ], { duration: d, easing: ease, delay: i * (stagger / MOTION.speed), fill: 'forwards' });
   });
-  selectedEl.style.position = 'relative';
-  selectedEl.style.zIndex = String(others.length + 1);
-  const slid = runAnim(selectedEl, [
-    { transform: 'translateX(0)' },
-    { transform: 'translateX(' + slide + 'px)' },
-  ], { duration: d, easing: ease, fill: 'forwards' });
-  return Promise.all(tucks.concat([slid])).then(function(){
-    return selectedEl.getBoundingClientRect();
-  });
-}
-
-/* T1 (part 2) — FLIP a freshly-built filled tile from fromRect up to the log row.
-   Built from `coord` (not the live node) so it survives the innerHTML re-render. */
-function flyTileToLog(fromRect, toRect, coord){
-  if(reducedMotion() || !fromRect || !toRect) return Promise.resolve();
-  const { dur, ease } = MOTION.t1;
-  const holder = document.createElement('div');
-  holder.innerHTML = tile(coord, { state: 'filled' });
-  const clone = holder.firstElementChild;
-  clone.style.cssText += 'position:fixed; margin:0; left:' + fromRect.left + 'px; top:' + fromRect.top +
-    'px; width:' + fromRect.width + 'px; height:' + fromRect.height + 'px; z-index:9999; pointer-events:none;';
-  document.body.appendChild(clone);
-  const dx = toRect.left - fromRect.left, dy = toRect.top - fromRect.top;
-  const sx = toRect.width / fromRect.width, sy = toRect.height / fromRect.height;
-  return runAnim(clone, [
-    { transform: 'translate(0,0) scale(1)', opacity: 1 },
-    { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')', opacity: 0.6 },
-  ], { duration: dur / MOTION.speed, easing: ease }).then(function(){ clone.remove(); });
+  return Promise.all([sel].concat(tucks));
 }
