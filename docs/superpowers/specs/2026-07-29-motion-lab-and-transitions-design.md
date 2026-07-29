@@ -88,8 +88,8 @@ replay · loop · speed · duration · easing · (T1) slide distance / tuck scal
 current `MOTION` values to paste back as new defaults in `transitions.js`).
 
 ## Data flow
-- **Lab:** control change → update `MOTION` / CSS vars → replay on the mock before/after
-  DOM.
+- **Lab:** control change → update `MOTION` / CSS vars → replay on the fixture
+  before/after DOM (real component atoms, lab-arranged).
 - **App:** `advance()` reads `MOTION` at play time. No live coupling to the lab — the
   lab's product is the settled default values committed into `transitions.js`.
 
@@ -103,7 +103,7 @@ confirming the T1-then-T2 sequence; and `prefers-reduced-motion` on → instant 
   is unavailable or off on the first frame, degrade to a selected fade-up without the
   exact FLIP.
 - **Lab / app drift** — mitigated by sharing `components.js` + `transitions.js`; the
-  lab's mock DOM must mirror the real class structure.
+  lab's fixture DOM must mirror the real class structure.
 - **innerHTML swap mid-animation** — mitigated by clone-based FLIP + the `animating`
   flag.
 
