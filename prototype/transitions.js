@@ -85,8 +85,8 @@ function t1TileConverge(rowEl, selectedEl){
     el.style.zIndex = String(others.length - i);   // behind the selected, descending
     return runAnim(el, [
       { transform: 'translateX(0) scale(1)', opacity: 1 },
-      { transform: 'translateX(' + (rowRect.left - r.left) + 'px) scale(' + tuckScale + ')', opacity: 0.4 },
-    ], { duration: d, easing: ease, delay: i * (stagger / MOTION.speed), fill: 'forwards' });
+      { transform: 'translateX(' + (rowRect.left - r.left) + 'px) scale(' + tuckScale + ')', opacity: 0 },
+    ], { duration: d, easing: ease, delay: i * (stagger / MOTION.speed), fill: 'forwards' });   // slide behind + fade out
   });
   return Promise.all([sel].concat(tucks));
 }

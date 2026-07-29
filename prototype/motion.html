@@ -24,6 +24,12 @@
   .controls label{display:flex; align-items:center; gap:8px; color:#6b7280; justify-content:space-between;}
   .controls output, .controls select{font-variant-numeric:tabular-nums; color:#111827;}
   .controls textarea{width:100%; height:96px; font:11px ui-monospace,Menlo,monospace;}
+  .controls .frames button{min-width:34px;}
+  .hintline{font-size:11px; color:#9ca3af; margin:0;}
+  /* the completed "→ result" that fades in at frame 3 */
+  .res{display:inline-flex; align-items:center; gap:5px; margin-left:2px; font-size:14px; color:#4b5563;}
+  /* recolor the selected tile hand→filled as it converges (lab viewport only) */
+  .panel-mock .tile{transition:background-color var(--t1-dur,320ms) ease, border-color var(--t1-dur,320ms) ease, color var(--t1-dur,320ms) ease;}
 </style>
 
 <header class="cat">
@@ -47,77 +53,104 @@
 function onBoardCellClick(){}   /* inert here */
 
 const FIX_HAND = ["E6","E2","E10","G6","A12","I1"];
-let current = "t1";   // "t1" | "t2"
-let looping = false;
-
+/* the "→ result" that fades in at frame 3 (empty = isolated placement, no arrow) */
+const RESULT = {
+  E6:  " → merger",
+  E2:  " → grew "  + brand("Messla"),
+  E10: " → grew "  + brand("ZuckFace"),
+  G6:  " → Found startup",
+  A12: "",
+  I1:  "",
+};
+let current = "t1";   // "t1" (active→completed) | "t2" (push-up, decoupled)
 const vp = document.getElementById("viewport");
 
-/* ---- fixtures: render the real atoms into a mock panel ---- */
-function renderT1Fixture(){
-  vp.innerHTML =
-    `<div class="stepstack" id="logStack">${stepEntry({phase:"Draw", detail: tile("G5",{state:"filled"}) + " → grew"})}</div>` +
-    activeStep({ label:"Place a tile",
-      body:`<div class="option-row" id="row">${FIX_HAND.map(c=>tile(c,{state:"hand"})).join("")}</div>
-        <div class="hint">Tap a highlighted tile.</div>` }) +
-    stagingZone({ label:"Staging — commits on end turn" });
+/* ============================================================
+   T1 — active → completed. Decoupled from the next step.
+   Frame 1: place-active (clickable) · Frame 2: converged ·
+   Frame 3: + arrow/result faded in.
+   ============================================================ */
+function t1Body(inner){ return activeStep({ label:"Place a tile", body:inner }); }
+
+function renderT1(){   // Frame 1 — clickable
+  vp.innerHTML = t1Body(
+    `<div class="option-row" id="row">${FIX_HAND.map(c=>tile(c,{state:"hand",onclick:`selectTile('${c}')`})).join("")}</div>
+     <div class="hint">Tap a tile to resolve.</div>`);
 }
-function nextStepHtml(){
-  return activeStep({ label:"Buy shares (0/3)",
-    body:`<div class="buy-grid">${["PaperfulPost","Messla","ZuckFace"].map(id=>stockCard(id,{mode:"select",price:300})).join("")}</div>` });
-}
-function renderT2Fixture(){
-  vp.innerHTML =
-    `<div class="stepstack">${stepEntry({phase:"Place a tile", detail: tile("E6",{state:"filled"})})}</div>` +
-    `<div id="stepSlot"></div>` +
-    stagingZone({ label:"Staging — commits on end turn" });
-  // the active step is injected fresh on each play (so it can toast in)
+function renderT1Frame(n){   // static keyframe previews (default coord E6)
+  const coord = "E6";
+  if(n===1) return renderT1();
+  if(n===2) vp.innerHTML = t1Body(`<div class="option-row">${tile(coord,{state:"filled"})}</div><div class="hint">Tap a tile to resolve.</div>`);
+  if(n===3) vp.innerHTML = t1Body(`<div class="option-row">${tile(coord,{state:"filled"})}${RESULT[coord]?`<span class="res">${RESULT[coord]}</span>`:""}</div>`);
 }
 
-/* ---- play the selected transition ---- */
-async function play(){
+async function selectTile(coord){
   applyMotionVars();
-  if(current==="t1"){
-    renderT1Fixture();
-    const row = document.getElementById("row");
-    const sel = [...row.children].find(el=> el.getAttribute("title")==="E6") || row.children[0];
-    // Phase A — resolve in place: selected slides left, unused converge behind it
-    await t1TileConverge(row, sel);
-    // Phase B — push up: the completed step rises into the log as the next step rises in
-    const active = vp.querySelector(".active-step");
-    const holder = document.createElement("div");
-    holder.innerHTML = nextStepHtml();
-    const incoming = holder.firstElementChild;
-    active.parentNode.insertBefore(incoming, active.nextSibling);
-    await stepAdvance(active, incoming);
-    // settle: the same node becomes the log entry (updated in place, now pushed up)
-    active.style.transform = ""; active.style.zIndex = "";
-    document.getElementById("logStack").appendChild(active);
-    incoming.style.transform = ""; incoming.style.opacity = "";
-  } else {
-    renderT2Fixture();
-    const slot = document.getElementById("stepSlot");
-    slot.innerHTML = nextStepHtml();
-    await t2Toaster(slot.querySelector(".active-step"));
+  const row = document.getElementById("row");
+  if(!row) return;
+  const selEl = [...row.children].find(el=> el.getAttribute("title")===coord);
+  if(!selEl) return;
+  // Frame 1 → 2: selected recolors hand→filled + slides left; the rest converge behind and fade out
+  selEl.classList.remove("t-hand"); selEl.classList.add("t-filled");
+  await t1TileConverge(row, selEl);
+  row.innerHTML = tile(coord,{state:"filled"});   // settle to the clean converged DOM
+  // Frame 2 → 3: arrow + result fades and slides in (if this placement has one)
+  const res = RESULT[coord];
+  if(res){
+    const span = document.createElement("span");
+    span.className = "res"; span.innerHTML = res;
+    row.appendChild(span);
+    await runAnim(span, [
+      { opacity:0, transform:"translateX(10px)" },
+      { opacity:1, transform:"translateX(0)" },
+    ], { duration: MOTION.t1.dur/MOTION.speed, easing: MOTION.t1.ease });
   }
-  if(looping){ setTimeout(play, 700); }
 }
 
-/* ---- scrub: start paused, drive currentTime across all animations in the viewport ---- */
+/* ============================================================
+   T2 — push-up reveal. Decoupled: does not depend on step contents.
+   The current step rises up (into the log) as the next rises from below.
+   ============================================================ */
+function renderT2(){
+  vp.innerHTML =
+    `<div class="stepstack" id="logStack">${stepEntry({phase:"Place a tile", detail: tile("E6",{state:"filled"})+" → merger"})}</div>` +
+    `<div id="slot">${activeStep({ label:"Found a startup", body:`<div class="hint">the current step</div>` })}</div>`;
+}
+async function playPushUp(){
+  renderT2(); applyMotionVars();
+  const slot = document.getElementById("slot");
+  const active = slot.querySelector(".active-step");
+  const holder = document.createElement("div");
+  holder.innerHTML = activeStep({ label:"Buy shares (0/3)",
+    body:`<div class="buy-grid">${["PaperfulPost","Messla","ZuckFace"].map(id=>stockCard(id,{mode:"select",price:300})).join("")}</div>` });
+  const incoming = holder.firstElementChild;
+  slot.appendChild(incoming);
+  await stepAdvance(active, incoming);
+  active.style.transform=""; document.getElementById("logStack").appendChild(active);   // becomes the log entry
+  incoming.style.transform=""; incoming.style.opacity="";
+}
+
+/* ---- scrub: start the current transition paused, drive currentTime across it ---- */
 let scrubAnims = [];
 function startScrub(){
   applyMotionVars();
-  if(current==="t1"){ renderT1Fixture(); const row=document.getElementById("row");
-    const sel=[...row.children].find(el=>el.getAttribute("title")==="E6")||row.children[0]; t1TileConverge(row, sel); }
-  else { renderT2Fixture(); const slot=document.getElementById("stepSlot");
-    slot.innerHTML = activeStep({label:"Buy shares (0/3)", body:`<div class="buy-grid">${stockCard("Messla",{mode:"select",price:300})}</div>`});
-    t2Toaster(slot.querySelector(".active-step")); }
+  if(current==="t1"){
+    renderT1(); const row=document.getElementById("row");
+    const sel=[...row.children].find(el=>el.getAttribute("title")==="E6")||row.children[0];
+    sel.classList.remove("t-hand"); sel.classList.add("t-filled");
+    t1TileConverge(row, sel);
+  } else {
+    renderT2(); const slot=document.getElementById("slot");
+    const active=slot.querySelector(".active-step");
+    const holder=document.createElement("div"); holder.innerHTML=activeStep({label:"Buy shares (0/3)", body:`<div class="buy-grid">${stockCard("Messla",{mode:"select",price:300})}</div>`});
+    const incoming=holder.firstElementChild; slot.appendChild(incoming);
+    stepAdvance(active, incoming);
+  }
   scrubAnims = vp.getAnimations ? vp.getAnimations({subtree:true}) : [];
   scrubAnims.forEach(a=> a.pause());
 }
 function scrubTo(frac){
-  const maxEnd = Math.max(1, ...scrubAnims.map(a=>{
-    const t=a.effect.getTiming(); return (t.delay||0)+(t.duration||0);
-  }));
+  const maxEnd = Math.max(1, ...scrubAnims.map(a=>{ const t=a.effect.getTiming(); return (t.delay||0)+(t.duration||0); }));
   scrubAnims.forEach(a=>{ a.currentTime = frac * maxEnd; });
 }
 
@@ -128,25 +161,25 @@ function renderControls(){
   c.innerHTML = `
     <h2>Transition</h2>
     <div class="row" id="pick">
-      <button data-t="t1" class="${current==="t1"?"on":""}">T1 · tile resolve + push</button>
+      <button data-t="t1" class="${current==="t1"?"on":""}">T1 · active → completed</button>
       <button data-t="t2" class="${current==="t2"?"on":""}">T2 · push-up</button>
-    </div>
-    <div class="row">
-      <button id="playBtn">▶ Replay</button>
-      <button id="loopBtn" class="${looping?"on":""}">Loop</button>
     </div>
     <label>Speed <select id="speed">
       <option value="1"${MOTION.speed===1?" selected":""}>1×</option>
       <option value="0.5"${MOTION.speed===0.5?" selected":""}>0.5×</option>
       <option value="0.25"${MOTION.speed===0.25?" selected":""}>0.25×</option>
     </select></label>
-    <h2>${current==="t1"?"T1 params":"T2 params"}</h2>
     ${current==="t1" ? `
+      <h2>Frames</h2>
+      <div class="row frames"><button data-f="1">① active</button><button data-f="2">② converged</button><button data-f="3">③ completed</button></div>
+      <p class="hintline">Click a tile in the panel to play ①→②→③.</p>
+      <h2>T1 params</h2>
       <label>Duration <input type="range" id="t1dur" min="0" max="800" step="20" value="${t1.dur}"><output>${t1.dur}ms</output></label>
       <label>Tuck scale <input type="range" id="t1tuck" min="0.5" max="1" step="0.05" value="${t1.tuckScale}"><output>${t1.tuckScale}</output></label>
       <label>Stagger ms <input type="range" id="t1stag" min="0" max="120" step="5" value="${t1.stagger}"><output>${t1.stagger}</output></label>
-      <p style="margin:0;color:#9ca3af;font-size:11px;">Push-up timing lives in T2.</p>
     ` : `
+      <div class="row"><button id="playBtn">▶ Play push-up</button></div>
+      <h2>T2 params</h2>
       <label>Duration <input type="range" id="t2dur" min="0" max="800" step="20" value="${t2.dur}"><output>${t2.dur}ms</output></label>
       <label>Rise px <input type="range" id="t2rise" min="0" max="120" step="4" value="${t2.rise}"><output>${t2.rise}</output></label>
     `}
@@ -157,15 +190,13 @@ function renderControls(){
     <textarea id="tokens" readonly></textarea>
     <button id="copyBtn">Copy MOTION</button>
   `;
-  // wire
-  c.querySelectorAll("#pick button").forEach(b=> b.onclick=()=>{ current=b.dataset.t; renderControls(); play(); });
-  c.querySelector("#playBtn").onclick = play;
-  c.querySelector("#loopBtn").onclick = ()=>{ looping=!looping; renderControls(); if(looping) play(); };
+  c.querySelectorAll("#pick button").forEach(b=> b.onclick=()=>{ current=b.dataset.t; renderControls(); enter(); });
+  c.querySelectorAll(".frames button").forEach(b=> b.onclick=()=> renderT1Frame(parseInt(b.dataset.f,10)));
+  const playBtn = c.querySelector("#playBtn"); if(playBtn) playBtn.onclick = playPushUp;
   c.querySelector("#speed").onchange = e=>{ MOTION.speed=parseFloat(e.target.value); refreshTokens(); };
   const bind = (id, apply)=>{ const el=c.querySelector("#"+id); if(!el) return;
     el.oninput=()=>{ apply(parseFloat(el.value)); el.nextElementSibling.textContent = el.value + (id.endsWith("dur")?"ms":""); refreshTokens(); }; };
-  bind("t1dur", v=>MOTION.t1.dur=v);
-  bind("t1tuck", v=>MOTION.t1.tuckScale=v); bind("t1stag", v=>MOTION.t1.stagger=v);
+  bind("t1dur", v=>MOTION.t1.dur=v); bind("t1tuck", v=>MOTION.t1.tuckScale=v); bind("t1stag", v=>MOTION.t1.stagger=v);
   bind("t2dur", v=>MOTION.t2.dur=v); bind("t2rise", v=>MOTION.t2.rise=v);
   c.querySelector("#scrubStart").onclick = ()=>{ startScrub(); c.querySelector("#scrub").value=0; };
   c.querySelector("#scrub").oninput = e=> scrubTo(parseFloat(e.target.value));
@@ -176,7 +207,9 @@ function refreshTokens(){
   const t = document.querySelector("#tokens"); if(!t) return;
   t.value = "t1: " + JSON.stringify(MOTION.t1) + ",\nt2: " + JSON.stringify(MOTION.t2) + ",";
 }
+/* enter a mode: T1 waits at frame 1 for a click; T2 shows its start state */
+function enter(){ if(current==="t1") renderT1(); else renderT2(); }
 
 renderControls();
-play();
+enter();
 </script>
