@@ -250,6 +250,8 @@ function renderPayoutFrame(n){
 async function playPayout(){
   applyMotionVars();
   vp.innerHTML = activeStep({ label:PAYOUT_TITLE, body: payoutRevealBody() });
+  const step = vp.querySelector(".active-step");
+  if(step){ step.style.cursor="pointer"; step.title="Click to replay"; step.onclick=()=>playPayout(); }   // replay
   const lines = vp.querySelector(".payout-lines");
   if(lines) await payoutReveal(lines);
 }
@@ -354,7 +356,7 @@ function renderControls(){
       <h2>Frames</h2>
       <div class="row frames"><button data-mode="payout" data-f="1">① loader</button><button data-mode="payout" data-f="2">② majority</button><button data-mode="payout" data-f="3">③ completed</button></div>
       <div class="row"><button id="playPayout">▶ Play</button></div>
-      <p class="hintline">Loader → majority fades in → minority fades in. Watch at Speed 0.25×.</p>
+      <p class="hintline">Auto-plays on enter: loader → majority → minority. Click the panel or ▶ Play to replay; Speed 0.25× to slow it.</p>
       <h2>Payout params</h2>
       <label>Loader ms <input type="range" id="ploader" min="0" max="1600" step="20" value="${PY.loader}"><output>${PY.loader}ms</output></label>
       <label>Duration <input type="range" id="pdur" min="0" max="800" step="20" value="${PY.dur}"><output>${PY.dur}ms</output></label>
@@ -408,7 +410,7 @@ function enter(){
   if(current==="t1") renderT1();
   else if(current==="found") renderFound();
   else if(current==="merger") renderMerger();
-  else if(current==="payout") renderPayout();
+  else if(current==="payout") playPayout();   // no pick — auto-run loader→majority→minority (click panel to replay)
   else renderT2();
 }
 
