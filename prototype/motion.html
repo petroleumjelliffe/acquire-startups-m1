@@ -170,6 +170,59 @@ async function selectBrand(id){
 }
 
 /* ============================================================
+   Merger (pick survivor) — active → completed. Decoupled, interactive.
+   Brand ids (the player's stock already shows in their hand — no stock cards here).
+   KF1 both brands · KF2 pulse the clicked winner · KF3 winner slides left (if
+   needed), loser slides right, "absorbs" slides in → "[winner] absorbs [loser]".
+   ============================================================ */
+const MERGER_BRANDS = ["Messla","ZuckFace"];
+function mergerBody(clickable){
+  return `<div class="option-row" id="mrow">${MERGER_BRANDS.map(id=>
+    brand(id, clickable?{mode:"select",onclick:`selectSurvivor('${id}')`}:{mode:"select"})).join("")}</div>`;
+}
+function renderMerger(){ vp.innerHTML = activeStep({label:"Messla & ZuckFace Merger", body: mergerBody(true)}); }   // KF1
+function renderMergerFrame(n){
+  if(n===1) return renderMerger();
+  if(n===3) vp.innerHTML = activeStep({label:"Messla & ZuckFace Merger",
+    body:`<div class="option-row">${brand("Messla")}<span class="res">absorbs</span>${brand("ZuckFace")}</div>`});
+}
+function playMerger(){ renderMerger(); setTimeout(()=> selectSurvivor("ZuckFace"), 30); }   // right one → shows the slide-left
+
+async function selectSurvivor(id){
+  applyMotionVars();
+  const step = vp.querySelector(".active-step");
+  const row = step && step.querySelector("#mrow");
+  if(!row) return;
+  const els = [...row.children];
+  const selEl = els.find(el=> el.classList.contains("brand-"+id));
+  const othEl = els.find(el=> el!==selEl);
+  if(!selEl || !othEl) return;
+  const othId = MERGER_BRANDS.find(b=> b!==id);
+  const M = MOTION.merger, d = M.dur/MOTION.speed;
+  // KF2 — pulse the clicked winner
+  await pulse(selEl, M.blink);
+  // KF3 — winner → row-left (if needed), loser → right, "absorbs" slides in between
+  const rowRect = row.getBoundingClientRect();
+  const selRect = selEl.getBoundingClientRect();
+  const othRect = othEl.getBoundingClientRect();
+  const selW = selRect.width;
+  row.style.position="relative"; selEl.style.position="relative"; othEl.style.position="relative";
+  const winnerDelta = rowRect.left - selRect.left;                  // → left edge (≈0 if already left)
+  const loserDelta  = (rowRect.left + selW + 74) - othRect.left;    // → right, past where "absorbs" sits
+  const abs = document.createElement("span");
+  abs.className="res"; abs.textContent="absorbs";
+  abs.style.position="absolute"; abs.style.left=(selW+16)+"px"; abs.style.top=(selRect.top-rowRect.top+3)+"px"; abs.style.opacity="0";
+  row.appendChild(abs);
+  await Promise.all([
+    runAnim(selEl, [{transform:"translateX(0)"},{transform:`translateX(${winnerDelta}px)`}], {duration:d, easing:M.ease, fill:"forwards"}),
+    runAnim(othEl, [{transform:"translateX(0)"},{transform:`translateX(${loserDelta}px)`}], {duration:d, easing:M.ease, fill:"forwards"}),
+    runAnim(abs, [{opacity:0, transform:"translateX(-8px)"},{opacity:1, transform:"translateX(0)"}], {duration:d, easing:M.ease, delay:d*0.35, fill:"forwards"}),
+  ]);
+  // settle — completed "[winner] absorbs [loser]"
+  row.outerHTML = `<div class="option-row">${brand(id)}<span class="res">absorbs</span>${brand(othId)}</div>`;
+}
+
+/* ============================================================
    T2 — push-up reveal. Decoupled: does not depend on step contents.
    The current step rises up (into the log) as the next rises from below.
    ============================================================ */
@@ -203,6 +256,8 @@ function startScrub(){
     t1TileConverge(row, sel);
   } else if(current==="found"){
     renderFound(); scrubAnims=[]; return;   // multi-phase — use Play + Speed 0.25× instead
+  } else if(current==="merger"){
+    renderMerger(); scrubAnims=[]; return;  // multi-phase — use Play + Speed 0.25× instead
   } else {
     renderT2(); const slot=document.getElementById("slot");
     const active=slot.querySelector(".active-step");
@@ -221,8 +276,8 @@ function scrubTo(frac){
 /* ---- controls ---- */
 function renderControls(){
   const c = document.getElementById("controls");
-  const t1 = MOTION.t1, t2 = MOTION.t2, F = MOTION.found;
-  const modes = [["t1","Place"],["found","Found"],["t2","Push-up"]];
+  const t1 = MOTION.t1, t2 = MOTION.t2, F = MOTION.found, M = MOTION.merger;
+  const modes = [["t1","Place"],["found","Found"],["merger","Merger"],["t2","Push-up"]];
   let html = `
     <h2>Transition</h2>
     <div class="row" id="pick">${modes.map(([k,l])=>`<button data-t="${k}" class="${current===k?"on":""}">${l}</button>`).join("")}</div>
@@ -251,6 +306,15 @@ function renderControls(){
       <label>Blink ms <input type="range" id="fblink" min="0" max="800" step="20" value="${F.blink}"><output>${F.blink}ms</output></label>
       <label>Duration <input type="range" id="fdur" min="0" max="800" step="20" value="${F.dur}"><output>${F.dur}ms</output></label>
       <label>Stagger ms <input type="range" id="fstag" min="0" max="120" step="5" value="${F.stagger}"><output>${F.stagger}</output></label>`;
+  } else if(current==="merger"){
+    html += `
+      <h2>Frames</h2>
+      <div class="row frames"><button data-mode="merger" data-f="1">① both</button><button data-mode="merger" data-f="3">③ completed</button></div>
+      <div class="row"><button id="playMerger">▶ Play (ZuckFace wins)</button></div>
+      <p class="hintline">Click a brand to pick the survivor. ②pulse ③slide+absorbs — Speed 0.25×.</p>
+      <h2>Merger params</h2>
+      <label>Blink ms <input type="range" id="mblink" min="0" max="800" step="20" value="${M.blink}"><output>${M.blink}ms</output></label>
+      <label>Duration <input type="range" id="mdur" min="0" max="800" step="20" value="${M.dur}"><output>${M.dur}ms</output></label>`;
   } else {
     html += `
       <div class="row"><button id="playBtn">▶ Play push-up</button></div>
@@ -268,14 +332,17 @@ function renderControls(){
   c.innerHTML = html;
   // wire
   c.querySelectorAll("#pick button").forEach(b=> b.onclick=()=>{ current=b.dataset.t; renderControls(); enter(); });
-  c.querySelectorAll(".frames button").forEach(b=> b.onclick=()=>{ const f=parseInt(b.dataset.f,10); b.dataset.mode==="t1"?renderT1Frame(f):renderFoundFrame(f); });
+  c.querySelectorAll(".frames button").forEach(b=> b.onclick=()=>{ const f=parseInt(b.dataset.f,10);
+    ({t1:renderT1Frame, found:renderFoundFrame, merger:renderMergerFrame}[b.dataset.mode]||(()=>{}))(f); });
   const pf=c.querySelector("#playFound"); if(pf) pf.onclick=playFound;
+  const pm=c.querySelector("#playMerger"); if(pm) pm.onclick=playMerger;
   const pb=c.querySelector("#playBtn"); if(pb) pb.onclick=playPushUp;
   c.querySelector("#speed").onchange = e=>{ MOTION.speed=parseFloat(e.target.value); refreshTokens(); };
   const bind = (id, apply)=>{ const el=c.querySelector("#"+id); if(!el) return;
     el.oninput=()=>{ apply(parseFloat(el.value)); el.nextElementSibling.textContent = el.value + (id.endsWith("dur")||id.endsWith("blink")?"ms":""); refreshTokens(); }; };
   bind("t1blink", v=>MOTION.t1.blink=v); bind("t1dur", v=>MOTION.t1.dur=v); bind("t1tuck", v=>MOTION.t1.tuckScale=v); bind("t1stag", v=>MOTION.t1.stagger=v);
   bind("fblink", v=>MOTION.found.blink=v); bind("fdur", v=>MOTION.found.dur=v); bind("fstag", v=>MOTION.found.stagger=v);
+  bind("mblink", v=>MOTION.merger.blink=v); bind("mdur", v=>MOTION.merger.dur=v);
   bind("t2dur", v=>MOTION.t2.dur=v); bind("t2rise", v=>MOTION.t2.rise=v);
   c.querySelector("#scrubStart").onclick = ()=>{ startScrub(); c.querySelector("#scrub").value=0; };
   c.querySelector("#scrub").oninput = e=> scrubTo(parseFloat(e.target.value));
@@ -284,12 +351,18 @@ function renderControls(){
 }
 function refreshTokens(){
   const t = document.querySelector("#tokens"); if(!t) return;
-  t.value = "t1: "    + JSON.stringify(MOTION.t1)    + ",\n" +
-            "found: " + JSON.stringify(MOTION.found) + ",\n" +
-            "t2: "    + JSON.stringify(MOTION.t2)    + ",";
+  t.value = "t1: "     + JSON.stringify(MOTION.t1)     + ",\n" +
+            "found: "  + JSON.stringify(MOTION.found)  + ",\n" +
+            "merger: " + JSON.stringify(MOTION.merger) + ",\n" +
+            "t2: "     + JSON.stringify(MOTION.t2)     + ",";
 }
-/* enter a mode: Place/Found wait at frame 1 for a click; Push-up shows its start state */
-function enter(){ current==="t1" ? renderT1() : current==="found" ? renderFound() : renderT2(); }
+/* enter a mode: Place/Found/Merger wait at frame 1 for a click; Push-up shows its start state */
+function enter(){
+  if(current==="t1") renderT1();
+  else if(current==="found") renderFound();
+  else if(current==="merger") renderMerger();
+  else renderT2();
+}
 
 renderControls();
 enter();

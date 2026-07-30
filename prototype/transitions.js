@@ -7,8 +7,9 @@
 
 const MOTION = {
   t1:    { blink: 300, tuckScale: 0.9, stagger: 30, dur: 320, ease: 'cubic-bezier(.2,.7,.3,1)' },   // place: blink→converge
-  found: { blink: 360, stagger: 24, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },       // found: blink→gather→upper-left
-  t2:    { rise: 40, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                       // push-up / reveal
+  found:  { blink: 360, stagger: 24, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },       // found: blink→gather→upper-left
+  merger: { blink: 360, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                    // merger: pulse→slide+absorbs
+  t2:     { rise: 40, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                      // push-up / reveal
   speed: 1,   // lab-only slow-mo multiplier (1 / .5 / .25); the app leaves it at 1
 };
 
