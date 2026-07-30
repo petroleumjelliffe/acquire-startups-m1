@@ -303,6 +303,10 @@
   table.data th:not(:first-child), table.data td:not(:first-child){text-align:right;}
 
   .payout-lines{display:flex; flex-direction:column; gap:5px;}
+  .payout-loader{display:flex; align-items:center; gap:8px; font-size:14px; color:#6b7280;}
+  .payout-loader::before{content:""; width:13px; height:13px; border-radius:50%;
+    border:2px solid #d1d5db; border-top-color:#6b7280; animation:payout-spin .7s linear infinite;}
+  @keyframes payout-spin{to{transform:rotate(360deg);}}
   .bonus-line{display:flex; align-items:center; gap:6px; font-size:14px;}
   .bonus-line .player-emoji{font-size:15px;}
   .bonus-line .pnm{font-weight:600; color:#111827;}

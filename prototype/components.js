@@ -148,7 +148,7 @@ function activeStep({label, body, button=''}){
 function payoutLines(bonuses){
   return `<div class="payout-lines">
     ${bonuses.length ? bonuses.map(b=>
-      `<div class="bonus-line"><span class="player-emoji">${b.emoji||''}</span><span class="pnm">${b.player}</span>${b.qty!=null?`<span class="pqty">×${b.qty}</span>`:''}<span class="role">· ${b.type==='majority'?'Majority':'Minority'}</span>${cash(b.amount,{sign:'delta'})}</div>`
+      `<div class="bonus-line" data-role="${b.type}"><span class="player-emoji">${b.emoji||''}</span><span class="pnm">${b.player}</span>${b.qty!=null?`<span class="pqty">×${b.qty}</span>`:''}<span class="role">· ${b.type==='majority'?'Majority':'Minority'}</span>${cash(b.amount,{sign:'delta'})}</div>`
     ).join('') : '<div class="bonus-line">No shareholders to pay.</div>'}
   </div>`;
 }

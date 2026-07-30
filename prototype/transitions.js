@@ -9,6 +9,7 @@ const MOTION = {
   t1:    { blink: 300, tuckScale: 0.9, stagger: 30, dur: 320, ease: 'cubic-bezier(.2,.7,.3,1)' },   // place: blink→converge
   found:  { blink: 360, stagger: 24, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },       // found: blink→gather→upper-left
   merger: { blink: 360, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                    // merger: pulse→slide+absorbs
+  payout: { loader: 620, dur: 300, gap: 140, ease: 'cubic-bezier(.2,.7,.3,1)' },         // payout: loader→majority→minority
   t2:     { rise: 40, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                      // push-up / reveal
   speed: 1,   // lab-only slow-mo multiplier (1 / .5 / .25); the app leaves it at 1
 };
@@ -71,6 +72,37 @@ function stepAdvance(outgoingEl, incomingEl){
 function t2Toaster(activeStepEl){
   if(!activeStepEl) return Promise.resolve();
   return stepAdvance(null, activeStepEl);
+}
+
+/* Merger payout — the active step opens on a "calculating bonuses…" loader while the
+   bonuses resolve; then the majority bonus line(s) fade up, then the minority line(s).
+   linesEl is a .payout-lines already holding the settled .bonus-line[data-role] nodes
+   plus a .payout-loader; we hide the lines, hold the loader, drop it, then reveal the
+   majority group and the minority group in turn. The title never changes — this only
+   fills the body. Resolves when the last line has faded in. */
+async function payoutReveal(linesEl){
+  if(reducedMotion()) return;
+  const { loader, dur, gap, ease } = MOTION.payout;
+  const d = dur / MOTION.speed;
+  const loaderEl = linesEl.querySelector('.payout-loader');
+  const lines = Array.prototype.slice.call(linesEl.querySelectorAll('.bonus-line'));
+  lines.forEach(function(el){ el.style.opacity = '0'; });
+  await new Promise(function(r){ setTimeout(r, loader / MOTION.speed); });   // "calculating…"
+  if(loaderEl) loaderEl.remove();
+  const groups = [
+    lines.filter(function(el){ return el.getAttribute('data-role') === 'majority'; }),
+    lines.filter(function(el){ return el.getAttribute('data-role') === 'minority'; }),
+  ];
+  for(let g = 0; g < groups.length; g++){
+    if(!groups[g].length) continue;
+    await Promise.all(groups[g].map(function(el){
+      return runAnim(el, [
+        { opacity: 0, transform: 'translateY(6px)' },
+        { opacity: 1, transform: 'translateY(0)' },
+      ], { duration: d, easing: ease, fill: 'forwards' });
+    }));
+    if(g < groups.length - 1) await new Promise(function(r){ setTimeout(r, gap / MOTION.speed); });
+  }
 }
 
 /* T1 — the tile step resolves IN PLACE: the selected tile slides LEFT to the row's
