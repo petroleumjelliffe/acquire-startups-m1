@@ -257,6 +257,39 @@ async function playPayout(){
 }
 
 /* ============================================================
+   Staging receive — during buy, tapping a brand adds a share to the cart:
+   a large card materializes over the pile and shrinks into its slot. The buy
+   grid sits above a live staging zone; each tap increments the Messla cart.
+   KF1 empty cart · (Play) big card pops in over the pile · KF3 landed in slot.
+   ============================================================ */
+const STAGE_PRICE = 300;
+let stageN = 1;   // current Messla count in the lab cart
+function stagingCart(n){
+  return stagingZone({ label:"Staging — commits on end turn",
+    sharesHtml: n>0 ? stockStack("Messla", n, {size:"sm", price:STAGE_PRICE}) : "",
+    cashDelta: -n*STAGE_PRICE });
+}
+function renderStaging(){
+  vp.innerHTML =
+    activeStep({ label:`Buy shares (${Math.min(stageN,3)}/3)`,
+      body:`<div class="buy-grid">${["PaperfulPost","Messla","ZuckFace"].map(id=>stockCard(id,{mode:"select",price:STAGE_PRICE})).join("")}</div>` })
+    + stagingCart(stageN);
+  vp.querySelectorAll(".buy-grid .stock").forEach(b=> b.onclick=()=>playStaging());   // any tap → receive one
+}
+function renderStagingFrame(n){
+  if(n===1){ stageN=0; renderStaging(); }   // ① empty cart
+  if(n===3){ stageN=1; renderStaging(); }   // ③ one received
+}
+async function playStaging(){
+  applyMotionVars();
+  if(stageN>=3) stageN=0;   // cart caps at 3 — replay from empty
+  stageN++;
+  renderStaging();
+  const stack = vp.querySelector(".staging-pile .stock-stack");
+  if(stack) await stagingReceive(stack);
+}
+
+/* ============================================================
    T2 — push-up reveal. Decoupled: does not depend on step contents.
    The current step rises up (into the log) as the next rises from below.
    ============================================================ */
@@ -294,6 +327,8 @@ function startScrub(){
     renderMerger(); scrubAnims=[]; return;  // multi-phase — use Play + Speed 0.25× instead
   } else if(current==="payout"){
     renderPayout(); scrubAnims=[]; return;  // multi-phase — use Play + Speed 0.25× instead
+  } else if(current==="staging"){
+    stageN=1; renderStaging(); scrubAnims=[]; return;  // ghost lives on <body> — use Play + Speed 0.25×
   } else {
     renderT2(); const slot=document.getElementById("slot");
     const active=slot.querySelector(".active-step");
@@ -312,8 +347,8 @@ function scrubTo(frac){
 /* ---- controls ---- */
 function renderControls(){
   const c = document.getElementById("controls");
-  const t1 = MOTION.t1, t2 = MOTION.t2, F = MOTION.found, M = MOTION.merger, PY = MOTION.payout;
-  const modes = [["t1","Place"],["found","Found"],["merger","Merger"],["payout","Payout"],["t2","Push-up"]];
+  const t1 = MOTION.t1, t2 = MOTION.t2, F = MOTION.found, M = MOTION.merger, PY = MOTION.payout, S = MOTION.staging;
+  const modes = [["t1","Place"],["found","Found"],["merger","Merger"],["payout","Payout"],["staging","Staging"],["t2","Push-up"]];
   let html = `
     <h2>Transition</h2>
     <div class="row" id="pick">${modes.map(([k,l])=>`<button data-t="${k}" class="${current===k?"on":""}">${l}</button>`).join("")}</div>
@@ -361,6 +396,16 @@ function renderControls(){
       <label>Loader ms <input type="range" id="ploader" min="0" max="1600" step="20" value="${PY.loader}"><output>${PY.loader}ms</output></label>
       <label>Duration <input type="range" id="pdur" min="0" max="800" step="20" value="${PY.dur}"><output>${PY.dur}ms</output></label>
       <label>Group gap <input type="range" id="pgap" min="0" max="600" step="20" value="${PY.gap}"><output>${PY.gap}ms</output></label>`;
+  } else if(current==="staging"){
+    html += `
+      <h2>Frames</h2>
+      <div class="row frames"><button data-mode="staging" data-f="1">① empty</button><button data-mode="staging" data-f="3">③ received</button></div>
+      <div class="row"><button id="playStaging">▶ Play (receive)</button></div>
+      <p class="hintline">Tap a brand card in the panel to receive one into the cart. Big card pops over the pile then shrinks into its slot — Speed 0.25×.</p>
+      <h2>Staging params</h2>
+      <label>Rise px <input type="range" id="srise" min="0" max="200" step="10" value="${S.rise}"><output>${S.rise}</output></label>
+      <label>Grow × <input type="range" id="sgrow" min="1" max="4" step="0.1" value="${S.grow}"><output>${S.grow}</output></label>
+      <label>Duration <input type="range" id="sdur" min="0" max="900" step="20" value="${S.dur}"><output>${S.dur}ms</output></label>`;
   } else {
     html += `
       <div class="row"><button id="playBtn">▶ Play push-up</button></div>
@@ -379,10 +424,11 @@ function renderControls(){
   // wire
   c.querySelectorAll("#pick button").forEach(b=> b.onclick=()=>{ current=b.dataset.t; renderControls(); enter(); });
   c.querySelectorAll(".frames button").forEach(b=> b.onclick=()=>{ const f=parseInt(b.dataset.f,10);
-    ({t1:renderT1Frame, found:renderFoundFrame, merger:renderMergerFrame, payout:renderPayoutFrame}[b.dataset.mode]||(()=>{}))(f); });
+    ({t1:renderT1Frame, found:renderFoundFrame, merger:renderMergerFrame, payout:renderPayoutFrame, staging:renderStagingFrame}[b.dataset.mode]||(()=>{}))(f); });
   const pf=c.querySelector("#playFound"); if(pf) pf.onclick=playFound;
   const pm=c.querySelector("#playMerger"); if(pm) pm.onclick=playMerger;
   const pp=c.querySelector("#playPayout"); if(pp) pp.onclick=playPayout;
+  const ps=c.querySelector("#playStaging"); if(ps) ps.onclick=playStaging;
   const pb=c.querySelector("#playBtn"); if(pb) pb.onclick=playPushUp;
   c.querySelector("#speed").onchange = e=>{ MOTION.speed=parseFloat(e.target.value); refreshTokens(); };
   const bind = (id, apply)=>{ const el=c.querySelector("#"+id); if(!el) return;
@@ -391,6 +437,7 @@ function renderControls(){
   bind("fblink", v=>MOTION.found.blink=v); bind("fdur", v=>MOTION.found.dur=v); bind("fstag", v=>MOTION.found.stagger=v);
   bind("mblink", v=>MOTION.merger.blink=v); bind("mdur", v=>MOTION.merger.dur=v);
   bind("ploader", v=>MOTION.payout.loader=v); bind("pdur", v=>MOTION.payout.dur=v); bind("pgap", v=>MOTION.payout.gap=v);
+  bind("srise", v=>MOTION.staging.rise=v); bind("sgrow", v=>MOTION.staging.grow=v); bind("sdur", v=>MOTION.staging.dur=v);
   bind("t2dur", v=>MOTION.t2.dur=v); bind("t2rise", v=>MOTION.t2.rise=v);
   c.querySelector("#scrubStart").onclick = ()=>{ startScrub(); c.querySelector("#scrub").value=0; };
   c.querySelector("#scrub").oninput = e=> scrubTo(parseFloat(e.target.value));
@@ -403,6 +450,7 @@ function refreshTokens(){
             "found: "  + JSON.stringify(MOTION.found)  + ",\n" +
             "merger: " + JSON.stringify(MOTION.merger) + ",\n" +
             "payout: " + JSON.stringify(MOTION.payout) + ",\n" +
+            "staging: " + JSON.stringify(MOTION.staging) + ",\n" +
             "t2: "     + JSON.stringify(MOTION.t2)     + ",";
 }
 /* enter a mode: Place/Found/Merger wait at frame 1 for a click; Push-up shows its start state */
@@ -411,6 +459,7 @@ function enter(){
   else if(current==="found") renderFound();
   else if(current==="merger") renderMerger();
   else if(current==="payout") playPayout();   // no pick — auto-run loader→majority→minority (click panel to replay)
+  else if(current==="staging"){ stageN=1; renderStaging(); }   // waits for a buy-card tap to receive
   else renderT2();
 }
 

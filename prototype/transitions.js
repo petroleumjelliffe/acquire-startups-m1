@@ -10,6 +10,7 @@ const MOTION = {
   found:  { blink: 360, stagger: 24, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },       // found: blink→gather→upper-left
   merger: { blink: 360, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                    // merger: pulse→slide+absorbs
   payout: { loader: 620, dur: 300, gap: 140, ease: 'cubic-bezier(.2,.7,.3,1)' },         // payout: loader→majority→minority
+  staging:{ rise: 90, grow: 2.4, dur: 420, ease: 'cubic-bezier(.2,.7,.3,1)' },           // staging receive: card materializes big → shrinks into cart slot
   t2:     { rise: 40, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                      // push-up / reveal
   speed: 1,   // lab-only slow-mo multiplier (1 / .5 / .25); the app leaves it at 1
 };
@@ -103,6 +104,37 @@ async function payoutReveal(linesEl){
     }));
     if(g < groups.length - 1) await new Promise(function(r){ setTimeout(r, gap / MOTION.speed); });
   }
+}
+
+/* Staging receive — a bought/received share lands in the cart: a large card
+   materializes centered above the staging pile, then shrinks and descends into its
+   slot. targetStackEl is the .stock-stack in the pile that just incremented (it
+   already holds the final count). We overlay a fixed-position ghost of its top card,
+   pop the ghost in big + raised, then fly it down to scale 1 over the real card and
+   remove it — the real stack shows through underneath, so the landing is seamless.
+   Resolves once the card has landed. */
+async function stagingReceive(targetStackEl){
+  if(reducedMotion() || !targetStackEl) return;
+  const { rise, grow, dur, ease } = MOTION.staging;
+  const d = dur / MOTION.speed;
+  const cardEl = targetStackEl.querySelector('.stock');   // the single face card = landing target
+  if(!cardEl) return;
+  const to = cardEl.getBoundingClientRect();
+  const ghost = cardEl.cloneNode(true);
+  Object.assign(ghost.style, {
+    position: 'fixed', left: to.left + 'px', top: to.top + 'px',
+    width: to.width + 'px', height: to.height + 'px',
+    margin: '0', transformOrigin: 'center', zIndex: '9999', pointerEvents: 'none',
+  });
+  document.body.appendChild(ghost);
+  cardEl.style.visibility = 'hidden';   // hide the real face card until the ghost lands over it
+  await runAnim(ghost, [
+    { opacity: 0, transform: 'translateY(' + (-rise) + 'px) scale(' + grow + ')' },
+    { opacity: 1, transform: 'translateY(' + (-rise) + 'px) scale(' + grow + ')', offset: 0.28 },  // popped in, large, raised
+    { opacity: 1, transform: 'translateY(0) scale(1)' },   // shrunk down into the slot
+  ], { duration: d, easing: ease });
+  cardEl.style.visibility = '';
+  ghost.remove();
 }
 
 /* T1 — the tile step resolves IN PLACE: the selected tile slides LEFT to the row's

@@ -189,9 +189,8 @@ const SECTIONS = [
   { seq:"—", title:"Staging (spans steps) — all should be the same height", intent:"Net always reserved; the pile keeps a populated-row height, and the action slot is always reserved — so empty ↔ filled and button ↔ no-button never shift.",
     states:[
       {label:"staging-empty",   html: stagingZone({label:"Staging — commits on end turn"})},
-      {label:"staging-shares",  html: stagingZone({label:"Staging — commits on end turn", sharesHtml: stockStack("Messla",1,{size:"sm",price:P.Messla}), cashDelta:-P.Messla})},
-      {label:"staging-leaving", html: stagingZone({label:"Staging — Sam's liquidation", sharesHtml: stockStack("ZuckFace",3,{size:"sm",price:P.ZuckFace,leaving:true,onRemove:noop}) + stockStack("Messla",1,{size:"sm",price:P.Messla}), cashDelta:P.ZuckFace})},
       {label:"staging-cart",    html: stagingZone({label:"Staging — commits on end turn", sharesHtml: stockStack("Messla",2,{size:"sm",price:P.Messla}), cashDelta:-2*P.Messla})},
+      {label:"staging-leaving", html: stagingZone({label:"Staging — Sam's liquidation", sharesHtml: stockStack("ZuckFace",3,{size:"sm",price:P.ZuckFace,leaving:true,onRemove:noop}) + stockStack("Messla",1,{size:"sm",price:P.Messla}), cashDelta:P.ZuckFace})},
       {label:"staging-action",  html: stagingZone({label:"Staging — commits on end turn", sharesHtml: stockStack("Messla",2,{size:"sm",price:P.Messla}), cashDelta:-2*P.Messla, action:`<button class="primary-btn staging-action">Buy &amp; end turn</button>`})},
     ]},
 
