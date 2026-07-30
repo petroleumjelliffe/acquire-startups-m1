@@ -6,8 +6,9 @@
    ============================================================ */
 
 const MOTION = {
-  t1: { tuckScale: 0.9, stagger: 30, dur: 320, ease: 'cubic-bezier(.2,.7,.3,1)' },   // converge
-  t2: { rise: 40, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                       // push-up / reveal
+  t1:    { blink: 300, tuckScale: 0.9, stagger: 30, dur: 320, ease: 'cubic-bezier(.2,.7,.3,1)' },   // place: blink→converge
+  found: { blink: 360, stagger: 24, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },       // found: blink→gather→upper-left
+  t2:    { rise: 40, dur: 300, ease: 'cubic-bezier(.2,.7,.3,1)' },                       // push-up / reveal
   speed: 1,   // lab-only slow-mo multiplier (1 / .5 / .25); the app leaves it at 1
 };
 
@@ -29,6 +30,14 @@ function runAnim(el, keyframes, opts){
   if(reducedMotion()) return Promise.resolve();
   const anim = el.animate(keyframes, opts);
   return anim.finished.catch(()=>{});   // swallow cancellation
+}
+
+/* click confirmation — a quick opacity pulse on the chosen element before it resolves. */
+function pulse(el, ms){
+  if(!el || reducedMotion()) return Promise.resolve();
+  return runAnim(el, [
+    { opacity: 1 }, { opacity: 0.25 }, { opacity: 1 }, { opacity: 0.25 }, { opacity: 1 },
+  ], { duration: (ms || 300) / MOTION.speed, easing: 'ease-in-out' });
 }
 
 /* Step advance (T2) — every step resolves IN PLACE, then this pushes it up: the

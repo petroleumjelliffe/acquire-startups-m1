@@ -90,6 +90,8 @@ async function selectTile(coord){
   if(!row) return;
   const selEl = [...row.children].find(el=> el.getAttribute("title")===coord);
   if(!selEl) return;
+  // click confirmation: pulse the chosen tile
+  await pulse(selEl, MOTION.t1.blink);
   // Frame 1 → 2: selected recolors hand→filled + slides left; the rest converge behind and fade out
   selEl.classList.remove("t-hand"); selEl.classList.add("t-filled");
   await t1TileConverge(row, selEl);
@@ -105,6 +107,66 @@ async function selectTile(coord){
       { opacity:1, transform:"translateX(0)" },
     ], { duration: MOTION.t1.dur/MOTION.speed, easing: MOTION.t1.ease });
   }
+}
+
+/* ============================================================
+   Found — active → completed. Decoupled, interactive.
+   KF1 found-active · KF2 blink clicked brand · KF3 gather every brand
+   under the selected · KF4 selected slides to the upper-left.
+   ============================================================ */
+const FOUND_GROUPS = [
+  { price:200, ids:["PaperfulPost","Messla"] },
+  { price:300, ids:["CamCrooned","ZuckFace","WrecksonMobil"] },
+  { price:400, ids:["Gobble","Scrapple"] },
+];
+const FOUNDED = ["Messla","ZuckFace"];   // already on the board → taken (disabled)
+function foundBody(clickable){
+  return `<div class="found-groups">${FOUND_GROUPS.map(g=>`<div class="found-group">
+    <div class="found-price">${price(g.price)}<span class="found-price-note">to start</span></div>
+    <div class="option-row">${g.ids.map(id=> FOUNDED.includes(id)
+      ? brand(id,{disabled:true})
+      : brand(id, clickable?{mode:"select",onclick:`selectBrand('${id}')`}:{mode:"select"})).join("")}</div>
+  </div>`).join("")}</div>`;
+}
+function renderFound(){ vp.innerHTML = activeStep({label:"Found a startup", body: foundBody(true)}); }   // KF1
+function renderFoundFrame(n){
+  if(n===1) return renderFound();
+  if(n===4) vp.innerHTML = activeStep({label:"Found a startup",
+    body:`<div class="option-row">${brand("PaperfulPost")}<span class="res">(+1 free share)</span></div>`});
+}
+function playFound(){ renderFound(); setTimeout(()=> selectBrand("PaperfulPost"), 30); }
+
+async function selectBrand(id){
+  applyMotionVars();
+  const step = vp.querySelector(".active-step");
+  const groups = step && step.querySelector(".found-groups");
+  if(!groups) return;
+  const brands = [...groups.querySelectorAll(".brand")];
+  const selEl = brands.find(el=> el.classList.contains("brand-"+id) && !el.disabled);
+  if(!selEl) return;
+  const F = MOTION.found, d = F.dur/MOTION.speed;
+  // KF2 — click confirmation: pulse the clicked brand
+  await pulse(selEl, F.blink);
+  // KF3 — every other brand slides under the selected's location AND fades out as it goes
+  const selRect = selEl.getBoundingClientRect();
+  selEl.style.position="relative"; selEl.style.zIndex="50";
+  const movers = brands.filter(el=> el!==selEl);
+  groups.querySelectorAll(".found-price").forEach(p=>{ p.style.transition="opacity "+d+"ms"; p.style.opacity="0"; });
+  await Promise.all(movers.map((el,i)=>{
+    const r = el.getBoundingClientRect(); el.style.position="relative"; el.style.zIndex=String(40-i);
+    return runAnim(el, [
+      { transform:"translate(0,0)", opacity:1 },
+      { transform:`translate(${selRect.left-r.left}px, ${selRect.top-r.top}px)`, opacity:0 },
+    ], { duration:d, easing:F.ease, delay:i*(F.stagger/MOTION.speed), fill:"forwards" });
+  }));
+  // KF4 — selected slides to the groups' upper-left (the others have already faded out)
+  const gr = groups.getBoundingClientRect();
+  await runAnim(selEl, [
+    { transform:"translate(0,0)" },
+    { transform:`translate(${gr.left-selRect.left}px, ${gr.top-selRect.top}px)` },
+  ], { duration:d, easing:F.ease, fill:"forwards" });
+  // settle — completed
+  groups.outerHTML = `<div class="option-row">${brand(id)}<span class="res">(+1 free share)</span></div>`;
 }
 
 /* ============================================================
@@ -139,6 +201,8 @@ function startScrub(){
     const sel=[...row.children].find(el=>el.getAttribute("title")==="E6")||row.children[0];
     sel.classList.remove("t-hand"); sel.classList.add("t-filled");
     t1TileConverge(row, sel);
+  } else if(current==="found"){
+    renderFound(); scrubAnims=[]; return;   // multi-phase — use Play + Speed 0.25× instead
   } else {
     renderT2(); const slot=document.getElementById("slot");
     const active=slot.querySelector(".active-step");
@@ -157,46 +221,61 @@ function scrubTo(frac){
 /* ---- controls ---- */
 function renderControls(){
   const c = document.getElementById("controls");
-  const t1 = MOTION.t1, t2 = MOTION.t2;
-  c.innerHTML = `
+  const t1 = MOTION.t1, t2 = MOTION.t2, F = MOTION.found;
+  const modes = [["t1","Place"],["found","Found"],["t2","Push-up"]];
+  let html = `
     <h2>Transition</h2>
-    <div class="row" id="pick">
-      <button data-t="t1" class="${current==="t1"?"on":""}">T1 · active → completed</button>
-      <button data-t="t2" class="${current==="t2"?"on":""}">T2 · push-up</button>
-    </div>
+    <div class="row" id="pick">${modes.map(([k,l])=>`<button data-t="${k}" class="${current===k?"on":""}">${l}</button>`).join("")}</div>
     <label>Speed <select id="speed">
       <option value="1"${MOTION.speed===1?" selected":""}>1×</option>
       <option value="0.5"${MOTION.speed===0.5?" selected":""}>0.5×</option>
       <option value="0.25"${MOTION.speed===0.25?" selected":""}>0.25×</option>
-    </select></label>
-    ${current==="t1" ? `
+    </select></label>`;
+  if(current==="t1"){
+    html += `
       <h2>Frames</h2>
-      <div class="row frames"><button data-f="1">① active</button><button data-f="2">② converged</button><button data-f="3">③ completed</button></div>
+      <div class="row frames"><button data-mode="t1" data-f="1">① active</button><button data-mode="t1" data-f="2">② converged</button><button data-mode="t1" data-f="3">③ completed</button></div>
       <p class="hintline">Click a tile in the panel to play ①→②→③.</p>
-      <h2>T1 params</h2>
+      <h2>Place params</h2>
+      <label>Blink ms <input type="range" id="t1blink" min="0" max="800" step="20" value="${t1.blink}"><output>${t1.blink}ms</output></label>
       <label>Duration <input type="range" id="t1dur" min="0" max="800" step="20" value="${t1.dur}"><output>${t1.dur}ms</output></label>
       <label>Tuck scale <input type="range" id="t1tuck" min="0.5" max="1" step="0.05" value="${t1.tuckScale}"><output>${t1.tuckScale}</output></label>
-      <label>Stagger ms <input type="range" id="t1stag" min="0" max="120" step="5" value="${t1.stagger}"><output>${t1.stagger}</output></label>
-    ` : `
+      <label>Stagger ms <input type="range" id="t1stag" min="0" max="120" step="5" value="${t1.stagger}"><output>${t1.stagger}</output></label>`;
+  } else if(current==="found"){
+    html += `
+      <h2>Frames</h2>
+      <div class="row frames"><button data-mode="found" data-f="1">① active</button><button data-mode="found" data-f="4">④ completed</button></div>
+      <div class="row"><button id="playFound">▶ Play (PaperfulPost)</button></div>
+      <p class="hintline">Click a selectable brand to play. ②blink ③gather ④upper-left — watch at Speed 0.25×.</p>
+      <h2>Found params</h2>
+      <label>Blink ms <input type="range" id="fblink" min="0" max="800" step="20" value="${F.blink}"><output>${F.blink}ms</output></label>
+      <label>Duration <input type="range" id="fdur" min="0" max="800" step="20" value="${F.dur}"><output>${F.dur}ms</output></label>
+      <label>Stagger ms <input type="range" id="fstag" min="0" max="120" step="5" value="${F.stagger}"><output>${F.stagger}</output></label>`;
+  } else {
+    html += `
       <div class="row"><button id="playBtn">▶ Play push-up</button></div>
-      <h2>T2 params</h2>
+      <h2>Push-up params</h2>
       <label>Duration <input type="range" id="t2dur" min="0" max="800" step="20" value="${t2.dur}"><output>${t2.dur}ms</output></label>
-      <label>Rise px <input type="range" id="t2rise" min="0" max="120" step="4" value="${t2.rise}"><output>${t2.rise}</output></label>
-    `}
+      <label>Rise px <input type="range" id="t2rise" min="0" max="120" step="4" value="${t2.rise}"><output>${t2.rise}</output></label>`;
+  }
+  html += `
     <h2>Scrub</h2>
     <div class="row"><button id="scrubStart">Load frame</button></div>
     <label>t <input type="range" id="scrub" min="0" max="1" step="0.02" value="0" style="flex:1"></label>
     <h2>Tokens</h2>
     <textarea id="tokens" readonly></textarea>
-    <button id="copyBtn">Copy MOTION</button>
-  `;
+    <button id="copyBtn">Copy MOTION</button>`;
+  c.innerHTML = html;
+  // wire
   c.querySelectorAll("#pick button").forEach(b=> b.onclick=()=>{ current=b.dataset.t; renderControls(); enter(); });
-  c.querySelectorAll(".frames button").forEach(b=> b.onclick=()=> renderT1Frame(parseInt(b.dataset.f,10)));
-  const playBtn = c.querySelector("#playBtn"); if(playBtn) playBtn.onclick = playPushUp;
+  c.querySelectorAll(".frames button").forEach(b=> b.onclick=()=>{ const f=parseInt(b.dataset.f,10); b.dataset.mode==="t1"?renderT1Frame(f):renderFoundFrame(f); });
+  const pf=c.querySelector("#playFound"); if(pf) pf.onclick=playFound;
+  const pb=c.querySelector("#playBtn"); if(pb) pb.onclick=playPushUp;
   c.querySelector("#speed").onchange = e=>{ MOTION.speed=parseFloat(e.target.value); refreshTokens(); };
   const bind = (id, apply)=>{ const el=c.querySelector("#"+id); if(!el) return;
-    el.oninput=()=>{ apply(parseFloat(el.value)); el.nextElementSibling.textContent = el.value + (id.endsWith("dur")?"ms":""); refreshTokens(); }; };
-  bind("t1dur", v=>MOTION.t1.dur=v); bind("t1tuck", v=>MOTION.t1.tuckScale=v); bind("t1stag", v=>MOTION.t1.stagger=v);
+    el.oninput=()=>{ apply(parseFloat(el.value)); el.nextElementSibling.textContent = el.value + (id.endsWith("dur")||id.endsWith("blink")?"ms":""); refreshTokens(); }; };
+  bind("t1blink", v=>MOTION.t1.blink=v); bind("t1dur", v=>MOTION.t1.dur=v); bind("t1tuck", v=>MOTION.t1.tuckScale=v); bind("t1stag", v=>MOTION.t1.stagger=v);
+  bind("fblink", v=>MOTION.found.blink=v); bind("fdur", v=>MOTION.found.dur=v); bind("fstag", v=>MOTION.found.stagger=v);
   bind("t2dur", v=>MOTION.t2.dur=v); bind("t2rise", v=>MOTION.t2.rise=v);
   c.querySelector("#scrubStart").onclick = ()=>{ startScrub(); c.querySelector("#scrub").value=0; };
   c.querySelector("#scrub").oninput = e=> scrubTo(parseFloat(e.target.value));
@@ -205,10 +284,12 @@ function renderControls(){
 }
 function refreshTokens(){
   const t = document.querySelector("#tokens"); if(!t) return;
-  t.value = "t1: " + JSON.stringify(MOTION.t1) + ",\nt2: " + JSON.stringify(MOTION.t2) + ",";
+  t.value = "t1: "    + JSON.stringify(MOTION.t1)    + ",\n" +
+            "found: " + JSON.stringify(MOTION.found) + ",\n" +
+            "t2: "    + JSON.stringify(MOTION.t2)    + ",";
 }
-/* enter a mode: T1 waits at frame 1 for a click; T2 shows its start state */
-function enter(){ if(current==="t1") renderT1(); else renderT2(); }
+/* enter a mode: Place/Found wait at frame 1 for a click; Push-up shows its start state */
+function enter(){ current==="t1" ? renderT1() : current==="found" ? renderFound() : renderT2(); }
 
 renderControls();
 enter();
