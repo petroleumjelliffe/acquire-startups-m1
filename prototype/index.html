@@ -432,22 +432,18 @@ function stagingActionHtml(){
 function handHtml(){
   const g = game, dp = displayPlayer(), liq = g.stage==="mergerLiquidation", folded = g.stage==="turnComplete";
   // liquidation → the liquidator's live holdings; buy/found → the turn-player's turn-start base; complete → folded
-  const port = (liq || folded) ? dp.portfolio : g.turnStartHand.portfolio;
-  const bal  = (liq || folded) ? dp.cash      : g.turnStartHand.cash;
-  return `<div class="hand-zone">
-    <div class="zone-label">${dp.name}'s hand</div>
-    <div class="hand-body">${stacksFor(port)}<div class="balance"><span class="bl">Balance</span><span class="bn">${cash(bal)}</span></div></div>
-  </div>`;
+  const portfolio = (liq || folded) ? dp.portfolio : g.turnStartHand.portfolio;
+  const bal       = (liq || folded) ? dp.cash      : g.turnStartHand.cash;
+  return handZone({name:dp.name, portfolio, cash:bal});
 }
 function playersHtml(){
   const g = game, dp = displayPlayer(), liq = g.stage==="mergerLiquidation", folded = g.stage==="turnComplete";
-  return `<div class="players-strip">
-    ${g.players.map(p=>{
-      const isDp = p.id===dp.id;
-      const c = (isDp && !liq && !folded) ? g.turnStartHand.cash : p.cash;   // turn-player tracks the hand base until fold
-      return `<div class="pl ${isDp?'active':''}"><span class="player-emoji">${p.emoji||'•'}</span><span class="pnm">${p.name}</span><span class="pcash">${cash(c)}</span></div>`;
-    }).join('')}
-  </div>`;
+  const players = g.players.map(p=>{
+    const isDp = p.id===dp.id;
+    const c = (isDp && !liq && !folded) ? g.turnStartHand.cash : p.cash;   // turn-player tracks the hand base until fold
+    return {emoji:p.emoji, name:p.name, cash:c, active:isDp};
+  });
+  return playersStrip(players);
 }
 
 function stepEntryHtml(step){
@@ -458,8 +454,7 @@ function stepsListHtml(steps){
   return steps.map(s=>stepEntryHtml(s)).join('');
 }
 function stepStackHtml(){
-  const g = game;   // always present: this is the flex spacer that pins the zones below it to the bottom
-  return `<div class="stepstack">${stepsListHtml(g.steps)}</div>`;
+  return stepStack(game.steps, stepEntryHtml);   // stepEntryHtml adds the ↺ undo button per step
 }
 
 function capTableHtml(ids){
@@ -596,8 +591,13 @@ function onRemoveBrand(id){ const i = game.cart.findIndex(it=>it.id===id); if(i>
 
 function renderPanel(){
   // bottom-anchored: log rises at top, then active phase, staging, your hand, players pinned
-  document.getElementById("panel").innerHTML =
-    `${stepStackHtml()}${activeStepHtml()}${stagingHtml()}${handHtml()}${playersHtml()}`;
+  document.getElementById("panel").innerHTML = panelHtml({
+    stepstack: stepStackHtml(),
+    active:    activeStepHtml(),
+    staging:   stagingHtml(),
+    hand:      handHtml(),
+    players:   playersHtml(),
+  });
 }
 
 function renderOverlay(){

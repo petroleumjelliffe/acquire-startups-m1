@@ -204,3 +204,31 @@ function boardHtml(board, opts={}){
   });
   return html;
 }
+
+/* ---- panel zones (hoisted from index.html; pure / props-in) ---- */
+
+/* the "<name>'s hand" zone: portfolio stacks + balance. */
+function handZone({name, portfolio, cash:bal}){
+  return `<div class="hand-zone">
+    <div class="zone-label">${name}'s hand</div>
+    <div class="hand-body">${stacksFor(portfolio)}<div class="balance"><span class="bl">Balance</span><span class="bn">${cash(bal)}</span></div></div>
+  </div>`;
+}
+
+/* the players strip. players: [{emoji, name, cash, active}] (cash already resolved by caller). */
+function playersStrip(players){
+  return `<div class="players-strip">
+    ${players.map(p=>`<div class="pl ${p.active?'active':''}"><span class="player-emoji">${p.emoji||'•'}</span><span class="pnm">${p.name}</span><span class="pcash">${cash(p.cash)}</span></div>`).join('')}
+  </div>`;
+}
+
+/* the stepstack wrapper (also the flex spacer pinning zones below to the bottom).
+   renderEntry maps one step → HTML; defaults to the shared stepEntry (no undo). */
+function stepStack(steps, renderEntry=stepEntry){
+  return `<div class="stepstack">${steps.map(s=>renderEntry(s)).join('')}</div>`;
+}
+
+/* compose the panel: the five zones in fixed order. Callers pass pre-rendered HTML. */
+function panelHtml({stepstack='', active='', staging='', hand='', players=''}){
+  return `${stepstack}${active}${staging}${hand}${players}`;
+}
