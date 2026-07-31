@@ -38,6 +38,10 @@
   .tp-controls button.on{background:#2563eb; color:#fff; border-color:#2563eb;}
   .tp-controls label{display:flex; align-items:center; gap:8px; color:#6b7280;}
   .tp-controls output{font-variant-numeric:tabular-nums; color:#111827;}
+
+  /* ---- final-scoring stage: a fixed-height game view for the overlay to cover ---- */
+  .fs-stage{height:560px; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden; background:#fff;}
+  .fs-stage .main{height:100%;}
 </style>
 
 <header class="cat">
@@ -79,6 +83,53 @@ const FIX_BOARD = (()=>{
 })();
 const FIX_HAND = ["E6","E2","E10","G6","A12","I1"];   // Alex's hand
 const FIX_HQ   = ["E3","E7"];                          // founding tiles
+
+/* ---- final-scoring fixture: three chains, three players, game over at 41 ---- */
+const FS_HQ = ["A1","F1","H1"];
+const FS_BOARD = (()=>{
+  const b = {}; ROWS.forEach(r=>COLS.forEach(c=> b[r+c] = {placed:false}));
+  const fill = (id, row, from, to)=>{ for(let c=from;c<=to;c++) b[row+c] = {placed:true, startupId:id}; };
+  ["A","B","C"].forEach(r=> fill("Gobble", r, 1, 12));   // 36
+  fill("Gobble", "D", 1, 5);                             // +5 → 41
+  fill("Messla", "F", 1, 8);                             // 8
+  fill("ZuckFace", "H", 1, 5);                           // 5
+  return b;
+})();
+const FS_PANEL = panelHtml({
+  stepstack: stepStack([{phase:"Place a tile", detail:`${tile("D5",{state:"filled"})} → Gobble reached 41 · game over`}]),
+  hand:      handZone({name:"Alex", portfolio:{Gobble:6, Messla:4}, cash:8600}),
+  players:   playersStrip([
+    {emoji:"🦊", name:"Alex",   cash:8600,  active:true},
+    {emoji:"🐢", name:"Sam",    cash:12000},
+    {emoji:"🦁", name:"Jordan", cash:3100},
+  ]),
+});
+const FS_SCORE = {
+  reason: "Gobble reached 41 tiles",
+  players: [
+    {id:"p1", name:"Alex",   emoji:"🦊", cash:8600},
+    {id:"p2", name:"Sam",    emoji:"🐢", cash:12000},
+    {id:"p3", name:"Jordan", emoji:"🦁", cash:3100},
+  ],
+  chains: [
+    {id:"Gobble",   size:41, price:1000},
+    {id:"Messla",   size:8,  price:600},
+    {id:"ZuckFace", size:5,  price:400},
+  ],
+  holdings: {
+    p1: {Gobble:6, Messla:4},
+    p2: {Gobble:3, Messla:7},
+    p3: {Gobble:1, Messla:4, ZuckFace:3},
+  },
+  bonuses: [
+    {chainId:"Gobble",   playerId:"p1", type:"majority", amount:10000},
+    {chainId:"Gobble",   playerId:"p2", type:"minority", amount:5000},
+    {chainId:"Messla",   playerId:"p2", type:"majority", amount:6000},
+    {chainId:"Messla",   playerId:"p1", type:"minority", amount:1500},   // tie: $3,000 split
+    {chainId:"Messla",   playerId:"p3", type:"minority", amount:1500},
+    {chainId:"ZuckFace", playerId:"p3", type:"both",     amount:6000},   // sole holder
+  ],
+};
 
 /* ---- active-step fixtures (also fed to the transition player) ---- */
 function placeActiveState(){
@@ -255,9 +306,24 @@ function transitionSection(){
   </section>`;
 }
 
+/* ---- final scoring: a full-width stage so the scrim covers a real board + panel ---- */
+function finalScoringSection(){
+  return `<section class="group">
+    <h2><span class="seq">★</span>Final scoring</h2>
+    <p class="intent">A chain reached 41 tiles. One column per player, sorted by final total; each chain contributes a stock row and a bonus row (M majority · m minority · Mm sole holder). Terminal — there is no way out of this overlay.</p>
+    <div class="fs-stage">
+      <div class="main side">
+        <div class="board-wrap"><div class="board">${boardHtml(FS_BOARD, {hqTiles:FS_HQ})}</div></div>
+        <div class="panel">${FS_PANEL}</div>
+        ${finalScoring(FS_SCORE)}
+      </div>
+    </div>
+  </section>`;
+}
+
 /* ---- render ---- */
 document.getElementById("catalog").innerHTML =
-  SECTIONS.map(sectionEl).join("") + transitionSection();
+  SECTIONS.map(sectionEl).join("") + transitionSection() + finalScoringSection();
 
 const vp = document.getElementById("tpViewport");
 let curPhase = "place";
