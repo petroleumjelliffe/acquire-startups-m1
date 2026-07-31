@@ -232,3 +232,77 @@ function stepStack(steps, renderEntry=stepEntry){
 function panelHtml({stepstack='', active='', staging='', hand='', players=''}){
   return `${stepstack}${active}${staging}${hand}${players}`;
 }
+
+/* ============================================================
+   Final scoring — the game-over overlay.
+   Bonuses arrive authored (majority/minority resolution is a rules
+   concern); this derives only stock values, totals and the sort.
+   ============================================================ */
+
+const BONUS_MARK = {
+  majority: {mark:'M',  title:'Majority shareholder'},
+  minority: {mark:'m',  title:'Minority shareholder'},
+  both:     {mark:'Mm', title:'Sole holder — majority and minority combined'},
+};
+
+/* M and m differ only in case, so the weight/size split in CSS carries the
+   distinction; the title carries the word. */
+function bonusMark(type){
+  const b = BONUS_MARK[type];
+  return `<abbr class="fs-mark fs-mark-${type}" title="${b.title}">${b.mark}</abbr>`;
+}
+
+/* one column per player: per-chain rows plus the three summed values.
+   Sorted by total, highest first — the winner reads leftmost. */
+function scoreColumns({players, chains, holdings, bonuses}){
+  return players.map(p=>{
+    const held = holdings[p.id] || {};
+    const rows = chains.map(ch=>{
+      const qty = held[ch.id] || 0;
+      const bonus = bonuses.find(b=> b.chainId===ch.id && b.playerId===p.id) || null;
+      return {chainId:ch.id, qty, stock:qty*ch.price, bonus};
+    });
+    const stock = rows.reduce((n,r)=> n + r.stock, 0);
+    const bonus = rows.reduce((n,r)=> n + (r.bonus ? r.bonus.amount : 0), 0);
+    return {player:p, rows, stock, bonus, total: stock + bonus + p.cash};
+  }).sort((a,b)=> b.total - a.total);
+}
+
+/* the terminal game-over overlay: scrim + card. No dismiss — the game is over. */
+function finalScoring({reason, players, chains, holdings, bonuses}){
+  const cols = scoreColumns({players, chains, holdings, bonuses});
+  const win  = cols[0];
+  const dash = `<span class="fs-none">—</span>`;
+
+  const head = `<tr><th class="fs-rowlabel"></th>${cols.map(c=>
+    `<th class="fs-player"><span class="player-emoji">${c.player.emoji||'•'}</span><span class="pnm">${c.player.name}</span></th>`
+  ).join('')}</tr>`;
+
+  const chainRows = chains.map((ch,i)=>{
+    const cells = cols.map(c=> c.rows[i]);
+    return `<tr class="fs-chain-head"><th colspan="${cols.length+1}">`
+        + `<span class="fs-ticker">${ticker(ch.id)}</span>${brand(ch.id)}`
+        + `<span class="fs-chain-meta">${ch.size} tiles · ${price(ch.price)}</span></th></tr>`
+      + `<tr class="fs-stock"><th class="fs-rowlabel">stock</th>${cells.map(r=>
+          `<td>${r.qty ? `<span class="fs-qty">×${r.qty}</span>${cash(r.stock)}` : dash}</td>`
+        ).join('')}</tr>`
+      + `<tr class="fs-bonus"><th class="fs-rowlabel">bonus</th>${cells.map(r=>
+          `<td>${r.bonus ? `${bonusMark(r.bonus.type)}${cash(r.bonus.amount,{sign:'delta'})}` : dash}</td>`
+        ).join('')}</tr>`;
+  }).join('');
+
+  const cashRow  = `<tr class="fs-cash"><th class="fs-rowlabel">Cash</th>${
+    cols.map(c=>`<td>${cash(c.player.cash)}</td>`).join('')}</tr>`;
+  const totalRow = `<tr class="fs-total"><th class="fs-rowlabel">Total</th>${
+    cols.map(c=>`<td>${cash(c.total)}</td>`).join('')}</tr>`;
+
+  return `<div class="final-scoring-scrim">
+    <div class="final-scoring">
+      <div class="fs-banner">
+        <div class="fs-winner"><span class="player-emoji">${win.player.emoji||'•'}</span>${win.player.name} wins with ${cash(win.total)}</div>
+        <div class="fs-reason">${reason} — game over</div>
+      </div>
+      <table class="fs-table">${head}${chainRows}${cashRow}${totalRow}</table>
+    </div>
+  </div>`;
+}
