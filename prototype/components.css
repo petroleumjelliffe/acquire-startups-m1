@@ -380,6 +380,6 @@
   .fs-mark-minority{font-weight:500; font-size:12px;}
 
   .fs-cash > th, .fs-cash > td{border-top:1px solid #e5e7eb; padding-top:10px;}
-  .fs-total > th, .fs-total > td{
+  .fs-table .fs-total > th, .fs-table .fs-total > td{
     border-top:2px solid #111827; padding-top:10px; font-size:15px; font-weight:700;
   }
