@@ -342,3 +342,44 @@
     background:#2563eb; color:#fff; border:none; border-radius:8px; padding:12px 24px; font-size:14px; font-weight:600; cursor:pointer;
   }
   .reveal-overlay button:hover{background:#1d4ed8;}
+
+  /* ---------- Final scoring — the terminal game-over overlay ---------- */
+  .final-scoring-scrim{
+    position:absolute; inset:0; z-index:30; background:rgba(17,24,39,0.55);
+    display:flex; align-items:center; justify-content:center; padding:24px;
+  }
+  .final-scoring{
+    background:#fff; border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.28);
+    padding:20px 24px 22px; max-width:100%; max-height:100%; overflow:auto;
+  }
+
+  .fs-banner{margin-bottom:14px;}
+  .fs-winner{display:flex; align-items:center; gap:8px; font-size:18px; font-weight:700; color:#1f2937;}
+  .fs-reason{margin-top:3px; font-size:12px; color:#6b7280;}
+
+  .fs-table{border-collapse:collapse; font-variant-numeric:tabular-nums; font-size:13px;}
+  .fs-table th, .fs-table td{padding:5px 12px; text-align:right; white-space:nowrap;}
+  .fs-player{font-weight:700; color:#374151; padding-bottom:8px;}
+  .fs-player .pnm{margin-left:6px;}
+  .fs-rowlabel{
+    text-align:left; padding-left:16px; font-size:11px; font-weight:500;
+    text-transform:uppercase; letter-spacing:.04em; color:#9ca3af;
+  }
+
+  .fs-chain-head > th{text-align:left; padding:14px 12px 4px; border-top:1px solid #e5e7eb;}
+  .fs-ticker{font-weight:700; color:#6b7280; margin-right:6px;}
+  .fs-chain-meta{margin-left:8px; font-size:11px; font-weight:500; color:#9ca3af;}
+
+  .fs-qty{color:#9ca3af; margin-right:6px;}
+  .fs-none{color:#d1d5db;}
+
+  /* M vs m differ only in case — weight and size carry the distinction visually,
+     the title carries the word. */
+  .fs-mark{margin-right:6px; text-decoration:none; border:none; cursor:help; color:#6b7280;}
+  .fs-mark-majority, .fs-mark-both{font-weight:800; color:#374151;}
+  .fs-mark-minority{font-weight:500; font-size:12px;}
+
+  .fs-cash > th, .fs-cash > td{border-top:1px solid #e5e7eb; padding-top:10px;}
+  .fs-total > th, .fs-total > td{
+    border-top:2px solid #111827; padding-top:10px; font-size:15px; font-weight:700;
+  }
