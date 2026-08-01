@@ -59,6 +59,7 @@ export interface MergerContext {
 export interface Player {
   id: string;
   name: string;
+  emoji: string;
   cash: number;
   hand: Coord[];
   portfolio: Record<string, number>; //startupId -> shares owned
@@ -68,6 +69,7 @@ export interface Player {
 }
 export interface Startup {
   id: string; //todo: replace with StartupId type
+  ticker: string;
   tiles: Coord[]; //TODO: deprecate in favor of getStartupTiles from Board
   foundingTile: Coord | null;
   tier: number; //0-2

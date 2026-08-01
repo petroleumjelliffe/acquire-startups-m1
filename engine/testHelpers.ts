@@ -1,6 +1,6 @@
 import { GameState, Player, Startup } from './gameTypes';
 import { createInitialGame } from './gameInit';
-import { Coord } from './gameHelpers';
+import { Coord, generateAllCoords } from './gameHelpers';
 
 /**
  * Creates a minimal game state for testing
@@ -20,10 +20,10 @@ export function createTestPlayer(overrides?: Partial<Player>): Player {
   return {
     id: 'test-player-1',
     name: 'Test Player',
+    emoji: '🦊',
     cash: 6000,
     hand: [],
     portfolio: {},
-    connectionState: 'connected',
     ...overrides,
   };
 }
@@ -35,6 +35,7 @@ export function createTestStartup(overrides?: Partial<Startup>): Startup {
   return {
     id: 'TestCo',
     tier: 1,
+    ticker: '$X',
     isFounded: false,
     foundingTile: null,
     totalShares: 25,
@@ -44,12 +45,17 @@ export function createTestStartup(overrides?: Partial<Startup>): Startup {
 }
 
 /**
- * Sets up a game state with founded startups on the board
+ * Sets up a game state with founded startups on the board.
+ * `tiles` may be an explicit list of coords, or a count — in which case
+ * that many coords are auto-assigned from the board (useful when a test
+ * only cares about chain size, not specific placement).
  */
 export function setupGameWithStartups(
-  startups: Array<{ id: string; tiles: Coord[]; tier?: number }>
+  startups: Array<{ id: string; tiles: Coord[] | number; tier?: number }>
 ): GameState {
   const state = createTestGameState();
+  const autoCoords = generateAllCoords();
+  let autoCursor = 0;
 
   // Found each startup and place tiles
   startups.forEach(({ id, tiles, tier = 1 }) => {
@@ -57,10 +63,15 @@ export function setupGameWithStartups(
     if (startup) {
       startup.isFounded = true;
       startup.tier = tier;
-      startup.foundingTile = tiles[0];
+
+      const coords = Array.isArray(tiles)
+        ? tiles
+        : autoCoords.slice(autoCursor, (autoCursor += tiles));
+
+      startup.foundingTile = coords[0];
 
       // Place tiles on board
-      tiles.forEach((coord) => {
+      coords.forEach((coord) => {
         state.board[coord] = {
           placed: true,
           startupId: id,

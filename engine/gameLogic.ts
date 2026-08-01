@@ -7,32 +7,13 @@ import { Coord,
   getStartupSize,
 } from "./gameHelpers";
 import { tok, pushLog } from "./log";
+import { getSharePriceAtSize } from "./startups";
 
 //----------------------------------------------------
 // STARTUP CONFIG
 //----------------------------------------------------
 
-export const AVAILABLE_STARTUPS = [
-  { id: "Gobble", tier: 2 },
-  { id: "Scrapple", tier: 2 },
-  { id: "PaperfulPost", tier: 0 },
-  { id: "CamCrooned", tier: 1 },
-  { id: "Messla", tier: 0 },
-  { id: "ZuckFace", tier: 1 },
-  { id: "WrecksonMobil", tier: 1 },
-];
-
-export const sharePrices = [
-  {
-    sharePrice: [200, 300, 400, 500, 600, 700, 800, 900, 1000],
-  },
-  {
-    sharePrice: [300, 400, 500, 600, 700, 800, 900, 1000, 1100],
-  },
-  {
-    sharePrice: [400, 500, 600, 700, 800, 900, 1000, 1100, 1200],
-  },
-];
+export { AVAILABLE_STARTUPS } from "./startups";
 
 export interface BonusResult {
   playerId: string;
@@ -574,21 +555,9 @@ export function advanceTurn(state: GameState) {
 
 //get share price based on tier and size
 export function getSharePrice(state: GameState, startupId: string): number {
-  const size = getStartupSize(state, startupId);
-  const { tier } = state.startups[startupId];
-
-  //array of cutoff values, index corresponds to shareprice index
-  const thresholds = [2, 3, 4, 5, 6, 11, 21, 31, 41]; //size thresholds
-
-  //find first index whose value is >= si
-  //array indexof
-  const payoutIndex = thresholds.reduce((acc, val, idx) => {
-    if (size >= val) {
-      return idx;
-    }
-    return acc;
-  }, 0);
-  return sharePrices[tier].sharePrice[payoutIndex];
+  const startup = state.startups[startupId];
+  if (!startup) return 0;
+  return getSharePriceAtSize(startup.tier as 0 | 1 | 2, getStartupSize(state, startupId));
 }
 
 export const getAvailableStartups = function (state: GameState) {

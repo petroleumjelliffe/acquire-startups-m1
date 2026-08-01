@@ -3,3 +3,4 @@ export * from './gameHelpers';
 export * from './gameInit';
 export * from './gameLogic';
 export * from './log';
+export * from './startups';

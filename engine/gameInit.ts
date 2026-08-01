@@ -1,8 +1,6 @@
 import type { GameState, Startup, Player, TileCell } from "./gameTypes";
 import { generateAllCoords, shuffleSeeded, Coord } from "./gameHelpers";
-
-// keep your existing AVAILABLE_STARTUPS array in gameLogic.ts or a config file
-import { AVAILABLE_STARTUPS } from "./gameLogic";
+import { AVAILABLE_STARTUPS, PLAYER_EMOJI } from "./startups";
 
 export function createEmptyBoard(): Record<Coord, TileCell> {
   const b: Record<string, TileCell> = {};
@@ -15,6 +13,7 @@ export function createInitialGame(seed: string, names: string[]): GameState {
   const players: Player[] = names.map((n, i) => ({
     id: `p${i + 1}`,
     name: n,
+    emoji: PLAYER_EMOJI[i % PLAYER_EMOJI.length],
     cash: 6000,
     hand: [],
     portfolio: {},
