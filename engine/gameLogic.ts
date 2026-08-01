@@ -740,12 +740,19 @@ export function advanceToNextAbsorbedStartup(state: GameState) {
   const s = state.startups[currentAbsorbed];
   s.isFounded = false;
   s.foundingTile = null;
-  s.availableShares = s.totalShares;
 
-  // Clear any remaining shares from portfolios
-  for (const p of state.players) {
-    p.portfolio[currentAbsorbed] = 0;
-  }
+  // Shares a player chose to keep are still outstanding — they are not
+  // "returned to the bank" the way sold/traded shares are, and the chain may
+  // be refounded later with those shares regaining value. So the pool must
+  // only reclaim what nobody is holding, mirroring the (already correct)
+  // legacy `completeLiquidation` path below. Do NOT zero player portfolios
+  // here: that would silently destroy a `keep` choice with no cash and no
+  // survivor share in exchange.
+  const heldShares = state.players.reduce(
+    (sum, p) => sum + (p.portfolio[currentAbsorbed] || 0),
+    0
+  );
+  s.availableShares = s.totalShares - heldShares;
 
   pushLog(state, 'Liquidated shares', [tok.brand(currentAbsorbed), tok.text(' has been liquidated')]);
 

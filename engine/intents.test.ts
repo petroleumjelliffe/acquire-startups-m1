@@ -317,4 +317,46 @@ describe('applyIntent — liquidate', () => {
     });
     expect(next.log.at(-1)).toMatchObject({ phase: 'Liquidated shares', playerId: alex.id });
   });
+
+  // Regression coverage for a review finding: advanceToNextAbsorbedStartup
+  // used to zero every player's portfolio for the absorbed chain once its
+  // shareholder queue emptied, silently destroying `keep` choices (no cash,
+  // no survivor share, share just gone). Kept shares must survive past the
+  // chain's full liquidation, exactly like the already-correct legacy
+  // completeLiquidation path (see gameLogic.test.ts "Bug Fix #3").
+  it('preserves a kept share after the whole queue has resolved, and reflects it in the pool', () => {
+    const { state, alex, sam } = merged();
+    const afterAlex = applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 1, trade: 2, keep: 1,
+    });
+    const afterSam = applyIntent(afterAlex, {
+      type: 'liquidate', playerId: sam.id, startupId: 'ZuckFace', sell: 0, trade: 2, keep: 0,
+    });
+
+    expect(afterSam.stage).toBe('buy');
+    // alex's kept ZuckFace share must still be there — not wiped by the
+    // end-of-chain cleanup that fires once sam (the last queued holder) resolves.
+    expect(afterSam.players[0].portfolio['ZuckFace']).toBe(1);
+    // ZuckFace's pool reclaims everything except the 1 share still held —
+    // NOT a full reset to totalShares (25), which would double-issue it.
+    expect(afterSam.startups['ZuckFace'].availableShares).toBe(
+      afterSam.startups['ZuckFace'].totalShares - 1,
+    );
+  });
+
+  // Regression coverage for the `trade` unit mismatch between the intent
+  // (absorbed shares surrendered) and completePlayerMergerLiquidation's
+  // `trade` param (survivor shares gained): a bug that passed intent.trade
+  // straight through would debit the survivor pool by 2x too much.
+  it('debits the survivor pool by the shares gained, not the shares surrendered', () => {
+    const { state, alex } = merged();
+    const survivorBefore = state.startups['Messla'].availableShares;
+
+    const next = applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 1, trade: 2, keep: 1,
+    });
+
+    // 2 ZuckFace shares traded two-for-one → exactly 1 Messla share gained.
+    expect(next.startups['Messla'].availableShares).toBe(survivorBefore - 1);
+  });
 });
