@@ -147,9 +147,14 @@ describe('applyIntent', () => {
     alex.hand = ['C1'];
     alex.cash = 0;
     giveShares(state, alex.id, { ZuckFace: 3 }); // sole holder of the absorbed chain
+    // The merge path mutates startups, portfolio, cash and mergerContext — the
+    // isolated-placement test above touches none of those, so this is what
+    // would catch a partial clone that shares them by reference.
+    const before = JSON.stringify(state);
 
     const next = applyIntent(state, { type: 'placeTile', playerId: alex.id, coord: 'C1' });
 
+    expect(JSON.stringify(state)).toBe(before);
     expect(next.stage).toBe('mergerLiquidation');
     // ZuckFace at 3 tiles, tier 1 → price 400; sole holder → 400 × 15
     expect(next.players[0].cash).toBe(6000);
@@ -187,6 +192,25 @@ describe('applyIntent', () => {
     expect(merged.board['D1'].startupId).toBe('Messla');
     // the non-tied smaller chain is absorbed too
     expect(merged.board['C2'].startupId).toBe('Messla');
+  });
+
+  it('rejects a survivor pick whose pending merger data is incomplete', () => {
+    // `pendingTiedStartups` alone is not enough: completeSurvivorSelection also
+    // needs the tile and the touching-chain list, and merely no-ops without
+    // them. That must surface as a rejection, never as a no-op "success".
+    for (const missing of ['pendingMergerTile', 'pendingMergerStartups'] as const) {
+      const state = tiedMergeFixture();
+      state.players[0].hand = ['C1'];
+      const placed = applyIntent(state, {
+        type: 'placeTile', playerId: state.players[0].id, coord: 'C1',
+      });
+      expect(placed.stage).toBe('chooseSurvivor');
+      delete placed[missing];
+
+      expect(codeOf(() => applyIntent(placed, {
+        type: 'chooseSurvivor', playerId: state.players[0].id, startupId: 'Messla',
+      }))).toBe('illegalPlacement');
+    }
   });
 
   it('rejects an unknown intent type, and every intent not yet implemented', () => {

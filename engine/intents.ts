@@ -77,6 +77,16 @@ function doPlaceTile(state: GameState, intent: Extract<Intent, { type: 'placeTil
   // gameLogic. It leaves the played tile pending so the legacy modal path can
   // cancel; the intent path commits immediately instead.
   handleTilePlacement(state, intent.coord);
+
+  // INVARIANT: the hand is settled here and nowhere else on the intent path —
+  // the played tile is gone and `pendingTileToRemove` is cleared. The
+  // replacement draw is `endTurn`'s job.
+  //
+  // Do NOT reach for `completeTileTransaction` to do that draw. It is the
+  // obvious existing "remove from hand + draw" helper, but it early-returns
+  // when `pendingTileToRemove` is unset — which is always, here. It would
+  // silently draw nothing, and the failure would only surface once hands ran
+  // dry. `endTurn` must shift from `state.bag` itself.
   player.hand = player.hand.filter((c) => c !== intent.coord);
   state.pendingTileToRemove = undefined;
 
@@ -110,6 +120,14 @@ function doChooseSurvivor(
 
   const tied = state.pendingTiedStartups ?? [];
   if (!tied.includes(intent.startupId)) reject('notATiedSurvivor');
+
+  // `completeSurvivorSelection` reads these two siblings and bails with a bare
+  // console.error if either is missing. Without this guard that bail would
+  // surface as a *successful* intent that changed nothing, wedging the game in
+  // `chooseSurvivor` forever. The authoritative reducer must reject instead.
+  if (!state.pendingMergerTile || !state.pendingMergerStartups) {
+    reject('illegalPlacement', 'no pending merger');
+  }
 
   // Absorbs every touching chain — the tied losers and any smaller ones —
   // capturing pre-merger prices before the board is repainted.
