@@ -6,6 +6,7 @@ import { Coord,
   getTilesForStartup,
   getStartupSize,
 } from "./gameHelpers";
+import { tok, pushLog } from "./log";
 
 //----------------------------------------------------
 // STARTUP CONFIG
@@ -89,10 +90,11 @@ export function resolveInitialDraw(state: GameState) {
   // return tiles to bag end
   for (const d of drawn) state.bag.push(d.tile);
 
-  state.log.push(
-    `Initial draw: ${sorted.map((d) => `${d.name}→${d.tile}`).join(", ")}`
-  );
-  state.log.push(`${firstName} will go first.`);
+  pushLog(state, 'Drew tiles', sorted.flatMap((d, i) => [
+    tok.text(i === 0 ? `${d.name}→` : `, ${d.name}→`),
+    tok.tile(d.tile),
+  ]));
+  pushLog(state, 'Drew tiles', [tok.text('will go first')], state.players[firstIndex].id);
 
   return { drawn: sorted, firstIndex };
 }
@@ -139,13 +141,10 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     const touching = [...adjStartups];
     const safeChains = touching.filter((id) => getStartupSize(state, id) >= 11);
     if (safeChains.length > 1) {
-      state.log.push(
-        `${
-          player.name
-        } attempted illegal merge involving safe chain(s): ${safeChains.join(
-          ", "
-        )}`
-      );
+      pushLog(state, 'Merger', [
+        tok.text('Attempted illegal merge involving safe chain(s): '),
+        ...safeChains.flatMap((id, i) => i === 0 ? [tok.brand(id)] : [tok.text(', '), tok.brand(id)]),
+      ], player.id);
       return state; // 🚫 block placement
     }
   }
@@ -186,7 +185,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       // state.stage = "buy";
       // state.currentBuyCount = 0;
     } else {
-      state.log.push(`${player.name} placed ${coord} (isolated).`);
+      pushLog(state, 'Placed a tile', [tok.tile(coord), tok.text(' (isolated)')], player.id);
       //enter buy stage
       state.stage = "buy";
       state.currentBuyCount = 0;
@@ -196,11 +195,12 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     const [id] = [...adjStartups];
     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
     for (const g of group) state.board[g].startupId = id;
-    state.log.push(
-      `${player.name} expanded ${id} to ${
-        getTilesForStartup(state.board, id).length
-      } tiles.`
-    );
+    pushLog(state, 'Placed a tile', [
+      tok.tile(coord),
+      tok.text(' expanded '),
+      tok.brand(id),
+      tok.text(` to ${getTilesForStartup(state.board, id).length} tiles`),
+    ], player.id);
     //enter buy stage
     state.stage = "buy";
     state.currentBuyCount = 0;
@@ -243,9 +243,11 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       for (const g of group) state.board[g].startupId = survivorId;
 
       mergeStartups(state, survivorId, absorbedIds);
-      state.log.push(
-        `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
-      );
+      pushLog(state, 'Merger', [
+        ...absorbedIds.flatMap((id, i) => i === 0 ? [tok.brand(id)] : [tok.text(', '), tok.brand(id)]),
+        tok.text(' into '),
+        tok.brand(survivorId),
+      ], player.id);
 
       state.stage = "mergerPayout";
       prepareMergerPayout(state, survivorId, absorbedIds, absorbedPrices);
@@ -397,9 +399,11 @@ export function completeSurvivorSelection(state: GameState, survivorId: string) 
   for (const g of group) state.board[g].startupId = survivorId;
 
   mergeStartups(state, survivorId, absorbedIds);
-  state.log.push(
-    `${player.name} merged ${absorbedIds.join(", ")} into ${survivorId}.`
-  );
+  pushLog(state, 'Merger', [
+    ...absorbedIds.flatMap((id, i) => i === 0 ? [tok.brand(id)] : [tok.text(', '), tok.brand(id)]),
+    tok.text(' into '),
+    tok.brand(survivorId),
+  ], player.id);
 
   // Complete the tile transaction (remove from hand, draw new tile)
   completeTileTransaction(state);
@@ -515,7 +519,7 @@ export function foundStartup(
 
   //grant founding bondus
   grantFoundingShare(state, state.players[state.turnIndex].id, id);
-  state.log.push(`${id} was founded at ${foundingTile}.`);
+  pushLog(state, 'Founded a brand', [tok.brand(id), tok.text(' at '), tok.tile(foundingTile)], state.players[state.turnIndex].id);
 
   state.stage = "buy";
   delete state.pendingFoundTile;
@@ -618,9 +622,11 @@ export function grantFoundingShare(
   if (startup.availableShares > 0) {
     startup.availableShares -= 1;
     player.portfolio[startupId] = (player.portfolio[startupId] || 0) + 1;
-    state.log.push(
-      `${player.name} received a free share of ${startupId} for founding it.`
-    );
+    pushLog(state, 'Founded a brand', [
+      tok.text('Received a free share of '),
+      tok.brand(startupId),
+      tok.text(' for founding it'),
+    ], player.id);
   }
 }
 
@@ -647,9 +653,11 @@ export function buyShares(
   startup.availableShares -= buyCount;
   state.currentBuyCount = (state.currentBuyCount || 0) + buyCount;
 
-  state.log.push(
-    `${player.name} bought ${buyCount} ${startupId} share(s) for $${total}.`
-  );
+  pushLog(state, 'Bought shares', [
+    tok.stack(startupId, buyCount),
+    tok.text(' for '),
+    tok.cash(total),
+  ], player.id);
   return true;
 }
 
@@ -755,6 +763,10 @@ function buildShareholderQueue(state: GameState, startupId: string): string[] {
   return shareholders;
 }
 
+function bonusLabel(type: 'majority' | 'minority' | 'both'): string {
+  return type === 'both' ? 'Majority + minority' : type === 'majority' ? 'Majority' : 'Minority';
+}
+
 export function finalizeMergerPayout(state: GameState) {
   const bonuses: BonusResult[] = (state as any).pendingBonuses || [];
 
@@ -763,7 +775,10 @@ export function finalizeMergerPayout(state: GameState) {
     const player = state.players.find((p) => p.id === b.playerId);
     if (player) {
       player.cash += b.amount;
-      state.log.push(`${player.name} received $${b.amount} ${b.type} bonus.`);
+      pushLog(state, 'Merger payout', [
+        tok.text(`${bonusLabel(b.type)} bonus `),
+        tok.cash(b.amount, true),
+      ], player.id);
     }
   }
 
@@ -815,7 +830,7 @@ export function advanceToNextAbsorbedStartup(state: GameState) {
     p.portfolio[currentAbsorbed] = 0;
   }
 
-  state.log.push(`${currentAbsorbed} has been liquidated.`);
+  pushLog(state, 'Liquidated shares', [tok.brand(currentAbsorbed), tok.text(' has been liquidated')]);
 
   // Move to next absorbed startup
   ctx.currentLiquidationIndex += 1;
@@ -841,7 +856,7 @@ export function advanceToNextAbsorbedStartup(state: GameState) {
     // All absorbed startups processed
     delete state.mergerContext;
     state.stage = "buy";
-    state.log.push("Merger complete. Entering buy phase.");
+    pushLog(state, 'Merger', [tok.text('Merger complete. Entering buy phase.')]);
   }
 }
 
@@ -878,19 +893,25 @@ export function completePlayerMergerLiquidation(
   if (trade > 0) {
     player.portfolio[ctx.survivorId] = (player.portfolio[ctx.survivorId] || 0) + trade;
     survivor.availableShares -= trade;
-    state.log.push(
-      `${player.name} traded ${tradeCost} ${absorbedId} shares for ${trade} ${ctx.survivorId} shares.`
-    );
+    pushLog(state, 'Traded a tile', [
+      tok.stack(absorbedId, tradeCost),
+      tok.text(' for '),
+      tok.stack(ctx.survivorId, trade),
+    ], player.id);
   }
 
   // Add cash from sells
   if (sell > 0) {
     player.cash += sellGain;
-    state.log.push(`${player.name} sold ${sell} ${absorbedId} shares for $${sellGain}.`);
+    pushLog(state, 'Liquidated shares', [
+      tok.stack(absorbedId, sell),
+      tok.text(' sold for '),
+      tok.cash(sellGain),
+    ], player.id);
   }
 
   if (hold > 0) {
-    state.log.push(`${player.name} held ${hold} ${absorbedId} shares.`);
+    pushLog(state, 'Liquidated shares', [tok.stack(absorbedId, hold), tok.text(' held')], player.id);
   }
 
   // Advance to next shareholder
@@ -993,9 +1014,11 @@ export function handleLiquidationChoice(
       const proceeds = shares * price;
       player.cash += proceeds;
       player.portfolio[absorbedId] = 0;
-      state.log.push(
-        `${player.name} sold ${shares} ${absorbedId} share(s) for $${proceeds}.`
-      );
+      pushLog(state, 'Liquidated shares', [
+        tok.stack(absorbedId, shares),
+        tok.text(' sold for '),
+        tok.cash(proceeds),
+      ], player.id);
       break;
     }
     case "trade": {
@@ -1006,18 +1029,19 @@ export function handleLiquidationChoice(
         player.portfolio[survivorId] =
           (player.portfolio[survivorId] || 0) + tradeCount;
         survivor.availableShares -= tradeCount;
-        state.log.push(
-          `${player.name} traded ${
-            tradeCount * 2
-          } ${absorbedId} shares for ${tradeCount} ${survivorId} share(s).`
-        );
+        pushLog(state, 'Traded a tile', [
+          tok.stack(absorbedId, tradeCount * 2),
+          tok.text(' for '),
+          tok.stack(survivorId, tradeCount),
+        ], player.id);
       }
       break;
     }
     case "hold": {
-      state.log.push(
-        `${player.name} chose to hold ${shares} ${absorbedId} share(s).`
-      );
+      pushLog(state, 'Liquidated shares', [
+        tok.text('Chose to hold '),
+        tok.stack(absorbedId, shares),
+      ], player.id);
       break;
     }
   }
@@ -1069,7 +1093,12 @@ export function completeLiquidation(state: GameState, absorbedId: string) {
     if (cell.startupId === absorbedId) cell.startupId = undefined;
   }
 
-  state.log.push(`${absorbedId} has been liquidated. ${heldShares} share(s) held by players.`);
+  pushLog(state, 'Liquidated shares', [
+    tok.brand(absorbedId),
+    tok.text(' has been liquidated. '),
+    tok.stack(absorbedId, heldShares),
+    tok.text(' held by players'),
+  ]);
 
   // ✅ NOTE: We do NOT clear player portfolios here - held shares persist!
 
@@ -1085,5 +1114,5 @@ export function finalizeAllLiquidations(state: GameState) {
   state.pendingLiquidations = [];
   delete state.mergerContext;
   state.stage = "buy"; // or next phase depending on your flow
-  state.log.push(`All liquidations complete. Returning to buy phase.`);
+  pushLog(state, 'Liquidated shares', [tok.text('All liquidations complete. Returning to buy phase.')]);
 }

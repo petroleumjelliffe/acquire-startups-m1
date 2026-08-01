@@ -57,6 +57,7 @@ export function createInitialGame(seed: string, names: string[]): GameState {
     bag,
     startups,
     log: [],
+    nextStepId: 1,
     // availableStartups: AVAILABLE_STARTUPS.map((s) => s.id), //list of ids
   };
 }

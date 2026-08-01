@@ -1,5 +1,6 @@
 import React from "react";
 import { GameState } from "../../engine/gameTypes";
+import { renderLogText } from "../../engine/log";
 
 export function GameLog({ state }: { state: GameState }) {
   return (
@@ -9,9 +10,9 @@ export function GameLog({ state }: { state: GameState }) {
         {state.log
           .slice()
           .reverse()
-          .map((l, i) => (
-            <li key={i} className="mb-1 border-b border-gray-100 pb-1 last:border-none">
-              {l}
+          .map((entry) => (
+            <li key={entry.stepId} className="mb-1 border-b border-gray-100 pb-1 last:border-none">
+              {renderLogText(entry)}
             </li>
           ))}
       </ul>

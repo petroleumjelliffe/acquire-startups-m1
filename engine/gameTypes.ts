@@ -26,6 +26,20 @@ export type StartupId =
   | "Messla"
   | "ZuckFace"
   | "WrecksonMobil";
+
+export type LogToken =
+  | { kind: 'text';  text: string }
+  | { kind: 'tile';  coord: Coord }
+  | { kind: 'brand'; startupId: StartupId }
+  | { kind: 'cash';  amount: number; delta?: boolean }
+  | { kind: 'stack'; startupId: StartupId; count: number };
+
+export interface LogEntry {
+  stepId: number;
+  phase: string;
+  detail: LogToken[];
+  playerId?: string;
+}
 // src/state/gameTypes.ts
 export interface MergerContext {
   survivorId: string;
@@ -70,7 +84,8 @@ export interface GameState {
   turnIndex: number;
   board: Record<Coord, TileCell>;
   bag: Coord[];
-  log: string[];
+  log: LogEntry[];
+  nextStepId: number;
   //   startups: Record<string, Startup>;
   startups: Record<string, Startup>; //all
   // availableStartups: string[]; //available ids
