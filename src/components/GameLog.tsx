@@ -12,7 +12,8 @@ export function GameLog({ state }: { state: GameState }) {
           .reverse()
           .map((entry) => (
             <li key={entry.stepId} className="mb-1 border-b border-gray-100 pb-1 last:border-none">
-              {renderLogText(entry)}
+              <span className="log-phase">{entry.phase}</span>
+              <span className="log-detail">{renderLogText(entry)}</span>
             </li>
           ))}
       </ul>

@@ -893,7 +893,7 @@ export function completePlayerMergerLiquidation(
   if (trade > 0) {
     player.portfolio[ctx.survivorId] = (player.portfolio[ctx.survivorId] || 0) + trade;
     survivor.availableShares -= trade;
-    pushLog(state, 'Traded a tile', [
+    pushLog(state, 'Liquidated shares', [
       tok.stack(absorbedId, tradeCost),
       tok.text(' for '),
       tok.stack(ctx.survivorId, trade),
@@ -1029,7 +1029,7 @@ export function handleLiquidationChoice(
         player.portfolio[survivorId] =
           (player.portfolio[survivorId] || 0) + tradeCount;
         survivor.availableShares -= tradeCount;
-        pushLog(state, 'Traded a tile', [
+        pushLog(state, 'Liquidated shares', [
           tok.stack(absorbedId, tradeCount * 2),
           tok.text(' for '),
           tok.stack(survivorId, tradeCount),
