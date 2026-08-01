@@ -12,6 +12,30 @@ import {
   giveShares,
   getStartupSize,
 } from './testHelpers';
+import { createInitialGame } from './gameInit';
+import { roundBonus } from './bonuses';
+import type { Coord } from './gameHelpers';
+
+/**
+ * Like setupGameWithStartups, but with three players instead of the default
+ * two — needed to exercise a tied-minority scenario (one clear majority
+ * holder plus two runners-up tied beneath them).
+ */
+function setupThreePlayerGameWithStartups(
+  startups: Array<{ id: string; tiles: Coord[]; tier?: number }>
+): GameState {
+  const state = createInitialGame('test-seed', ['Alice', 'Bob', 'Cara']);
+  startups.forEach(({ id, tiles, tier = 1 }) => {
+    const startup = state.startups[id];
+    startup.isFounded = true;
+    startup.tier = tier;
+    startup.foundingTile = tiles[0];
+    tiles.forEach((coord) => {
+      state.board[coord] = { placed: true, startupId: id };
+    });
+  });
+  return state;
+}
 
 describe('Merger Logic - Critical Bug Fixes', () => {
   describe('Bug Fix #1: Majority/Minority Bonuses Use Pre-Merger Prices', () => {
@@ -302,6 +326,67 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       const techCo = state.startups['Messla'];
       expect(techCo.isFounded).toBe(false);
       expect(techCo.availableShares).toBe(techCo.totalShares - 4); // 4 shares held by player2
+    });
+  });
+
+  describe('Phase 0: Typed bonuses on the production payout path', () => {
+    // Regression coverage for the two bugs this task fixes, exercised through
+    // prepareMergerPayout itself (not just the pure computeChainBonuses unit
+    // tests in bonuses.test.ts) — so a revert of the production wiring would
+    // be caught here.
+
+    it('pays a sole holder the combined majority+minority bonus (bug: previously majority only, minority silently dropped)', () => {
+      const state = setupGameWithStartups([
+        { id: 'Messla', tiles: ['A1', 'A2', 'A3', 'A4', 'A5'], tier: 1 },
+        { id: 'CamCrooned', tiles: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'], tier: 1 },
+      ]);
+
+      const soleHolder = state.players[0];
+      giveShares(state, soleHolder.id, { Messla: 5 }); // only shareholder of Messla
+
+      const preMergerPrice = getSharePrice(state, 'Messla');
+      const absorbedPrices = { Messla: preMergerPrice };
+
+      prepareMergerPayout(state, 'CamCrooned', ['Messla'], absorbedPrices);
+
+      const bonuses = state.pendingBonuses ?? [];
+      expect(bonuses).toHaveLength(1);
+      expect(bonuses[0]).toMatchObject({
+        playerId: soleHolder.id,
+        type: 'both',
+        amount: preMergerPrice * 15,
+      });
+    });
+
+    it('splits a tied minority bonus between the tied runner-up holders (bug: previously each got the full bonus)', () => {
+      const state = setupThreePlayerGameWithStartups([
+        { id: 'Messla', tiles: ['A1', 'A2', 'A3', 'A4', 'A5', 'A6'], tier: 1 },
+        { id: 'CamCrooned', tiles: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'], tier: 1 },
+      ]);
+
+      const [p1, p2, p3] = state.players;
+      giveShares(state, p1.id, { Messla: 7 }); // clear majority
+      giveShares(state, p2.id, { Messla: 4 }); // tied minority
+      giveShares(state, p3.id, { Messla: 4 }); // tied minority
+
+      const preMergerPrice = getSharePrice(state, 'Messla');
+      const absorbedPrices = { Messla: preMergerPrice };
+
+      prepareMergerPayout(state, 'CamCrooned', ['Messla'], absorbedPrices);
+
+      const bonuses = state.pendingBonuses ?? [];
+      const majorityBonus = bonuses.find((b) => b.playerId === p1.id);
+      const p2Bonus = bonuses.find((b) => b.playerId === p2.id);
+      const p3Bonus = bonuses.find((b) => b.playerId === p3.id);
+
+      expect(majorityBonus).toMatchObject({
+        type: 'majority',
+        amount: preMergerPrice * 10,
+      });
+
+      const expectedMinorityEach = roundBonus((preMergerPrice * 5) / 2);
+      expect(p2Bonus).toMatchObject({ type: 'minority', amount: expectedMinorityEach });
+      expect(p3Bonus).toMatchObject({ type: 'minority', amount: expectedMinorityEach });
     });
   });
 });
