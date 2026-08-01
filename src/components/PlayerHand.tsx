@@ -1,5 +1,5 @@
 import React from "react";
-import { Coord, compareTiles } from "../utils/gameHelpers";
+import { Coord, compareTiles } from "../../engine/gameHelpers";
 export function PlayerHand({
   name,
   hand,

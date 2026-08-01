@@ -4,7 +4,7 @@
 import { createActor, type ActorRefFrom, type SnapshotFrom } from "xstate";
 import type { MultiplayerGameState, MultiplayerPlayer } from "./types.js";
 import { saveGame, loadAllGames } from "./persistence.js";
-import { createInitialGame } from "../src/state/gameInit.js";
+import { createInitialGame } from "../engine/gameInit.js";
 import { gameRoomMachine } from "./machines/gameRoomMachine.js";
 import type { GameRoomMachineEvent } from "./machines/types.js";
 

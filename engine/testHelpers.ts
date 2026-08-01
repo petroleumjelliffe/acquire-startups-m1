@@ -1,6 +1,6 @@
-import { GameState, Player, Startup } from '../state/gameTypes';
-import { createInitialGame } from '../state/gameInit';
-import { Coord } from '../utils/gameHelpers';
+import { GameState, Player, Startup } from './gameTypes';
+import { createInitialGame } from './gameInit';
+import { Coord } from './gameHelpers';
 
 /**
  * Creates a minimal game state for testing

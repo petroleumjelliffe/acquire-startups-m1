@@ -1,8 +1,8 @@
 // src/components/FoundStartupModal.tsx
 import React from "react";
-import { GameState } from "../state/gameTypes";
-import { foundStartup, completeTileTransaction } from "../state/gameLogic";
-import { Coord } from "../utils/gameHelpers";
+import { GameState } from "../../engine/gameTypes";
+import { foundStartup, completeTileTransaction } from "../../engine/gameLogic";
+import { Coord } from "../../engine/gameHelpers";
 
 interface FoundStartupModalProps {
   state: GameState;

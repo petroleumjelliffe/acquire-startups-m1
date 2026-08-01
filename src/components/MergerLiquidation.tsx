@@ -1,7 +1,7 @@
 // src/components/MergerLiquidation.tsx
 import React, { useState, useEffect } from "react";
-import { GameState } from "../state/gameTypes";
-import { completePlayerMergerLiquidation } from "../state/gameLogic";
+import { GameState } from "../../engine/gameTypes";
+import { completePlayerMergerLiquidation } from "../../engine/gameLogic";
 
 export const MergerLiquidationModal: React.FC<{
   state: GameState;

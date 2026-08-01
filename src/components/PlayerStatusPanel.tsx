@@ -1,6 +1,6 @@
 // src/components/PlayerStatusPanel.tsx
 import React from "react";
-import { GameState } from "../state/gameTypes";
+import { GameState } from "../../engine/gameTypes";
 
 export function PlayerStatusPanel({ state, currentPlayerId }: { state: GameState; currentPlayerId?: string }) {
   // Helper to obscure cash for other players

@@ -1,4 +1,4 @@
-import type { Coord } from "../utils/gameHelpers";
+import type { Coord } from "./gameHelpers";
 export type Stage =
   | "setup"
   | "draw"

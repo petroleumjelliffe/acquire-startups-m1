@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import type { GameState } from "./state/gameTypes";
-import { createInitialGame } from "./state/gameInit";
-import { handleTilePlacement, completeSurvivorSelection } from "./state/gameLogic";
+import type { GameState } from "../engine/gameTypes";
+import { createInitialGame } from "../engine/gameInit";
+import { handleTilePlacement, completeSurvivorSelection } from "../engine/gameLogic";
 import { Board } from "./components/Board";
 import { PlayerHand } from "./components/PlayerHand";
 import { GameLog } from "./components/GameLog";
-import { Coord } from "./utils/gameHelpers";
+import { Coord } from "../engine/gameHelpers";
 import { DrawModal } from "./components/DrawModal";
 import { BuyModal } from "./components/BuyModal";
 import { MergerPayoutModal, FoundStartupModal } from "./components"; //barrelfile
@@ -155,7 +155,7 @@ export function Game({
 
   const confirmTilePlacement = () => {
     if (pendingState) {
-      const { completeTileTransaction } = require("./state/gameLogic");
+      const { completeTileTransaction } = require("../engine/gameLogic");
       const confirmedState = structuredClone(pendingState);
       completeTileTransaction(confirmedState);
       applyTilePlacement(confirmedState);

@@ -11,7 +11,7 @@ import {
   setupGameWithStartups,
   giveShares,
   getStartupSize,
-} from '../test/testHelpers';
+} from './testHelpers';
 
 describe('Merger Logic - Critical Bug Fixes', () => {
   describe('Bug Fix #1: Majority/Minority Bonuses Use Pre-Merger Prices', () => {

@@ -1,5 +1,5 @@
 import type { GameState, Startup, Player, TileCell } from "./gameTypes";
-import { generateAllCoords, shuffleSeeded, Coord } from "../utils/gameHelpers";
+import { generateAllCoords, shuffleSeeded, Coord } from "./gameHelpers";
 
 // keep your existing AVAILABLE_STARTUPS array in gameLogic.ts or a config file
 import { AVAILABLE_STARTUPS } from "./gameLogic";

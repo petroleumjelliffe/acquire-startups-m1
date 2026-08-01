@@ -1,7 +1,7 @@
 // src/components/SurvivorSelectionModal.tsx
 import React, { useState } from "react";
-import { GameState } from "../state/gameTypes";
-import { Coord } from "../utils/gameHelpers";
+import { GameState } from "../../engine/gameTypes";
+import { Coord } from "../../engine/gameHelpers";
 
 interface SurvivorSelectionModalProps {
   state: GameState;

@@ -6,7 +6,7 @@ import { useParams } from 'react-router-dom';
 import { WaitingRoom } from '../components/WaitingRoom';
 import { Game } from '../Game';
 import { useSocket } from '../context/SocketContext';
-import type { GameState } from '../state/gameTypes';
+import type { GameState } from '../../engine/gameTypes';
 
 export function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>();

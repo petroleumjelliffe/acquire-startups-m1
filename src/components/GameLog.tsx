@@ -1,5 +1,5 @@
 import React from "react";
-import { GameState } from "../state/gameTypes";
+import { GameState } from "../../engine/gameTypes";
 
 export function GameLog({ state }: { state: GameState }) {
   return (

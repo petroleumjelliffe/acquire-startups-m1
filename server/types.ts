@@ -1,7 +1,7 @@
 // server/types.ts
 // Shared types between server and client
 
-import type { GameState, Player } from "../src/state/gameTypes.js";
+import type { GameState, Player } from "../engine/gameTypes.js";
 
 export interface MultiplayerPlayer extends Player {
   // All properties inherited from Player (id, name, cash, hand, portfolio)

@@ -1,7 +1,7 @@
 // src/components/MergerPayoutModal.tsx
 import React from "react";
-import { GameState } from "../state/gameTypes";
-import { finalizeMergerPayout, completeTileTransaction } from "../state/gameLogic";
+import { GameState } from "../../engine/gameTypes";
+import { finalizeMergerPayout, completeTileTransaction } from "../../engine/gameLogic";
 
 export default function MergerPayoutModal({
   state,

@@ -1,6 +1,6 @@
 // src/components/PlayerSummary.tsx
 import React from 'react';
-import type { GameState } from '../state/gameTypes';
+import type { GameState } from '../../engine/gameTypes';
 
 interface PlayerSummaryProps {
   state: GameState;

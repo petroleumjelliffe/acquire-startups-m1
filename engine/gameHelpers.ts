@@ -1,4 +1,4 @@
-import { GameState } from '../state/gameTypes';
+import { GameState } from './gameTypes';
 
 // Utility helpers for Project Saffold
 //----------------------------------------------------
