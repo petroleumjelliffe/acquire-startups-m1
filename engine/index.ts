@@ -4,3 +4,4 @@ export * from './gameInit';
 export * from './gameLogic';
 export * from './log';
 export * from './startups';
+export * from './placement';

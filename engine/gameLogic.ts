@@ -8,6 +8,7 @@ import { Coord,
 } from "./gameHelpers";
 import { tok, pushLog } from "./log";
 import { getSharePriceAtSize } from "./startups";
+import { previewPlacement } from "./placement";
 
 //----------------------------------------------------
 // STARTUP CONFIG
@@ -112,16 +113,13 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     else adjUnclaimed.push(n);
   }
 
-  // Safe-chain rule
+  // Safe-chain rule — delegates to previewPlacement so there is one
+  // definition of this rule in the codebase.
   if (adjStartups.size >= 2) {
-    console.log(
-      "Touching startups:",
-      [...adjStartups].map((id) => `${id}(${getStartupSize(state, id)})`)
-    );
-
-    const touching = [...adjStartups];
-    const safeChains = touching.filter((id) => getStartupSize(state, id) >= 11);
-    if (safeChains.length > 1) {
+    const preview = previewPlacement(state, coord, player.id);
+    if (!preview.legal) {
+      const touching = [...adjStartups];
+      const safeChains = touching.filter((id) => getStartupSize(state, id) >= 11);
       pushLog(state, 'Merger', [
         tok.text('Attempted illegal merge involving safe chain(s): '),
         ...safeChains.flatMap((id, i) => i === 0 ? [tok.brand(id)] : [tok.text(', '), tok.brand(id)]),
