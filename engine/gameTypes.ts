@@ -1,4 +1,6 @@
 import type { Coord } from "./gameHelpers";
+import type { BonusResult } from "./bonuses";
+export type { BonusResult };
 export type Stage =
   | "setup"
   | "draw"
@@ -101,6 +103,7 @@ export interface GameState {
   lastAction?: string; //for UI hints
   pendingLiquidations?: string[]; //playerId -> shares to liquidate
   currentLiquidation?: string | null; //index in liquidation order
+  pendingBonuses?: BonusResult[]; //computed majority/minority bonuses, awaiting finalizeMergerPayout
   gameId?: string; // Multiplayer: unique game instance ID
   createdAt?: number; // Multiplayer: timestamp when game was created
   lastUpdated?: number; // Multiplayer: timestamp of last state update

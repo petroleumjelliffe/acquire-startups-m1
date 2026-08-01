@@ -5,3 +5,4 @@ export * from './gameLogic';
 export * from './log';
 export * from './startups';
 export * from './placement';
+export * from './bonuses';

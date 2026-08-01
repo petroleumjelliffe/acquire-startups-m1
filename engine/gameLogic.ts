@@ -1,4 +1,4 @@
-import type { GameState, Player, MergerContext } from "./gameTypes";
+import type { GameState, Player, MergerContext, StartupId } from "./gameTypes";
 import { Coord,
   compareTiles,
   getAdjacentCoords,
@@ -9,19 +9,14 @@ import { Coord,
 import { tok, pushLog } from "./log";
 import { getSharePriceAtSize } from "./startups";
 import { previewPlacement } from "./placement";
+import { computeChainBonuses, type BonusResult } from "./bonuses";
 
 //----------------------------------------------------
 // STARTUP CONFIG
 //----------------------------------------------------
 
 export { AVAILABLE_STARTUPS } from "./startups";
-
-export interface BonusResult {
-  playerId: string;
-  playerName: string;
-  amount: number;
-  type: "majority" | "minority";
-}
+export type { BonusResult } from "./bonuses";
 
 export function createMergerContext(
   survivorId: string,
@@ -646,58 +641,13 @@ export function prepareMergerPayout(
     // ✅ FIX: Use pre-merger price from passed-in prices
     const price = absorbedPrices[absorbedId];
 
-    const holdings = state.players
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        shares: p.portfolio[absorbedId] || 0,
-      }))
-      .filter((h) => h.shares > 0)
-      .sort((a, b) => b.shares - a.shares);
+    const holdings = state.players.map((p) => ({
+      playerId: p.id,
+      playerName: p.name,
+      shares: p.portfolio[absorbedId] || 0,
+    }));
 
-    if (holdings.length === 0) continue;
-
-    const majorityShares = holdings[0].shares;
-    const majorityHolders = holdings.filter((h) => h.shares === majorityShares);
-    const minorityShares = Math.max(
-      0,
-      ...holdings.filter((h) => h.shares < majorityShares).map((h) => h.shares)
-    );
-    const minorityHolders = holdings.filter(
-      (h) => h.shares === minorityShares && h.shares < majorityShares
-    );
-
-    const majBonus = price * 10;
-    const minBonus = price * 5;
-
-    if (majorityHolders.length > 1) {
-      const split = Math.floor((majBonus + minBonus) / majorityHolders.length);
-      for (const h of majorityHolders) {
-        allBonuses.push({
-          playerId: h.id,
-          playerName: h.name,
-          amount: split,
-          type: "majority",
-        });
-      }
-    } else {
-      for (const h of majorityHolders) {
-        allBonuses.push({
-          playerId: h.id,
-          playerName: h.name,
-          amount: majBonus,
-          type: "majority",
-        });
-      }
-      for (const h of minorityHolders) {
-        allBonuses.push({
-          playerId: h.id,
-          playerName: h.name,
-          amount: minBonus,
-          type: "minority",
-        });
-      }
-    }
+    allBonuses.push(...computeChainBonuses(absorbedId as StartupId, price, holdings));
   }
 
   // Store merger context for UI
@@ -707,7 +657,7 @@ export function prepareMergerPayout(
   state.stage = "mergerPayout";
 
   // Save the computed bonuses for the modal
-  (state as any).pendingBonuses = allBonuses;
+  state.pendingBonuses = allBonuses;
 }
 
 /**
@@ -735,7 +685,7 @@ function bonusLabel(type: 'majority' | 'minority' | 'both'): string {
 }
 
 export function finalizeMergerPayout(state: GameState) {
-  const bonuses: BonusResult[] = (state as any).pendingBonuses || [];
+  const bonuses: BonusResult[] = state.pendingBonuses ?? [];
 
   // Award bonuses
   for (const b of bonuses) {
@@ -749,7 +699,7 @@ export function finalizeMergerPayout(state: GameState) {
     }
   }
 
-  (state as any).pendingBonuses = undefined;
+  state.pendingBonuses = undefined;
 
   // Now transition to liquidation phase
   const ctx = state.mergerContext!;

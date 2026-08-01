@@ -51,12 +51,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       prepareMergerPayout(state, 'CamCrooned', ['Messla'], absorbedPrices);
 
       // Verify bonuses were calculated with correct price
-      const bonuses = (state as any).pendingBonuses as Array<{
-        playerId: string;
-        startupId: string;
-        amount: number;
-        type: string;
-      }>;
+      const bonuses = state.pendingBonuses;
 
       expect(bonuses).toBeDefined();
       expect(bonuses.length).toBeGreaterThan(0);
@@ -275,12 +270,12 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       prepareMergerPayout(state, 'CamCrooned', ['Messla'], absorbedPrices);
 
       // Verify bonuses
-      const bonuses = (state as any).pendingBonuses;
+      const bonuses = state.pendingBonuses ?? [];
       const p1Bonus = bonuses.find(
-        (b: any) => b.playerId === player1.id && b.type === 'majority'
+        (b) => b.playerId === player1.id && b.type === 'majority'
       );
       const p2Bonus = bonuses.find(
-        (b: any) => b.playerId === player2.id && b.type === 'minority'
+        (b) => b.playerId === player2.id && b.type === 'minority'
       );
 
       expect(p1Bonus.amount).toBe(preMergerPrice * 10);
