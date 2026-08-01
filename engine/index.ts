@@ -7,3 +7,4 @@ export * from './startups';
 export * from './placement';
 export * from './bonuses';
 export * from './endGame';
+export * from './intents';
