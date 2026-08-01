@@ -6,6 +6,7 @@ import {
   completeSurvivorSelection,
   finalizeMergerPayout,
   foundStartup,
+  completePlayerMergerLiquidation,
 } from './gameLogic';
 
 /**
@@ -136,6 +137,54 @@ function doChooseSurvivor(
 }
 
 /**
+ * Resolves one absorbed-chain holder's shares: sell for cash at the
+ * pre-merger price, trade two-for-one into survivor shares, or keep the
+ * rest. Players resolve one at a time, in the order `finalizeMergerPayout` /
+ * `advanceToNextAbsorbedStartup` queued them (`mergerContext.shareholderQueue`).
+ * Validation happens here; the bookkeeping (cash, portfolios, share pools,
+ * logging, and advancing to the next shareholder or absorbed chain) is
+ * entirely `completePlayerMergerLiquidation`'s job — it already knows how to
+ * walk `shareholderQueue`/`currentLiquidationIndex` and hand off to
+ * `advanceToNextAbsorbedStartup` when a chain's queue empties, including the
+ * multi-absorbed-chain case (moving on to the next chain's liquidation, or
+ * to `buy` once every absorbed chain is settled).
+ */
+function doLiquidate(state: GameState, intent: Extract<Intent, { type: 'liquidate' }>): void {
+  requireStage(state, 'mergerLiquidation');
+  const ctx = state.mergerContext;
+  if (!ctx) reject('wrongStage', 'no merger in progress');
+
+  const head = ctx.shareholderQueue[ctx.currentShareholderIndex];
+  if (!head || head !== intent.playerId) reject('notYourTurn');
+
+  const currentAbsorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
+  if (currentAbsorbed !== intent.startupId) {
+    reject('wrongStage', 'wrong chain for this queue entry');
+  }
+
+  const player = state.players.find((p) => p.id === intent.playerId)!;
+  const held = player.portfolio[intent.startupId] ?? 0;
+  const { sell, trade, keep } = intent;
+
+  if (sell < 0 || trade < 0 || keep < 0) reject('shareCountMismatch');
+  if (sell + trade + keep !== held) reject('shareCountMismatch', `holds ${held}`);
+  if (trade % 2 !== 0) reject('oddTradeCount');
+
+  const survivor = state.startups[ctx.survivorId];
+  const gained = trade / 2;
+  if (gained > survivor.availableShares) reject('notEnoughShares');
+
+  // `completePlayerMergerLiquidation`'s own `trade` param is the number of
+  // *survivor* shares gained (it derives its 2-for-1 cost internally), not
+  // the number of absorbed shares handed in — so pass `gained`, not `trade`.
+  completePlayerMergerLiquidation(state, intent.playerId, {
+    absorbedId: intent.startupId,
+    trade: gained,
+    sell,
+  });
+}
+
+/**
  * The one entry point for player actions. Pure by contract: it clones the
  * incoming state, then delegates to the (mutating) rules functions.
  * Throws `IllegalIntentError` and leaves the caller's state untouched if the
@@ -147,6 +196,7 @@ export function applyIntent(state: GameState, intent: Intent): GameState {
     case 'placeTile':           doPlaceTile(next, intent); break;
     case 'chooseFoundingBrand': doChooseFoundingBrand(next, intent); break;
     case 'chooseSurvivor':      doChooseSurvivor(next, intent); break;
+    case 'liquidate':           doLiquidate(next, intent); break;
     default:                    reject('unknownIntent', `no handler for ${(intent as Intent).type}`);
   }
   return next;

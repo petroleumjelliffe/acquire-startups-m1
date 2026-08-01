@@ -219,9 +219,6 @@ describe('applyIntent', () => {
 
     expect(codeOf(() => applyIntent(state, { type: 'nope' } as never))).toBe('unknownIntent');
 
-    expect(codeOf(() => applyIntent(state, {
-      type: 'liquidate', playerId: me, startupId: 'Messla', sell: 0, trade: 0, keep: 0,
-    }))).toBe('unknownIntent');
     expect(codeOf(() => applyIntent(state, { type: 'buyShares', playerId: me, picks: [] })))
       .toBe('unknownIntent');
     expect(codeOf(() => applyIntent(state, { type: 'tradeInDeadTiles', playerId: me, coords: [] })))
@@ -230,5 +227,94 @@ describe('applyIntent', () => {
       .toBe('unknownIntent');
     expect(codeOf(() => applyIntent(state, { type: 'endTurn', playerId: me })))
       .toBe('unknownIntent');
+  });
+});
+
+describe('applyIntent — liquidate', () => {
+  /**
+   * Reuses `mergeFixture`'s geometry (Messla B1-B6 tier 0, ZuckFace D1-D3
+   * tier 1; C1 merges them, Messla survives on size). Gives alex and sam
+   * ZuckFace shares before the merge, then commits the merge via placeTile
+   * so the resulting mergerLiquidation state is real, not hand-built.
+   */
+  function merged() {
+    const state = mergeFixture();
+    const [alex, sam] = state.players;
+    alex.hand = ['C1'];
+    alex.cash = 0;
+    sam.cash = 0;
+    giveShares(state, alex.id, { ZuckFace: 4 });
+    giveShares(state, sam.id, { ZuckFace: 2 });
+    const next = applyIntent(state, { type: 'placeTile', playerId: alex.id, coord: 'C1' });
+    return { state: next, alex, sam };
+  }
+
+  it('queues every holder of the absorbed chain in seat order', () => {
+    const { state, alex, sam } = merged();
+    expect(state.stage).toBe('mergerLiquidation');
+    expect(state.mergerContext!.shareholderQueue).toEqual([alex.id, sam.id]);
+    expect(state.mergerContext!.currentShareholderIndex).toBe(0);
+  });
+
+  it('sells at the absorbed price, trades two-for-one and keeps the rest', () => {
+    const { state, alex } = merged();
+    const cashBefore = state.players[0].cash;
+    // ZuckFace 3 tiles, tier 1 → $400
+    const next = applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 1, trade: 2, keep: 1,
+    });
+    expect(next.players[0].cash).toBe(cashBefore + 400);
+    expect(next.players[0].portfolio['ZuckFace']).toBe(1);
+    expect(next.players[0].portfolio['Messla']).toBe(1); // 2 traded → 1 survivor share
+    expect(next.mergerContext!.currentShareholderIndex).toBe(1);
+    expect(next.stage).toBe('mergerLiquidation');
+  });
+
+  it('returns to buy once the queue is exhausted', () => {
+    const { state, alex, sam } = merged();
+    const a = applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 4, trade: 0, keep: 0,
+    });
+    const b = applyIntent(a, {
+      type: 'liquidate', playerId: sam.id, startupId: 'ZuckFace', sell: 0, trade: 2, keep: 0,
+    });
+    expect(b.stage).toBe('buy');
+  });
+
+  it('rejects counts that do not add up to the holding', () => {
+    const { state, alex } = merged();
+    expect(codeOf(() => applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 1, trade: 1, keep: 1,
+    }))).toBe('shareCountMismatch');
+  });
+
+  it('rejects an odd trade count', () => {
+    const { state, alex } = merged();
+    expect(codeOf(() => applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 0, trade: 3, keep: 1,
+    }))).toBe('oddTradeCount');
+  });
+
+  it('rejects a trade the survivor pool cannot cover', () => {
+    const { state, alex } = merged();
+    state.startups['Messla'].availableShares = 1;
+    expect(codeOf(() => applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 0, trade: 4, keep: 0,
+    }))).toBe('notEnoughShares');
+  });
+
+  it('rejects a liquidation from a player who is not at the head of the queue', () => {
+    const { state, sam } = merged();
+    expect(codeOf(() => applyIntent(state, {
+      type: 'liquidate', playerId: sam.id, startupId: 'ZuckFace', sell: 2, trade: 0, keep: 0,
+    }))).toBe('notYourTurn');
+  });
+
+  it('logs what was done with the shares', () => {
+    const { state, alex } = merged();
+    const next = applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 2, trade: 2, keep: 0,
+    });
+    expect(next.log.at(-1)).toMatchObject({ phase: 'Liquidated shares', playerId: alex.id });
   });
 });
