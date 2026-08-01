@@ -178,6 +178,8 @@ bounded.
 
 No UI. Moves `src/state/*` and `src/utils/gameHelpers.ts` to `engine/`.
 
+**Rules**
+
 - Define `Intent` and `applyIntent` as a thin reducer over the functions that already exist.
 - Fix tied-minority split and sole-holder combined bonus.
 - Implement dead tiles: detection of permanently-unplayable tiles, and trade-in.
@@ -186,10 +188,22 @@ No UI. Moves `src/state/*` and `src/utils/gameHelpers.ts` to `engine/`.
 - Replace the `(state as any).pendingBonuses` escape hatch with a typed field.
 - Build the golden-game runner and the G1–G12 catalogue.
 
+**The engine carries what the UI needs to render**
+
+Phase 1 is blocked on each of these — they are things the prototype renders that the engine cannot
+currently express:
+
+| Gap | Change |
+|---|---|
+| `log: string[]` cannot carry a step stack. The prototype's entries are `{phase, detail, undo}`, each a rewind point (`prototype/components.js:130`); the engine stores formatted strings and `GameLog.tsx` prints them. The step stack is the centrepiece of the new UI. | Log becomes structured entries with a snapshot handle |
+| No `ticker`. `$G $S $PP $C $M $Z $W` are settled in `prototype/DESIGN_PRINCIPLES.md` and live in the prototype's `STARTUPS`; `AVAILABLE_STARTUPS` carries only `id` and `tier`. | `ticker` on the startup config |
+| Player emoji means different things in each codebase — the prototype gives a fixed avatar *beside* a name (🦊 Alex); `src/utils/emojiNames.ts` generates emoji as randomly-assigned *names*. `Player` has no `emoji` field. | Reconcile the two; add `emoji` to `Player` |
+| No next-price computation. `price(value, {next})` renders `$300 ↑ $600` — the price a chain *will* have after this merger or growth. | Expose the post-change price the atom needs |
+
 **Deletes:** `server/gameManager.ts` (dead), `majorityHolderBonus` (dead), the `as any` casts.
 
-**Done when:** G1–G12 pass, and the tied-minority and sole-holder tests demonstrably failed before
-their fixes.
+**Done when:** G1–G12 pass; the tied-minority and sole-holder tests demonstrably failed before their
+fixes; and the four fields above exist with the golden games asserting on structured log entries.
 
 ### Phase 1 — Port the component layer
 
@@ -198,17 +212,31 @@ Prototype → React, against **static fixtures only**. No game wiring.
 - Atoms: `brand`, `cash`, `price`, `stockCard`, `tile`.
 - Containers: `stockStack`, `pile`, `player`.
 - Composites: step-stack panel, `stagingZone`, `payoutLines`, `finalScoring`.
+- Panel zone order: `stepstack → active → staging → hand → players`.
 - `components.css` becomes the app stylesheet, design tokens first.
 - Motion tokens from `transitions.js`; `prefers-reduced-motion` respected; panel-height stability
   enforced (panel zones must not resize as content changes — reveal via transition, never layout
   jump).
 
+**The staging zone is UI only.** It is a scratchpad giving players feedback on items moving in and
+out — shares and cash. It carries no commitment semantics and is unrelated to segment boundaries; it
+is indifferent to whether the underlying data has been applied locally or on the server.
+
+**Board parity.** `Board.tsx` diverges from the prototype in ways that are easy to miss: it renders
+coordinates as `{r}-{c}` where the prototype deliberately uses `A1`; it badges the last-placed tile
+with the player's **full name** rather than their initial; and it has no chain outlines, no
+blocked/dead-tile treatment, and no hover-reveal of coordinates on founded tiles.
+
+**Carried over undone.** Two prototype items are designed but unbuilt *there* too, and land here:
+the founding screen grouped by starting price (refinement #3, still a flat row), and the
+pass-and-play reveal overlay (built in the prototype, absent from `PassAndPlayPage.tsx`).
+
 Ships a **component catalog route** — the React equivalent of `states.html`, driven by the same
 golden-game fixtures. This is what makes "does it look right" verifiable independently of "does it
 play right", and it is a workflow already proven in this repo.
 
-**Done when:** every component in the catalog renders at parity with `states.html`, and the catalog
-covers each golden game's terminal state.
+**Done when:** every component in the catalog renders at parity with `states.html`, the board parity
+items above are closed, and the catalog covers each golden game's terminal state.
 
 ### Phase 2 — Pass-and-play on the new stack
 
@@ -292,6 +320,17 @@ deliberately deferred, not overlooked.
 ## Out of scope
 
 Cross-turn undo; undo-approval by other players; event sourcing; spectator mode.
+
+### Deliberately not ported from the prototype
+
+Listed so these read as decisions rather than omissions.
+
+- **The side-panel / bottom-panel layout toggle.** It existed to make a choice, and the choice is
+  made. Not a feature.
+- **"Show the same thing to all players — nothing is hidden per-player."** This is listed as an
+  interaction principle in `prototype/DESIGN_PRINCIPLES.md`, and Phases 3 and 5 deliberately break
+  it. The prototype's principles were written for pass-and-play; the hidden-hand ones do not
+  transfer.
 
 ## Deferred to their own specs
 
