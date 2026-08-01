@@ -105,9 +105,12 @@ export function previewPlacement(state: GameState, coord: Coord, playerId?: stri
   const total = sized.reduce((n, s) => n + s.size, 0) + 1 + absorbedLoners;
 
   if (tied.length > 1) {
-    // Survivor is undecided — reporting a per-chain price move here would
-    // imply an outcome we can't honestly claim yet, so prices stays empty.
+    // Survivor identity is undecided, but the resulting combined size is
+    // deterministic regardless of which tied chain wins — so report each
+    // tied candidate's price if it survives, paired with tiedSurvivorIds
+    // to signal the ambiguity to the caller.
     preview.tiedSurvivorIds = tied.map((s) => s.id);
+    for (const s of tied) preview.prices[s.id] = change(state, s.id, total);
   } else {
     preview.survivorId = sized[0].id;
     preview.absorbedIds = sized.slice(1).map((s) => s.id);

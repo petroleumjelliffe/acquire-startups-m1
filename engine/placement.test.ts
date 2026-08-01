@@ -55,6 +55,11 @@ describe('previewPlacement', () => {
     expect(p.kind).toBe('merge');
     expect(p.survivorId).toBeUndefined();
     expect(p.tiedSurvivorIds).toEqual(['Messla', 'ZuckFace']);
+    // Combined size is deterministic (4 + 4 + the placed tile = 9) even
+    // though which chain survives is not — both tied candidates get a
+    // price entry for "if this one wins".
+    expect(p.prices['Messla']).toEqual({ size: 4, price: 400, nextSize: 9, nextPrice: 600 });
+    expect(p.prices['ZuckFace']).toEqual({ size: 4, price: 500, nextSize: 9, nextPrice: 700 });
   });
 
   it('blocks a tile that would merge two safe chains, and calls it dead', () => {
