@@ -135,6 +135,10 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       //change state to found, in order to trigger the FoundStartupModal
       state.stage = "foundStartup";
       state.pendingFoundTile = coord;
+      pushLog(state, 'Placed a tile', [
+        tok.tile(coord),
+        tok.text(' — choose a brand to found'),
+      ], player.id);
 
       //move following game logic to the FoundStartupModal component
 
