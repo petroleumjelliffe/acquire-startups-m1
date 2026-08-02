@@ -495,6 +495,25 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     expect(next.log.at(-1)).toMatchObject({ phase: 'Traded a tile' });
   });
 
+  it('deduplicates a repeated coord so trading in one dead tile only ever surrenders and draws one', () => {
+    const state = deadTileFixture();
+    state.stage = 'play';
+    state.turnIndex = 0;
+    state.players[0].hand = ['C1', 'G6'];
+    state.bag = ['I12', 'H1'];
+    const next = applyIntent(state, {
+      type: 'tradeInDeadTiles',
+      playerId: state.players[0].id,
+      coords: ['C1', 'C1'],
+    });
+    // Exactly one tile surrendered from the hand, exactly one replacement drawn.
+    expect(next.players[0].hand).toEqual(['G6', 'I12']);
+    // The bag drops by exactly one.
+    expect(next.bag).toEqual(['H1']);
+    // Exactly one 'Traded a tile' log entry pushed.
+    expect(next.log.filter((e) => e.phase === 'Traded a tile')).toHaveLength(1);
+  });
+
   it('refuses to trade in a tile that is merely awkward', () => {
     const state = setupGameWithStartups([{ id: 'Messla', tiles: 3, tier: 0 }]);
     state.stage = 'play';

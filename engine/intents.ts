@@ -286,12 +286,16 @@ function doTradeInDeadTiles(state: GameState, intent: Extract<Intent, { type: 't
   requireStage(state, 'play');
   const player = requireCurrentPlayer(state, intent.playerId);
 
-  for (const c of intent.coords) {
+  // Dedupe before validating/mutating: a client sending the same coord twice
+  // must not surrender one tile and draw two.
+  const coords = [...new Set(intent.coords)];
+
+  for (const c of coords) {
     if (!player.hand.includes(c)) reject('tileNotInHand');
     if (!isDeadTile(state, c)) reject('notADeadTile', c);
   }
 
-  for (const c of intent.coords) {
+  for (const c of coords) {
     player.hand = player.hand.filter((x) => x !== c);
     const replacement = state.bag.shift();
     const detail = [tok.tile(c)];
