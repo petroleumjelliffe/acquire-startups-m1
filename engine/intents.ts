@@ -1,13 +1,21 @@
 import type { GameState, Player, Stage, StartupId } from './gameTypes';
 import type { Coord } from './gameHelpers';
-import { previewPlacement } from './placement';
+import { previewPlacement, isDeadTile } from './placement';
+import { getEndCondition } from './endGame';
+import { tok, pushLog } from './log';
 import {
   handleTilePlacement,
   completeSurvivorSelection,
   finalizeMergerPayout,
   foundStartup,
   completePlayerMergerLiquidation,
+  buyShares,
+  getSharePrice,
+  endBuyPhase,
 } from './gameLogic';
+
+const MAX_BUYS_PER_TURN = 3;
+const HAND_SIZE = 6;
 
 /**
  * The single server-authoritative vocabulary of player actions. Field names are
@@ -185,6 +193,138 @@ function doLiquidate(state: GameState, intent: Extract<Intent, { type: 'liquidat
 }
 
 /**
+ * Up to 3 shares per turn, cumulative across calls. The whole basket is
+ * priced and validated against founding/stock/cash *before* anything is
+ * charged — a basket the player can't afford must leave state untouched.
+ * The actual bookkeeping (cash, portfolio, share pool, currentBuyCount,
+ * logging) is delegated to gameLogic's `buyShares`, once per distinct
+ * startup in the basket; the pre-check below guarantees each call succeeds.
+ */
+function doBuyShares(state: GameState, intent: Extract<Intent, { type: 'buyShares' }>): void {
+  requireStage(state, 'buy');
+  const player = requireCurrentPlayer(state, intent.playerId);
+
+  const already = state.currentBuyCount ?? 0;
+  if (already + intent.picks.length > MAX_BUYS_PER_TURN) reject('tooManyPicks');
+
+  const wanted: Partial<Record<StartupId, number>> = {};
+  let total = 0;
+  for (const id of intent.picks) {
+    const startup = state.startups[id];
+    if (!startup || !startup.isFounded) reject('brandUnavailable');
+    wanted[id] = (wanted[id] ?? 0) + 1;
+    if (wanted[id]! > startup.availableShares) reject('notEnoughShares');
+    total += getSharePrice(state, id);
+  }
+  if (total > player.cash) reject('notEnoughCash');
+
+  for (const [id, count] of Object.entries(wanted) as [StartupId, number][]) {
+    buyShares(state, player.id, id, count);
+  }
+}
+
+function hasLegalTile(state: GameState, playerId: string): boolean {
+  const player = state.players.find((p) => p.id === playerId);
+  return !!player && player.hand.some((c) => previewPlacement(state, c, playerId).legal);
+}
+
+/** Draws straight from `state.bag` up to `size`. See the note on
+ * `completeTileTransaction` in `doPlaceTile` above — that helper is a
+ * permanent no-op on the intent path, so `endTurn` must do its own drawing.
+ */
+function drawUpTo(state: GameState, playerId: string, size = HAND_SIZE): Coord[] {
+  const player = state.players.find((p) => p.id === playerId)!;
+  const drawn: Coord[] = [];
+  while (player.hand.length < size && state.bag.length > 0) {
+    const tile = state.bag.shift()!;
+    player.hand.push(tile);
+    drawn.push(tile);
+  }
+  return drawn;
+}
+
+/**
+ * Legal from `buy` always. Legal from `play` only when the current player
+ * has no legal placement anywhere in hand — otherwise they must place.
+ * Draws the hand back up to 6 from the bag (never past what it holds),
+ * resets `currentBuyCount`, and advances to the next player's `play` stage.
+ */
+function doEndTurn(state: GameState, intent: Extract<Intent, { type: 'endTurn' }>): void {
+  const player = requireCurrentPlayer(state, intent.playerId);
+
+  if (state.stage === 'play') {
+    if (hasLegalTile(state, intent.playerId)) {
+      reject('wrongStage', 'a legal placement exists — you must place a tile');
+    }
+  } else {
+    requireStage(state, 'buy');
+  }
+
+  const drawn = drawUpTo(state, player.id);
+  if (drawn.length > 0) {
+    pushLog(state, 'Drew tiles', [tok.text(`${drawn.length} tile${drawn.length === 1 ? '' : 's'}`)], player.id);
+  }
+  pushLog(state, 'Ended turn', [], player.id);
+
+  // Resets currentBuyCount, advances turnIndex, and lands on 'play' —
+  // exactly what ending a turn needs, whether we arrived here from 'buy'
+  // or from a dead-ended 'play'. This is also the fix for the stale
+  // currentBuyCount hazard: gameLogic's foundStartup and
+  // advanceToNextAbsorbedStartup enter 'buy' without resetting it, relying
+  // on it already being 0 — which only holds if every path out of a turn
+  // resets it here, unconditionally, regardless of how 'buy' was entered.
+  endBuyPhase(state);
+}
+
+/**
+ * Swaps genuinely dead tiles (would merge two safe chains) for fresh ones
+ * from the bag. The turn continues — stage stays 'play'. Validates every
+ * coord before mutating any of them, so a bad coord in the batch leaves the
+ * hand and bag untouched.
+ */
+function doTradeInDeadTiles(state: GameState, intent: Extract<Intent, { type: 'tradeInDeadTiles' }>): void {
+  requireStage(state, 'play');
+  const player = requireCurrentPlayer(state, intent.playerId);
+
+  for (const c of intent.coords) {
+    if (!player.hand.includes(c)) reject('tileNotInHand');
+    if (!isDeadTile(state, c)) reject('notADeadTile', c);
+  }
+
+  for (const c of intent.coords) {
+    player.hand = player.hand.filter((x) => x !== c);
+    const replacement = state.bag.shift();
+    const detail = [tok.tile(c)];
+    if (replacement) {
+      player.hand.push(replacement);
+      detail.push(tok.text(' → drew '), tok.tile(replacement));
+    } else {
+      detail.push(tok.text(' → bag empty'));
+    }
+    pushLog(state, 'Traded a tile', detail, player.id);
+  }
+}
+
+/**
+ * Only legal once `getEndCondition` says the game is over. A player who
+ * doesn't want to end declines simply by calling `endTurn` instead — the
+ * engine never ends the game on its own.
+ */
+function doDeclareEnd(state: GameState, intent: Extract<Intent, { type: 'declareEnd' }>): void {
+  requireStage(state, 'buy');
+  requireCurrentPlayer(state, intent.playerId);
+
+  const condition = getEndCondition(state);
+  if (!condition.met) reject('endNotAvailable');
+
+  const reason = condition.reasons[0];
+  pushLog(state, 'Game over', reason.kind === 'size41'
+    ? [tok.brand(reason.startupId), tok.text(` reached ${reason.size} tiles`)]
+    : [tok.text('every founded chain is safe')], intent.playerId);
+  state.stage = 'end';
+}
+
+/**
  * The one entry point for player actions. Pure by contract: it clones the
  * incoming state, then delegates to the (mutating) rules functions.
  * Throws `IllegalIntentError` and leaves the caller's state untouched if the
@@ -197,6 +337,10 @@ export function applyIntent(state: GameState, intent: Intent): GameState {
     case 'chooseFoundingBrand': doChooseFoundingBrand(next, intent); break;
     case 'chooseSurvivor':      doChooseSurvivor(next, intent); break;
     case 'liquidate':           doLiquidate(next, intent); break;
+    case 'buyShares':           doBuyShares(next, intent); break;
+    case 'endTurn':             doEndTurn(next, intent); break;
+    case 'tradeInDeadTiles':    doTradeInDeadTiles(next, intent); break;
+    case 'declareEnd':          doDeclareEnd(next, intent); break;
     default:                    reject('unknownIntent', `no handler for ${(intent as Intent).type}`);
   }
   return next;

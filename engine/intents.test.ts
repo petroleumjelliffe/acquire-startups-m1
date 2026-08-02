@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { applyIntent, IllegalIntentError } from './intents';
 import { createTestGameState, giveShares, setupGameWithStartups } from './testHelpers';
 import type { GameState } from './gameTypes';
+import type { Coord } from './gameHelpers';
 
 function playing(state: GameState = createTestGameState()): GameState {
   state.stage = 'play';
@@ -213,20 +214,9 @@ describe('applyIntent', () => {
     }
   });
 
-  it('rejects an unknown intent type, and every intent not yet implemented', () => {
+  it('rejects a genuinely unknown intent type', () => {
     const state = playing();
-    const me = state.players[0].id;
-
     expect(codeOf(() => applyIntent(state, { type: 'nope' } as never))).toBe('unknownIntent');
-
-    expect(codeOf(() => applyIntent(state, { type: 'buyShares', playerId: me, picks: [] })))
-      .toBe('unknownIntent');
-    expect(codeOf(() => applyIntent(state, { type: 'tradeInDeadTiles', playerId: me, coords: [] })))
-      .toBe('unknownIntent');
-    expect(codeOf(() => applyIntent(state, { type: 'declareEnd', playerId: me })))
-      .toBe('unknownIntent');
-    expect(codeOf(() => applyIntent(state, { type: 'endTurn', playerId: me })))
-      .toBe('unknownIntent');
   });
 });
 
@@ -358,5 +348,224 @@ describe('applyIntent — liquidate', () => {
 
     // 2 ZuckFace shares traded two-for-one → exactly 1 Messla share gained.
     expect(next.startups['Messla'].availableShares).toBe(survivorBefore - 1);
+  });
+});
+
+describe('applyIntent — buy, end turn, trade-in, declare end', () => {
+  /**
+   * Messla (3 tiles, tier 0 → $300/share) and ZuckFace (2 tiles, tier 1 →
+   * $300/share). No adjacency is needed here: nothing in this fixture places
+   * a tile, so the auto-assigned coords from `tiles: <count>` are fine.
+   */
+  function buying(): GameState {
+    const state = setupGameWithStartups([
+      { id: 'Messla', tiles: 3, tier: 0 },
+      { id: 'ZuckFace', tiles: 2, tier: 1 },
+    ]);
+    state.stage = 'buy';
+    state.turnIndex = 0;
+    state.currentBuyCount = 0;
+    state.players[0].cash = 1000;
+    state.players[0].hand = ['H8'];
+    return state;
+  }
+
+  /**
+   * Two safe (≥11 tile) chains both touching C1: Messla along row B
+   * (B1-B11) and ZuckFace along row D (D1-D11). C1's only neighbours are
+   * B1, D1 and C2, so C1 would merge two safe chains — a permanently dead
+   * tile. Explicit coords, per INTERFACE-FACTS: auto-assigned counts give
+   * no adjacency guarantee.
+   */
+  function deadTileFixture(): GameState {
+    const row = (r: string): Coord[] => Array.from({ length: 11 }, (_, i) => `${r}${i + 1}` as Coord);
+    return setupGameWithStartups([
+      { id: 'Messla', tiles: row('B'), tier: 0 },
+      { id: 'ZuckFace', tiles: row('D'), tier: 1 },
+    ]);
+  }
+
+  it('buys shares, charging cash and drawing down the pool', () => {
+    const state = buying();
+    const next = applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] });
+    expect(next.players[0].cash).toBe(1000 - 600);
+    expect(next.players[0].portfolio['Messla']).toBe(2);
+    expect(next.startups['Messla'].availableShares).toBe(23);
+    expect(next.currentBuyCount).toBe(2);
+    expect(next.stage).toBe('buy');
+    expect(next.log.at(-1)).toMatchObject({ phase: 'Bought shares' });
+  });
+
+  it('caps the turn at three shares across calls', () => {
+    const state = buying();
+    const one = applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] });
+    expect(() =>
+      applyIntent(one, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] }),
+    ).toThrow(IllegalIntentError);
+    try {
+      applyIntent(one, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] });
+    } catch (e) {
+      expect((e as IllegalIntentError).code).toBe('tooManyPicks');
+    }
+  });
+
+  it('rejects a basket the player cannot afford, buying nothing', () => {
+    const state = buying();
+    state.players[0].cash = 500;
+    try {
+      applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'ZuckFace'] });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as IllegalIntentError).code).toBe('notEnoughCash');
+    }
+    // nothing charged
+    expect(state.players[0].cash).toBe(500);
+  });
+
+  it('rejects buying an unfounded brand or one with an empty pool', () => {
+    const state = buying();
+    try {
+      applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Gobble'] });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as IllegalIntentError).code).toBe('brandUnavailable');
+    }
+
+    state.startups['Messla'].availableShares = 0;
+    try {
+      applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla'] });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as IllegalIntentError).code).toBe('notEnoughShares');
+    }
+  });
+
+  it('ends the turn: refills the hand, resets the buy count, advances the player', () => {
+    const state = buying();
+    state.bag = ['A9', 'A10', 'A11', 'A12', 'B9', 'B10'];
+    state.players[0].hand = ['H8'];
+    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0].id });
+    expect(next.players[0].hand).toHaveLength(6);
+    expect(next.currentBuyCount).toBe(0);
+    expect(next.turnIndex).toBe(1);
+    expect(next.stage).toBe('play');
+    expect(next.log.some((e) => e.phase === 'Drew tiles')).toBe(true);
+  });
+
+  it('does not refill past what the bag holds', () => {
+    const state = buying();
+    state.bag = ['A9'];
+    state.players[0].hand = ['H8'];
+    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0].id });
+    expect(next.players[0].hand).toHaveLength(2);
+    expect(next.bag).toEqual([]);
+  });
+
+  it('allows ending the turn from play only when no tile is playable', () => {
+    const state = deadTileFixture();
+    state.stage = 'play';
+    state.turnIndex = 0;
+    state.players[0].hand = ['C1']; // the only tile, and it is dead
+    state.bag = [];
+    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0].id });
+    expect(next.turnIndex).toBe(1);
+
+    const playable = setupGameWithStartups([{ id: 'Messla', tiles: 3, tier: 0 }]);
+    playable.stage = 'play';
+    playable.turnIndex = 0;
+    playable.players[0].hand = ['H8']; // far from the auto-assigned Messla tiles — isolated, legal
+    try {
+      applyIntent(playable, { type: 'endTurn', playerId: playable.players[0].id });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as IllegalIntentError).code).toBe('wrongStage');
+    }
+  });
+
+  it('trades in dead tiles and leaves the turn running', () => {
+    const state = deadTileFixture();
+    state.stage = 'play';
+    state.turnIndex = 0;
+    state.players[0].hand = ['C1', 'G6'];
+    state.bag = ['I12'];
+    const next = applyIntent(state, { type: 'tradeInDeadTiles', playerId: state.players[0].id, coords: ['C1'] });
+    expect(next.stage).toBe('play');
+    expect(next.players[0].hand).toEqual(['G6', 'I12']);
+    expect(next.bag).toEqual([]);
+    expect(next.log.at(-1)).toMatchObject({ phase: 'Traded a tile' });
+  });
+
+  it('refuses to trade in a tile that is merely awkward', () => {
+    const state = setupGameWithStartups([{ id: 'Messla', tiles: 3, tier: 0 }]);
+    state.stage = 'play';
+    state.turnIndex = 0;
+    state.players[0].hand = ['H8'];
+    try {
+      applyIntent(state, { type: 'tradeInDeadTiles', playerId: state.players[0].id, coords: ['H8'] });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as IllegalIntentError).code).toBe('notADeadTile');
+    }
+  });
+
+  it('declares the end only when the condition is met', () => {
+    const notYet = buying();
+    try {
+      applyIntent(notYet, { type: 'declareEnd', playerId: notYet.players[0].id });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as IllegalIntentError).code).toBe('endNotAvailable');
+    }
+
+    const over = setupGameWithStartups([{ id: 'Gobble', tiles: 41, tier: 2 }]);
+    over.stage = 'buy';
+    over.turnIndex = 0;
+    const ended = applyIntent(over, { type: 'declareEnd', playerId: over.players[0].id });
+    expect(ended.stage).toBe('end');
+    expect(ended.log.at(-1)).toMatchObject({ phase: 'Game over' });
+  });
+
+  // Regression for hazard 2: gameLogic's `foundStartup` and
+  // `advanceToNextAbsorbedStartup` set stage = 'buy' without touching
+  // `currentBuyCount` — they rely on it already being 0, an invariant that
+  // only holds if *every* path out of a turn resets it. This drives two
+  // full turns through applyIntent only: player 1 spends 2 of their 3 buys
+  // and ends the turn; player 2 then founds a brand fresh. If endTurn didn't
+  // reset currentBuyCount, player 2 would inherit player 1's leftover count
+  // and be capped at 1 share instead of 3.
+  it('lets a player who founds a brand buy a full three, unaffected by the previous player using up buys', () => {
+    const state = setupGameWithStartups([{ id: 'Gobble', tiles: 3, tier: 0 }]);
+    state.stage = 'play';
+    state.turnIndex = 0;
+    state.players[0].hand = ['E5'];
+    state.players[1].hand = ['H6'];
+    state.board['H5'] = { placed: true }; // lone unclaimed tile for player 2 to found against
+
+    const placed1 = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E5' });
+    expect(placed1.stage).toBe('buy');
+
+    const bought1 = applyIntent(placed1, {
+      type: 'buyShares', playerId: state.players[0].id, picks: ['Gobble', 'Gobble'],
+    });
+    expect(bought1.currentBuyCount).toBe(2);
+
+    const ended1 = applyIntent(bought1, { type: 'endTurn', playerId: state.players[0].id });
+    expect(ended1.turnIndex).toBe(1);
+    expect(ended1.stage).toBe('play');
+
+    const placed2 = applyIntent(ended1, { type: 'placeTile', playerId: state.players[1].id, coord: 'H6' });
+    expect(placed2.stage).toBe('foundStartup');
+
+    const founded2 = applyIntent(placed2, {
+      type: 'chooseFoundingBrand', playerId: state.players[1].id, startupId: 'Messla',
+    });
+    expect(founded2.stage).toBe('buy');
+    expect(founded2.currentBuyCount).toBe(0); // must not carry over player 1's count
+
+    const bought2 = applyIntent(founded2, {
+      type: 'buyShares', playerId: state.players[1].id, picks: ['Messla', 'Messla', 'Messla'],
+    });
+    expect(bought2.currentBuyCount).toBe(3);
+    expect(bought2.players[1].portfolio['Messla']).toBe(4); // 1 founding share + 3 bought
   });
 });
