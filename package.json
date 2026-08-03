@@ -16,6 +16,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "check:bundle": "vite build && ! grep -rlE \"['\\\"]vitest['\\\"]\" dist/assets 2>/dev/null",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
