@@ -218,8 +218,11 @@ const G14: GoldenGame = {
  *
  * Verified experimentally per the task brief: with `doDeclareEnd`'s
  * `if (!condition.met) reject('endNotAvailable')` line commented out, this
- * game fails (the intent is applied instead of throwing); restoring the line
- * makes it pass again. See task-6-report.md for the transcript.
+ * game fails — `condition.reasons[0]` is then `undefined` and the very next
+ * line (`reason.kind`) throws a bare `TypeError`, which the runner's
+ * `toBeInstanceOf(IllegalIntentError)` check correctly rejects as not the
+ * expected `endNotAvailable` rejection. Restoring the line makes it pass
+ * again. See task-6-report.md for the full transcript.
  */
 const G15: GoldenGame = {
   id: 'G15',
