@@ -7,7 +7,13 @@ import { Coord,
   getStartupSize,
 } from "./gameHelpers";
 import { tok, pushLog } from "./log";
-import { getSharePriceAtSize } from "./startups";
+import {
+  getSharePriceAtSize,
+  SAFE_SIZE,
+  MAX_BUYS_PER_TURN,
+  HAND_SIZE,
+  TRADE_RATIO,
+} from "./startups";
 import { previewPlacement } from "./placement";
 import { computeChainBonuses, type BonusResult } from "./bonuses";
 
@@ -78,14 +84,14 @@ export function resolveInitialDraw(state: GameState) {
 
 export function dealOneRound(state: GameState) {
   for (const p of state.players) {
-    if (p.hand.length < 6 && state.bag.length > 0) {
+    if (p.hand.length < HAND_SIZE && state.bag.length > 0) {
       p.hand.push(state.bag.shift()!);
     }
   }
 }
 
 export function allHandsFull(state: GameState) {
-  return state.players.every((p) => p.hand.length >= 6);
+  return state.players.every((p) => p.hand.length >= HAND_SIZE);
 }
 
 //----------------------------------------------------
@@ -114,7 +120,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     const preview = previewPlacement(state, coord, player.id);
     if (!preview.legal) {
       const touching = [...adjStartups];
-      const safeChains = touching.filter((id) => getStartupSize(state, id) >= 11);
+      const safeChains = touching.filter((id) => getStartupSize(state, id) >= SAFE_SIZE);
       pushLog(state, 'Merger', [
         tok.text('Attempted illegal merge involving safe chain(s): '),
         ...safeChains.flatMap((id, i) => i === 0 ? [tok.brand(id)] : [tok.text(', '), tok.brand(id)]),
@@ -140,28 +146,10 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
         tok.text(' — choose a brand to found'),
       ], player.id);
 
-      //move following game logic to the FoundStartupModal component
-
-      //     const brandChoices = getAvailableStartups(state).map((s) => s.id);
-      //     const chosen = window.prompt(
-      //       `Choose startup to found: ${brandChoices.join(", ")}`,
-      //       brandChoices[0]
-      //     );
-      //     const chosenId =
-      //       chosen && brandChoices.includes(chosen) ? chosen : brandChoices[0];
-      //       const tier = AVAILABLE_STARTUPS.find(s => s.id === chosenId)?.tier || 1;
-      //     foundStartup(state, chosenId, coord);
-
-      //     // Claim contiguous unclaimed group
-      //     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
-      //     for (const g of group) state.board[g].startupId = chosenId;
-
-      //     state.log.push(
-      //       `${player.name} founded ${chosenId} with ${group.length} tiles.`
-      //     );
-      //     //enter buy stage
-      // state.stage = "buy";
-      // state.currentBuyCount = 0;
+      // The brand choice itself is the client's: the game parks on
+      // `foundStartup` and waits for the `chooseFoundingBrand` intent, which
+      // calls `foundStartup(state, id, coord)` to claim the group, grant the
+      // founder share and move on to `buy`.
     } else {
       pushLog(state, 'Placed a tile', [tok.tile(coord), tok.text(' (isolated)')], player.id);
       //enter buy stage
@@ -395,47 +383,17 @@ export function completeSurvivorSelection(state: GameState, survivorId: string) 
   prepareMergerPayout(state, survivorId, absorbedIds, absorbedPrices);
 }
 
-export function chooseFoundingBrand(
-  state: GameState,
-  playerName: string
-): string | null {
-  // TODO: replace with your modal; prompt is just a dev stub
-  const choices = getAvailableStartups(state).map((s) => s.id);
-  if (choices.length === 0) return null;
-  if (choices.length === 1) return choices[0];
-  const chosen = window.prompt(
-    `${playerName}: choose startup to found:\n${choices.join(", ")}`,
-    choices[0]
-  );
-  if (!chosen) return null;
-  return choices.includes(chosen) ? chosen : null;
-}
-
-export function pickMergeSurvivor(
-  state: GameState,
-  playersTurnName: string,
-  ids: string[]
-): string {
-  // survivor = largest; tie → prompt
-  const sizes = ids
-    .map((id) => ({ id, size: state.startups[id].tiles.length }))
-    .sort((a, b) => b.size - a.size);
-  const top = sizes[0];
-  const next = sizes[1];
-
-  if (!next || top.size > next.size) return top.id;
-
-  // tie among some
-  const tied = sizes.filter((s) => s.size === top.size).map((s) => s.id);
-  if (tied.length === 1) return tied[0];
-
-  // TODO: replace with modal; prompt is a dev stub
-  const chosen = window.prompt(
-    `${playersTurnName}: tie! choose survivor:\n${tied.join(", ")}`,
-    tied[0]
-  );
-  return tied.includes(chosen || "") ? (chosen as string) : tied[0];
-}
+// `chooseFoundingBrand` and `pickMergeSurvivor` lived here as dev stubs that
+// called `window.prompt`. Both were dead — nothing in engine/, src/, server/
+// or prototype/ referenced either — but both were exported through the
+// engine barrel that server/ imports, so a Node caller reaching for the
+// invitingly-named `chooseFoundingBrand` would have hit
+// `ReferenceError: window is not defined` at runtime. The live replacements
+// are `foundStartup` (below) and `completeSurvivorSelection` (above); the
+// *choice* itself belongs to the client, arriving as the
+// `chooseFoundingBrand` / `chooseSurvivor` intents. Do not reintroduce a
+// browser global in engine/ — the `engine` vitest project runs under
+// `environment: 'node'` specifically so that such a call fails a test.
 
 /**
  * Count how many tiles belong to each startup ID.
@@ -606,7 +564,7 @@ export function buyShares(
   const startup = state.startups[startupId];
   if (!player || !startup || !startup.isFounded) return false;
 
-  const remainingAllowance = 3 - (state.currentBuyCount || 0);
+  const remainingAllowance = MAX_BUYS_PER_TURN - (state.currentBuyCount || 0);
   const buyCount = Math.min(count, remainingAllowance, startup.availableShares);
   if (buyCount <= 0) return false;
 
@@ -809,7 +767,7 @@ export function completePlayerMergerLiquidation(
   // ✅ FIX: Use pre-merger price from merger context
   const sharePrice = ctx.absorbedPrices[absorbedId] || 0;
 
-  const tradeCost = trade * 2;
+  const tradeCost = trade * TRADE_RATIO;
   const sellGain = sell * sharePrice;
   const hold = (player.portfolio[absorbedId] || 0) - tradeCost - sell;
 

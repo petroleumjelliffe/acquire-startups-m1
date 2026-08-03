@@ -3,6 +3,20 @@ import { getStartupSize } from './gameHelpers';
 
 export const SAFE_SIZE = 11;
 export const END_SIZE = 41;
+
+/**
+ * Rule constants with more than one consumer. They live here, next to
+ * SAFE_SIZE/END_SIZE, because every one of them used to be duplicated as a
+ * literal across `intents.ts`, `gameInit.ts` and `gameLogic.ts` — the
+ * validator's copy and the mutator's copy could drift apart silently.
+ * Import them; never re-declare them.
+ */
+/** Shares a player may buy in one turn, cumulative across `buyShares` calls. */
+export const MAX_BUYS_PER_TURN = 3;
+/** Tiles a player holds at the start of their turn. */
+export const HAND_SIZE = 6;
+/** Absorbed shares handed in per survivor share gained in a merger trade. */
+export const TRADE_RATIO = 2;
 export const SIZE_THRESHOLDS: readonly number[] = [2, 3, 4, 5, 6, 11, 21, 31, 41];
 export const PLAYER_EMOJI: readonly string[] = ['🦊', '🐢', '🦁', '🐙', '🦉', '🐝'];
 

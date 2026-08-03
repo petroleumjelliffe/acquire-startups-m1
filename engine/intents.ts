@@ -3,6 +3,7 @@ import type { Coord } from './gameHelpers';
 import { previewPlacement, isDeadTile } from './placement';
 import { getEndCondition } from './endGame';
 import { tok, pushLog } from './log';
+import { MAX_BUYS_PER_TURN, HAND_SIZE, TRADE_RATIO } from './startups';
 import {
   handleTilePlacement,
   completeSurvivorSelection,
@@ -13,9 +14,6 @@ import {
   getSharePrice,
   endBuyPhase,
 } from './gameLogic';
-
-const MAX_BUYS_PER_TURN = 3;
-const HAND_SIZE = 6;
 
 /**
  * The single server-authoritative vocabulary of player actions. Field names are
@@ -176,10 +174,10 @@ function doLiquidate(state: GameState, intent: Extract<Intent, { type: 'liquidat
 
   if (sell < 0 || trade < 0 || keep < 0) reject('shareCountMismatch');
   if (sell + trade + keep !== held) reject('shareCountMismatch', `holds ${held}`);
-  if (trade % 2 !== 0) reject('oddTradeCount');
+  if (trade % TRADE_RATIO !== 0) reject('oddTradeCount');
 
   const survivor = state.startups[ctx.survivorId];
-  const gained = trade / 2;
+  const gained = trade / TRADE_RATIO;
   if (gained > survivor.availableShares) reject('notEnoughShares');
 
   // `completePlayerMergerLiquidation`'s own `trade` param is the number of
@@ -219,7 +217,22 @@ function doBuyShares(state: GameState, intent: Extract<Intent, { type: 'buyShare
   if (total > player.cash) reject('notEnoughCash');
 
   for (const [id, count] of Object.entries(wanted) as [StartupId, number][]) {
-    buyShares(state, player.id, id, count);
+    // `buyShares` returns false when *it* refuses the basket — a different
+    // rule copy saying no after ours said yes. The validation above is
+    // supposed to make that unreachable, so a false here is an engine-
+    // invariant violation, not a player error: there is no IllegalIntentCode
+    // that honestly describes it, and reporting one would tell the client to
+    // fix an input that was fine. Assert instead, loudly. `applyIntent`
+    // clones before delegating, so the throw still leaves the caller's state
+    // untouched. Silently discarding this return is how a MAX_BUYS_PER_TURN
+    // divergence would ship a partially-applied basket as a full success.
+    if (!buyShares(state, player.id, id, count)) {
+      throw new Error(
+        `engine invariant: buyShares refused ${count}x ${id} for ${player.id} ` +
+        `after doBuyShares validated the basket — the buy rules in intents.ts ` +
+        `and gameLogic.ts have diverged`,
+      );
+    }
   }
 }
 

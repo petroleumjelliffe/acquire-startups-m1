@@ -1,6 +1,6 @@
 import type { GameState, Startup, Player, TileCell } from "./gameTypes";
 import { generateAllCoords, shuffleSeeded, Coord } from "./gameHelpers";
-import { AVAILABLE_STARTUPS, PLAYER_EMOJI } from "./startups";
+import { AVAILABLE_STARTUPS, PLAYER_EMOJI, HAND_SIZE } from "./startups";
 
 export function createEmptyBoard(): Record<Coord, TileCell> {
   const b: Record<string, TileCell> = {};
@@ -32,8 +32,7 @@ export function createInitialGame(seed: string, names: string[]): GameState {
     ])
   );
 
-  // Deal starting hands: round-robin from the bag, up to 6 tiles each
-  const HAND_SIZE = 6;
+  // Deal starting hands: round-robin from the bag, up to HAND_SIZE each
   let dealt = 0;
   while (dealt < HAND_SIZE) {
     let anyDealtThisRound = false;
