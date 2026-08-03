@@ -93,4 +93,51 @@ describe('snapshot store', () => {
   it('rejects a rewind to an unknown step rather than returning nonsense', () => {
     expect(() => rewindTo(createSnapshotStore(), 999)).toThrow(/999/);
   });
+
+  it('a rewind followed by a rejected retry keeps the snapshot at that step intact', () => {
+    const store = createSnapshotStore();
+    const start = twoPlayers();
+    const after = applyIntentWithHistory(store, start, { type: 'placeTile', playerId: 'p1', coord: 'A1' });
+    const stepId = firstNewStep(start, after);
+
+    const rewound = rewindTo(store, stepId);
+    expect(store.has(stepId)).toBe(true);
+
+    // 'B2' is not in p1's hand (['A1', 'A2']) — this is a legitimate rejection,
+    // not a bug in the intent. It retries at the same stepId the rewind landed on.
+    expect(() =>
+      applyIntentWithHistory(store, rewound, { type: 'placeTile', playerId: 'p1', coord: 'B2' }),
+    ).toThrow();
+
+    expect(store.has(stepId)).toBe(true);
+    expect(JSON.stringify(rewindTo(store, stepId))).toBe(JSON.stringify(rewound));
+  });
+
+  it('mutating a rewound state does not corrupt the stored snapshot (pins the return-side clone)', () => {
+    const store = createSnapshotStore();
+    const start = twoPlayers();
+    const after = applyIntentWithHistory(store, start, { type: 'placeTile', playerId: 'p1', coord: 'A1' });
+    const stepId = firstNewStep(start, after);
+
+    const first = rewindTo(store, stepId);
+    const untampered = JSON.stringify(first);
+    first.players[0]!.cash = -999;
+    first.log.push({ stepId: 9999, phase: 'tampered', detail: [] });
+
+    const second = rewindTo(store, stepId);
+    expect(JSON.stringify(second)).toBe(untampered);
+  });
+
+  it('mutating the caller state after the call does not corrupt the stored snapshot (pins the store-side clone)', () => {
+    const store = createSnapshotStore();
+    const start = twoPlayers();
+    const beforeSnapshotJSON = JSON.stringify(start);
+    const after = applyIntentWithHistory(store, start, { type: 'placeTile', playerId: 'p1', coord: 'A1' });
+    const stepId = firstNewStep(start, after);
+
+    start.players[0]!.cash = -999;
+    start.log.push({ stepId: 9999, phase: 'tampered', detail: [] });
+
+    expect(JSON.stringify(rewindTo(store, stepId))).toBe(beforeSnapshotJSON);
+  });
 });

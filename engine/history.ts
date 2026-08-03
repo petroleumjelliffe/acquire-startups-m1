@@ -21,7 +21,14 @@ export function createSnapshotStore(): SnapshotStore {
 /**
  * Snapshots `state` under the stepId the next log entry will carry, then applies
  * the intent. A rejected intent throws out of `applyIntent` before the snapshot
- * can mislead anyone: the entry is removed on the way out.
+ * can mislead anyone: on the way out, the entry is restored to whatever it held
+ * before this call — deleted if this call is what created it, or put back if a
+ * prior `rewindTo` had already filed a legitimate snapshot there. `rewindTo`
+ * deliberately keeps the entry AT the step it rewinds to (that's what makes a
+ * repeated rewind idempotent), so retrying with an illegal intent right after a
+ * rewind lands on a stepId that is already occupied. Unconditionally deleting
+ * would destroy that still-valid snapshot and break a later rewind to the same
+ * step — exactly the undo-then-retry sequence the undo UI exists for.
  */
 export function applyIntentWithHistory(
   store: SnapshotStore,
@@ -29,11 +36,17 @@ export function applyIntentWithHistory(
   intent: Intent,
 ): GameState {
   const stepId = state.nextStepId;
+  const hadEntry = store.has(stepId);
+  const previous = store.get(stepId);
   store.set(stepId, structuredClone(state));
   try {
     return applyIntent(state, intent);
   } catch (e) {
-    store.delete(stepId);
+    if (hadEntry) {
+      store.set(stepId, previous!);
+    } else {
+      store.delete(stepId);
+    }
     throw e;
   }
 }
