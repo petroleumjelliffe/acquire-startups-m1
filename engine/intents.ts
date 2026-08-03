@@ -326,10 +326,33 @@ function doTradeInDeadTiles(state: GameState, intent: Extract<Intent, { type: 't
  * Only legal once `getEndCondition` says the game is over. A player who
  * doesn't want to end declines simply by calling `endTurn` instead — the
  * engine never ends the game on its own.
+ *
+ * Stage gate, mirroring `doEndTurn`: legal from `buy` always, and from
+ * `play` only when the current player has no legal placement anywhere in
+ * hand. Restricting it to `buy` alone deadlocked the game: `buy` is
+ * reachable only by placing a tile, so once the bag and every hand are
+ * empty nobody can ever get back there — `declareEnd` was rejected forever
+ * while `endTurn` succeeded forever, and the game could not terminate. G11
+ * makes declining explicitly legal, so the engine actively steers play into
+ * that state.
+ *
+ * The gate matters. Allowing `declareEnd` from `play` *ungated* would let a
+ * player skip a placement they are able to make in order to freeze the
+ * board — a real strategic change, not a bug fix. Gated, it changes nothing
+ * about normal play: if you can place, you must (and land in `buy`, where
+ * declaring already worked); if you cannot, declaring is the only way the
+ * game ever finishes.
  */
 function doDeclareEnd(state: GameState, intent: Extract<Intent, { type: 'declareEnd' }>): void {
-  requireStage(state, 'buy');
   requireCurrentPlayer(state, intent.playerId);
+
+  if (state.stage === 'play') {
+    if (hasLegalTile(state, intent.playerId)) {
+      reject('wrongStage', 'a legal placement exists — place your tile first');
+    }
+  } else {
+    requireStage(state, 'buy');
+  }
 
   const condition = getEndCondition(state);
   if (!condition.met) reject('endNotAvailable');

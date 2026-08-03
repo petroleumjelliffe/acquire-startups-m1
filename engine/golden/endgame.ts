@@ -142,4 +142,61 @@ const G11: GoldenGame = {
   ],
 };
 
-export const ENDGAME_GAMES: GoldenGame[] = [G8, G9, G10, G11];
+/**
+ * G14: the game can always be ended — declaring from `play` when there is
+ * nothing to place.
+ *
+ * `declareEnd` used to require `stage: 'buy'`, and the only route to `buy`
+ * is placing a tile. Once the bag and every hand were empty, nobody could
+ * reach `buy` again: `endTurn` succeeded forever and `declareEnd` was
+ * rejected forever, so a game that had met its end condition could never
+ * terminate. G11 above makes declining explicitly legal, which is exactly
+ * how play arrives here.
+ *
+ * The fix is gated, and steps 1–2 pin the gate: while Alex still holds a
+ * playable tile he must play it, so `declareEnd` from `play` is refused.
+ * An ungated version would let a player skip a placement to freeze the
+ * board, which is a strategic change rather than a bug fix.
+ */
+const G14: GoldenGame = {
+  id: 'G14',
+  title: 'declaring the end from play when no tile can be placed',
+  setup: {
+    players: [
+      { name: 'Alex', cash: 1000, hand: ['H8'], shares: { Messla: 5 } },
+      { name: 'Sam',  cash: 2000, hand: [],     shares: { ZuckFace: 4 } },
+    ],
+    // Both chains safe, so the end condition is met throughout.
+    chains: [
+      { id: 'Messla',   coords: row('B', 12) },
+      { id: 'ZuckFace', coords: row('D', 11) },
+    ],
+    stage: 'play',
+    bag: [],
+  },
+  steps: [
+    {
+      name: 'Alex still has a playable tile, so he cannot declare instead of placing',
+      intent: { type: 'declareEnd', playerId: 'p1' },
+      expectError: 'wrongStage',
+    },
+    {
+      name: 'he places it, which puts him in buy where declaring already worked',
+      intent: { type: 'placeTile', playerId: 'p1', coord: 'H8' },
+      then: { stage: 'buy', hand: { p1: [] }, boardOwner: { H8: null } },
+    },
+    {
+      name: 'he declines to end; the empty bag leaves him with no tiles at all',
+      intent: { type: 'endTurn', playerId: 'p1' },
+      then: { stage: 'play', currentPlayer: 'p2', hand: { p1: [] } },
+    },
+    {
+      name: 'Sam has an empty hand and can never reach buy — he declares from play',
+      intent: { type: 'declareEnd', playerId: 'p2' },
+      then: { stage: 'end', logPhases: ['Game over'] },
+    },
+  ],
+  final: { stage: 'end' },
+};
+
+export const ENDGAME_GAMES: GoldenGame[] = [G8, G9, G10, G11, G14];
