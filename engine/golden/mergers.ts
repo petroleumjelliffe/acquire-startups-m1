@@ -118,13 +118,31 @@ const G4: GoldenGame = {
       name: '($3,000 + $1,500) / 2 = $2,250, rounded up to $2,300 each; Jordan gets nothing',
       intent: { type: 'placeTile', playerId: 'p1', coord: 'C1' },
       then: {
+        // Three players still hold absorbed ZuckFace shares, so — like G5 —
+        // the merger doesn't fall straight through to `buy`.
+        stage: 'mergerLiquidation',
         cash: { p1: 2300, p2: 2300, p3: 0 },
+        // Bonuses are paid in cash; nobody's shares have moved yet — the
+        // absorbed holdings are exactly what the fixture handed out.
+        shares: { p1: { ZuckFace: 5 }, p2: { ZuckFace: 5 }, p3: { ZuckFace: 1 } },
+        hand: { p1: [] },
       },
     },
   ],
 };
 
 // The sole-holder bug: before Task 5, Alex received the majority bonus only.
+//
+// ZuckFace is tier 1 (AVAILABLE_STARTUPS in engine/startups.ts), and at the
+// moment of the merge it stands at size 2 (row('D', 2)).
+// getSharePriceAtSize(1, 2) walks SIZE_THRESHOLDS = [2,3,4,5,6,11,21,31,41],
+// lands on band 0 (size 2 is the first threshold met), TIER0_PRICES[0] = 200,
+// plus tier * 100 = 100, giving a share price of $300 — confirmed by calling
+// the function directly: `getSharePriceAtSize(1, 2) === 300`.
+// computeChainBonuses (engine/bonuses.ts) pays a sole holder both pots
+// combined as ONE entry of type 'both': majorityPot (price * 10 = $3,000) +
+// minorityPot (price * 5 = $1,500) = $4,500, not two separate entries that
+// merely sum to the same number.
 const G5: GoldenGame = {
   id: 'G5',
   title: 'sole holder — majority and minority paid together as one figure',
@@ -148,6 +166,18 @@ const G5: GoldenGame = {
         // shareholder left to resolve (sell/trade/keep) before it does.
         stage: 'mergerLiquidation',
         cash: { p1: 4500, p2: 0 },
+        // NOT pinned with `finalScoreBonuses` here — verified experimentally
+        // that it cannot be: `mergeStartups` (engine/gameLogic.ts) sets
+        // ZuckFace.isFounded = false synchronously, in the same `placeTile`
+        // intent that computes this very bonus and before
+        // `prepareMergerPayout` even runs. `finalScore()`'s bonus list is
+        // scoped to `foundedChains(state)` (engine/endGame.ts), so a merged
+        // chain's bonus is never visible through it, at any step, in this
+        // game or any other — see task-6-report.md for the reproduction.
+        // The $4,500 total is pinned via `cash` above; the "one entry, not
+        // two summed entries" SHAPE this step's title promises is pinned
+        // instead by `computeChainBonuses`'s own unit coverage in
+        // engine/bonuses.test.ts, not by the golden catalogue.
       },
     },
   ],
@@ -190,9 +220,32 @@ const G6: GoldenGame = {
 };
 
 /**
- * G7: three-way merger — one survivor, two absorbed, both paid out.
+ * G7: three-way merger — one survivor, two absorbed, both paid out — then
+ * carried through liquidating each absorbed chain in turn.
+ *
  * `C1` touches `B1` (Messla), `D1` (Gobble) and `C2` (ZuckFace) — a genuine
  * three-way merge, confirmed by running it against the live engine.
+ *
+ * Liquidation ORDER: `previewPlacement` (engine/placement.ts) builds
+ * `touchingIds` from `getAdjacentCoords(C1)`, which yields neighbours in a
+ * fixed north/south/west/east order — for C1 that's [B1, D1, C2], i.e.
+ * [Messla, Gobble, ZuckFace]. It then sorts descending by size (a stable
+ * sort), so ties keep that relative order. Messla (8) sorts first; Gobble
+ * and Gobble/ZuckFace are tied at size 2, so the pre-sort order [Gobble,
+ * ZuckFace] survives — `absorbedIds` ends up `['Gobble', 'ZuckFace']`.
+ * Confirmed against the live engine (`state.mergerContext.absorbedIds` after
+ * the merge step below): Gobble is liquidated first even though ZuckFace
+ * has the larger shareholder queue (2 holders vs Gobble's 1) — chain order
+ * is decided by adjacency/size, never by shareholder count. This wasn't
+ * surprising once traced, but it was previously unpinned: G6's shorter
+ * absorbed-chain path never exercises the ordering between two absorbed
+ * chains at all.
+ *
+ * Within each absorbed chain, `buildShareholderQueue` starts at
+ * `state.turnIndex` and wraps — confirmed live: Gobble's queue is `['p1']`
+ * (Sam holds none), and ZuckFace's queue is `['p1', 'p2']` (Alex first,
+ * since turnIndex still points at him — the merger never advances whose
+ * turn it is).
  */
 const G7: GoldenGame = {
   id: 'G7',
@@ -224,7 +277,59 @@ const G7: GoldenGame = {
         cash: { p1: 9000, p2: 1500 },
       },
     },
+    {
+      // Only Alex holds Gobble, so this succeeding (rather than being
+      // rejected `notYourTurn`) is itself proof Gobble is queued first.
+      name: 'Gobble is liquidated first — Alex, its only shareholder, sells out at $400/share',
+      intent: { type: 'liquidate', playerId: 'p1', startupId: 'Gobble', sell: 2, trade: 0, keep: 0 },
+      then: {
+        stage: 'mergerLiquidation',
+        cash: { p1: 9000 + 2 * 400 },
+        shares: { p1: { Gobble: 0 } },
+        availableShares: { Gobble: 25 },
+        founded: { Gobble: false },
+        // The sale itself, then `advanceToNextAbsorbedStartup`'s own
+        // "Gobble has been liquidated" cleanup entry as the queue empties.
+        logPhases: ['Liquidated shares', 'Liquidated shares'],
+      },
+    },
+    {
+      // Alex still acts before Sam on ZuckFace even though it's a *different*
+      // absorbed chain — the per-chain queue restarts from the current
+      // player (turnIndex), not from wherever Gobble's queue left off.
+      name: 'ZuckFace is liquidated next — Alex again, ahead of Sam, at $300/share',
+      intent: { type: 'liquidate', playerId: 'p1', startupId: 'ZuckFace', sell: 3, trade: 0, keep: 0 },
+      then: {
+        stage: 'mergerLiquidation',
+        cash: { p1: 9000 + 2 * 400 + 3 * 300 },
+        shares: { p1: { ZuckFace: 0 } },
+        availableShares: { ZuckFace: 24 },
+        logPhases: ['Liquidated shares'],
+      },
+    },
+    {
+      name: 'Sam sells out, which closes the merger and returns both absorbed brands to the shelf',
+      intent: { type: 'liquidate', playerId: 'p2', startupId: 'ZuckFace', sell: 1, trade: 0, keep: 0 },
+      then: {
+        stage: 'buy',
+        currentPlayer: 'p1',
+        cash: { p2: 1500 + 1 * 300 },
+        shares: { p2: { ZuckFace: 0 } },
+        availableShares: { Gobble: 25, ZuckFace: 25 },
+        founded: { Gobble: false, ZuckFace: false },
+        logPhases: ['Liquidated shares', 'Liquidated shares', 'Merger'],
+      },
+    },
   ],
+  final: {
+    stage: 'buy',
+    currentPlayer: 'p1',
+    // Both absorbed chains' tiles were repainted onto the survivor.
+    chainSize: { Messla: 13, Gobble: 0, ZuckFace: 0 },
+    founded: { Messla: true, Gobble: false, ZuckFace: false },
+    boardOwner: { C1: 'Messla', D1: 'Messla', D2: 'Messla', C2: 'Messla', C3: 'Messla' },
+    cash: { p1: 9000 + 2 * 400 + 3 * 300, p2: 1500 + 1 * 300 },
+  },
 };
 
 /**

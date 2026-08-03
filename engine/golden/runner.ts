@@ -80,6 +80,17 @@ export function assertState(
       expect(stock + bonus + cash, at(`final score total ${id}`)).toBe(total);
     }
   }
+  if (a.finalScoreBonuses !== undefined) {
+    const report = finalScore(state);
+    for (const [id, expected] of Object.entries(a.finalScoreBonuses)) {
+      const actual = report.bonuses
+        .filter((b) => b.playerId === id)
+        .map((b) => ({ chainId: b.chainId, type: b.type, amount: b.amount }));
+      const key = (x: { chainId: string; type: string }) => `${x.chainId}:${x.type}`;
+      expect([...actual].sort((x, y) => key(x).localeCompare(key(y))), at(`final score bonuses ${id}`))
+        .toEqual([...expected].sort((x, y) => key(x).localeCompare(key(y))));
+    }
+  }
 }
 
 /**

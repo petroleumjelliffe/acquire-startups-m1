@@ -24,6 +24,8 @@ export interface StateAssertion {
   logPhases?: string[];
   /** playerId → stock + bonus + cash, from finalScore() */
   finalScoreTotals?: Record<string, number>;
+  /** playerId → the bonus entries finalScore() reports for them, order-insensitive */
+  finalScoreBonuses?: Record<string, { chainId: string; type: string; amount: number }[]>;
 }
 
 export interface GoldenStep {

@@ -82,6 +82,16 @@ const G9: GoldenGame = {
       p2: 12000 + 3 * 1200 + 6000,  // cash + stock (3 × $1200) + minority bonus
       p3: 3100 + 1 * 1200,          // cash + stock (1 × $1200), no bonus
     },
+    // Confirmed by calling finalScore(state).bonuses directly at this exact
+    // state: Gobble is still founded (it's the survivor, never absorbed),
+    // so — unlike a merged-away chain — its bonus report is actually
+    // observable here. Jordan holds neither top nor runner-up share count,
+    // so gets no entry at all (an absent key, not a zero-amount one).
+    finalScoreBonuses: {
+      p1: [{ chainId: 'Gobble', type: 'majority', amount: 12000 }],
+      p2: [{ chainId: 'Gobble', type: 'minority', amount: 6000 }],
+      p3: [],
+    },
   },
 };
 
@@ -199,4 +209,36 @@ const G14: GoldenGame = {
   final: { stage: 'end' },
 };
 
-export const ENDGAME_GAMES: GoldenGame[] = [G8, G9, G10, G11, G14];
+/**
+ * G15: pins the `declareEnd` guard itself — without it, this game would pass
+ * unchanged (G10 alone doesn't prove the guard exists, since it only ever
+ * exercises the condition-met branch). Messla stands at size 5, well below
+ * `SAFE_SIZE` (11), and no chain has reached `END_SIZE` (41), so the end
+ * condition is unmet and `declareEnd` must be refused.
+ *
+ * Verified experimentally per the task brief: with `doDeclareEnd`'s
+ * `if (!condition.met) reject('endNotAvailable')` line commented out, this
+ * game fails (the intent is applied instead of throwing); restoring the line
+ * makes it pass again. See task-6-report.md for the transcript.
+ */
+const G15: GoldenGame = {
+  id: 'G15',
+  title: 'declareEnd is refused when the end condition is unmet',
+  setup: {
+    players: [
+      { name: 'Alex', cash: 1000, hand: ['H8'], shares: { Messla: 5 } },
+      { name: 'Sam',  cash: 2000 },
+    ],
+    chains: [{ id: 'Messla', coords: row('B', 5) }],   // size 5 — not safe, not 41
+    stage: 'buy',
+  },
+  steps: [
+    {
+      name: 'no chain is safe and none has reached 41 — the end is not available',
+      intent: { type: 'declareEnd', playerId: 'p1' },
+      expectError: 'endNotAvailable',
+    },
+  ],
+};
+
+export const ENDGAME_GAMES: GoldenGame[] = [G8, G9, G10, G11, G14, G15];
