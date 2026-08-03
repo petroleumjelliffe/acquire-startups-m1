@@ -786,16 +786,29 @@ export function completePlayerMergerLiquidation(
 
   const player = state.players.find((p) => p.id === playerId)!;
   const survivor = state.startups[ctx.survivorId];
+  const absorbed = state.startups[absorbedId];
   // ✅ FIX: Use pre-merger price from merger context
   const sharePrice = ctx.absorbedPrices[absorbedId] || 0;
 
   const tradeCost = trade * TRADE_RATIO;
   const sellGain = sell * sharePrice;
-  const hold = (player.portfolio[absorbedId] || 0) - tradeCost - sell;
+  const beforeHolding = player.portfolio[absorbedId] || 0;
+  const hold = beforeHolding - tradeCost - sell;
 
   // Deduct absorbed shares
   player.portfolio[absorbedId] -= tradeCost + sell;
   if (player.portfolio[absorbedId] < 0) player.portfolio[absorbedId] = 0;
+
+  // Conservation: credit the bank with exactly what left the portfolio above
+  // (`beforeHolding - portfolio[absorbedId]`), not the requested `tradeCost +
+  // sell` — if the clamp two lines up ever fires (a holding smaller than
+  // requested), crediting the requested amount would manufacture shares.
+  // Doing this here, at the moment the shares leave the portfolio, keeps
+  // `held + availableShares === totalShares` true after *every* intent, not
+  // only once `advanceToNextAbsorbedStartup`'s end-of-chain reconciliation
+  // (~line 739) runs; that reconciliation stays in place as a backstop and
+  // is now idempotent given this line already keeps the pool correct.
+  absorbed.availableShares += beforeHolding - player.portfolio[absorbedId];
 
   // Add survivor shares if traded
   if (trade > 0) {
