@@ -623,26 +623,53 @@ export function checkInvariants(state: GameState): string[] {
 
 - [ ] **Step 2: Write the driver and its test**
 
-Create `engine/golden/invariants.test.ts`. The driver picks a legal-looking intent for the current stage, applies it, and checks invariants after every single one. Illegal intents are expected and skipped — the point is to hammer the reducer, not to play well.
+Create `engine/golden/invariants.test.ts`.
+
+**Two traps verified before this plan was written — the driver below already avoids both, and you should understand why before changing it.**
+
+*Trap one: do not start from `createInitialGame`.* It returns `stage: "draw"` (`engine/gameInit.ts:51`), and **no intent accepts `'draw'`** — every `requireStage` in `engine/intents.ts` names only `play`, `foundStartup`, `chooseSurvivor`, `mergerLiquidation` or `buy`. A harness seeded from `createInitialGame` has every intent rejected at step 0, spins its whole step budget, and reports zero violations having done nothing at all. Build the opening position with `buildFixture` at `stage: 'play'` instead, exactly as the golden games do. (That `createInitialGame` produces a state `applyIntent` cannot advance is a real engine finding; note it in your report, do not fix it here.)
+
+*Trap two: `mergerLiquidation` needs the `liquidate` intent.* Omit that branch and every game that reaches a merger with shareholders stalls forever — silently, and again reporting no violations. The liquidating player is the head of `mergerContext.shareholderQueue`, **not** the turn player; that is the multi-actor path, and exercising it is most of this harness's value.
+
+The driver picks one plausible intent for the current stage, applies it, and checks invariants after every single one. Illegal intents are expected and skipped — the point is to hammer the reducer, not to play well. Where the driver has **no** move for a stage it returns `null`, and the run records that stage as a stall. A stall at anything other than `'end'` is a reportable finding, not a quiet exit: that is the exact shape of the deadlock Phase 0 shipped.
 
 ```ts
 import { describe, it, expect } from 'vitest';
 import type { GameState } from '../gameTypes';
 import type { Intent } from '../intents';
 import { applyIntent, IllegalIntentError } from '../intents';
-import { createInitialGame } from '../gameInit';
-import { shuffleSeeded } from '../gameHelpers';
+import { generateAllCoords, shuffleSeeded } from '../gameHelpers';
+import { HAND_SIZE, TRADE_RATIO } from '../startups';
+import { buildFixture } from './fixtures';
 import { checkInvariants } from './invariants';
 
 const MAX_STEPS = 400;
 const SEEDS = Array.from({ length: 60 }, (_, i) => `prop-${i}`);
+const NAMES = ['Alex', 'Sam', 'Jordan'];
+
+/**
+ * An opening position `applyIntent` can actually advance. `createInitialGame`
+ * cannot be used: it yields `stage: 'draw'`, which no intent accepts.
+ */
+function newGame(seed: string): GameState {
+  const all = shuffleSeeded(generateAllCoords(), seed);
+  return buildFixture({
+    players: NAMES.map((name, i) => ({ name, hand: all.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE) })),
+    bag: all.slice(NAMES.length * HAND_SIZE),
+    stage: 'play',
+  });
+}
 
 /** A cheap deterministic picker: shuffles by seed+salt and takes the head. */
 function pick<T>(items: T[], seed: string, salt: number): T | undefined {
   return shuffleSeeded(items, `${seed}:${salt}`)[0];
 }
 
-/** Chooses one plausible intent for the current stage. May well be illegal. */
+/**
+ * One plausible intent for the current stage, or null when this driver has no
+ * move to make. Null is a signal, not an exit: `playOne` records the stage, and
+ * a stall anywhere but `end` is a finding.
+ */
 function nextIntent(state: GameState, seed: string, salt: number): Intent | null {
   const me = state.players[state.turnIndex];
   if (!me) return null;
@@ -662,6 +689,21 @@ function nextIntent(state: GameState, seed: string, salt: number): Intent | null
       const startupId = pick(state.pendingTiedStartups ?? founded, seed, salt);
       return startupId ? { type: 'chooseSurvivor', playerId: me.id, startupId } : null;
     }
+    case 'mergerLiquidation': {
+      // Multi-actor: the actor is the head of the shareholder queue, not the
+      // player whose turn it is.
+      const ctx = state.mergerContext;
+      if (!ctx) return null;
+      const playerId = ctx.shareholderQueue[ctx.currentShareholderIndex];
+      const startupId = ctx.absorbedIds[ctx.currentLiquidationIndex];
+      if (!playerId || !startupId) return null;
+
+      const held = state.players.find((p) => p.id === playerId)?.portfolio[startupId] ?? 0;
+      // `trade` counts shares handed IN, so it must be a whole multiple of the
+      // ratio or the reducer rejects with `oddTradeCount`.
+      const trade = salt % 2 === 0 ? held - (held % TRADE_RATIO) : 0;
+      return { type: 'liquidate', playerId, startupId, sell: held - trade, trade, keep: 0 };
+    }
     case 'buy': {
       // three-way: buy something, declare the end, or just end the turn
       const choice = salt % 3;
@@ -673,7 +715,7 @@ function nextIntent(state: GameState, seed: string, salt: number): Intent | null
         : { type: 'endTurn', playerId: me.id };
     }
     default:
-      return { type: 'endTurn', playerId: me.id };
+      return null;
   }
 }
 
@@ -682,55 +724,62 @@ interface RunResult {
   steps: number;
   reachedEnd: boolean;
   emptiedBag: boolean;
+  stalledAt: string | null;
   violation: string | null;
   history: Intent[];
 }
 
 function playOne(seed: string): RunResult {
-  let state = createInitialGame(seed, ['Alex', 'Sam', 'Jordan']);
+  let state = newGame(seed);
   const history: Intent[] = [];
+  const base = { seed, reachedEnd: false, emptiedBag: false, stalledAt: null as string | null };
   let emptiedBag = false;
   let salt = 0;
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    if (state.stage === 'end') break;
+    if (state.stage === 'end') {
+      return { ...base, steps: step, reachedEnd: true, emptiedBag, violation: null, history };
+    }
+
     const intent = nextIntent(state, seed, salt++);
-    if (!intent) break;
+    if (!intent) {
+      return { ...base, steps: step, emptiedBag, stalledAt: state.stage, violation: null, history };
+    }
 
     try {
       state = applyIntent(state, intent);
       history.push(intent);
     } catch (e) {
       if (e instanceof IllegalIntentError) continue;
-      return { seed, steps: step, reachedEnd: false, emptiedBag, violation: String(e), history };
+      return { ...base, steps: step, emptiedBag, violation: String(e), history };
     }
 
     if (state.bag.length === 0) emptiedBag = true;
     const problems = checkInvariants(state);
     if (problems.length) {
-      return { seed, steps: step, reachedEnd: false, emptiedBag, violation: problems.join('; '), history };
+      return { ...base, steps: step, emptiedBag, violation: problems.join('; '), history };
     }
   }
 
-  return {
-    seed,
-    steps: MAX_STEPS,
-    reachedEnd: state.stage === 'end',
-    emptiedBag,
-    violation: null,
-    history,
-  };
+  return { ...base, steps: MAX_STEPS, emptiedBag, reachedEnd: state.stage === 'end', violation: null, history };
 }
 
 describe('random-play invariants', () => {
   const runs = SEEDS.map(playOne);
+  const report = (r: RunResult) =>
+    `seed ${r.seed} @ step ${r.steps}: ${r.violation ?? r.stalledAt}\n  ${JSON.stringify(r.history)}`;
 
   it('holds every invariant across every seed', () => {
-    const broken = runs.filter((r) => r.violation);
     expect(
-      broken.map((r) => `seed ${r.seed} @ step ${r.steps}: ${r.violation}\n  ${JSON.stringify(r.history)}`),
+      runs.filter((r) => r.violation).map(report),
       'a failing seed above is reproducible — paste its intent list into a golden game',
     ).toEqual([]);
+  });
+
+  // The Phase 0 deadlock in one assertion: a game that can go no further while
+  // it is not over is a bug, whether the reducer refuses or the driver has no move.
+  it('never stalls anywhere but end', () => {
+    expect(runs.filter((r) => r.stalledAt).map(report)).toEqual([]);
   });
 
   // Guards against the probe that proves nothing: a policy that quits early
@@ -753,6 +802,7 @@ Three outcomes, all legitimate:
 
 - **All three pass.** Note in your report that no bug was found, and that this is weak evidence rather than strong — say what fraction of runs reached `end` and emptied the bag.
 - **An invariant fails.** You have found a real bug. Do not fix it inside this task — the harness is the deliverable. Report the seed, the intent history, and the violation, and let the controller decide whether it becomes its own task.
+- **The stall test fails.** Also a finding, and the more likely of the two. Read the reported stage before concluding anything: a stall at `mergerPayout`, `liquidation` or `liquidationPrompt` means the engine reaches a stage no intent can advance — a genuine deadlock of the Phase 0 kind. A stall at a stage the driver simply has no branch for is a gap in *your* driver; add the branch. Say which of the two it was.
 - **A coverage guard fails** (no game empties the bag or reaches `end`). Your policy is too shallow. Raise `MAX_STEPS`, or bias the `buy` stage away from `declareEnd`, until it reaches depth. A harness that never gets there is the failure mode this task exists to avoid.
 
 - [ ] **Step 4: Verify the whole suite**
