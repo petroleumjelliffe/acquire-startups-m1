@@ -66,15 +66,6 @@ export function assertState(
   if (a.logPhases !== undefined) {
     expect(state.log.slice(addedLogFrom).map((e) => e.phase), at('log phases')).toEqual(a.logPhases);
   }
-  if (a.bonuses !== undefined) {
-    const got = (state.pendingBonuses ?? []).map((b) => ({
-      playerId: b.playerId,
-      startupId: b.startupId,
-      type: b.type,
-      amount: b.amount,
-    }));
-    expect(got, at('bonuses')).toEqual(a.bonuses);
-  }
   if (a.finalScoreTotals !== undefined) {
     const report = finalScore(state);
     for (const [id, total] of Object.entries(a.finalScoreTotals)) {

@@ -192,6 +192,14 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       state.pendingMergerTile = coord;
       state.pendingTiedStartups = tied;
       state.pendingMergerStartups = touchingIds;
+      // Every other board-mutating placement branch logs 'Placed a tile';
+      // this one used to log nothing at all, so a tied merger's turn left no
+      // trace of the tile that caused it. Phase 1's step stack is built from
+      // `state.log`, so a silent segment is a hole in the feature.
+      pushLog(state, 'Placed a tile', [
+        tok.tile(coord),
+        tok.text(' — choose which brand survives'),
+      ], player.id);
     } else {
       // No tie - proceed with automatic survivor selection
       const survivorId = top.id;
@@ -209,6 +217,14 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       for (const g of group) state.board[g].startupId = survivorId;
 
       mergeStartups(state, survivorId, absorbedIds);
+      // The played coord, before the merger entry. Without it the log's
+      // account of a merger turn read "nothing happened, then two chains
+      // merged somewhere" — the merger entry names the chains but never the
+      // tile that joined them.
+      pushLog(state, 'Placed a tile', [
+        tok.tile(coord),
+        tok.text(' triggered a merger'),
+      ], player.id);
       pushLog(state, 'Merger', [
         ...absorbedIds.flatMap((id, i) => i === 0 ? [tok.brand(id)] : [tok.text(', '), tok.brand(id)]),
         tok.text(' into '),

@@ -36,12 +36,14 @@ const G2: GoldenGame = {
         chainSize: { Messla: 10, ZuckFace: 0 },
         // Alex majority 4 → $4,000; Sam minority 2 → $2,000
         cash: { p1: 4000, p2: 2000 },
-        // `doPlaceTile` settles the merger payout synchronously in the same
-        // intent (`settleMergerPayout` — see intents.ts), so the untied-merge
-        // branch's own 'Merger' log entry is the placement's only record;
-        // there is no separate 'Placed a tile' entry for a merging
-        // placement (verified against the live engine — task-12-report.md).
-        logPhases: ['Merger', 'Merger payout', 'Merger payout'],
+        // A merging placement now records the played coord like every other
+        // placement branch does ('Placed a tile'), then the merger itself.
+        // Before that fix the log's account of a merger turn was "nothing
+        // happened, then two chains merged somewhere". `doPlaceTile` settles
+        // the merger payout synchronously in the same intent
+        // (`settleMergerPayout` — see intents.ts), which is why the two
+        // payout entries land in this step and not a later one.
+        logPhases: ['Placed a tile', 'Merger', 'Merger payout', 'Merger payout'],
       },
     },
     {
@@ -175,12 +177,12 @@ const G6: GoldenGame = {
         cash: { p1: 0, p2: 0 },
         founded: { ZuckFace: false },
         availableShares: { ZuckFace: 25 },
-        // With no shareholders, `advanceToNextAbsorbedStartup` auto-cleans
-        // ZuckFace ('Liquidated shares') and then closes the merger
-        // ('Merger: Merger complete. Entering buy phase.') in the same
-        // intent — three entries, not two (verified against the live
-        // engine — task-12-report.md).
-        logPhases: ['Merger', 'Liquidated shares', 'Merger'],
+        // The placement records its coord first ('Placed a tile'), then the
+        // merger. With no shareholders, `advanceToNextAbsorbedStartup`
+        // auto-cleans ZuckFace ('Liquidated shares') and then closes the
+        // merger ('Merger: Merger complete. Entering buy phase.') in the
+        // same intent — so four entries, not two.
+        logPhases: ['Placed a tile', 'Merger', 'Liquidated shares', 'Merger'],
       },
     },
   ],
@@ -224,4 +226,98 @@ const G7: GoldenGame = {
   ],
 };
 
-export const MERGER_GAMES: GoldenGame[] = [G2, G3, G4, G5, G6, G7];
+/**
+ * G13: tied merger — the placing player picks which equal-size chain lives.
+ *
+ * The only golden game that exercises the `chooseSurvivor` intent, and the
+ * only one that reaches the tied branch of `handleTilePlacement`. Note this
+ * is a different thing from G3/G4's "tied bonus": those are
+ * `computeChainBonuses` cases with a single unambiguous survivor, decided
+ * before any player is asked anything. Here two chains are the *same size*,
+ * so the engine cannot pick a survivor itself — it parks on
+ * `stage: 'chooseSurvivor'` and waits. Conflating the two is why this path
+ * shipped with no golden coverage at all.
+ *
+ * Alex deliberately saves ZuckFace, the chain he holds nothing in, so the
+ * assertions prove the *chosen* brand survives rather than merely agreeing
+ * with whatever the untied path would have picked: Messla (which he holds
+ * 4 of) is the one absorbed and liquidated.
+ */
+const G13: GoldenGame = {
+  id: 'G13',
+  title: 'tied merger — the placing player picks which equal-size chain lives',
+  setup: {
+    players: [
+      { name: 'Alex', cash: 0, hand: ['C1'], shares: { Messla: 4 } },
+      { name: 'Sam',  cash: 0, shares: { Messla: 2 } },
+    ],
+    chains: [
+      { id: 'Messla',   coords: ['B1', 'B2', 'B3'] },  // tier 0, size 3 → $300
+      { id: 'ZuckFace', coords: ['D1', 'D2', 'D3'] },  // same size — hence the tie
+    ],
+  },
+  steps: [
+    {
+      name: 'C1 joins two equal-size chains, so the engine asks instead of deciding',
+      intent: { type: 'placeTile', playerId: 'p1', coord: 'C1' },
+      then: {
+        stage: 'chooseSurvivor',
+        // Nothing has merged yet: both chains are intact, C1 is on the board
+        // but unowned, and no bonus has been paid.
+        chainSize: { Messla: 3, ZuckFace: 3 },
+        founded: { Messla: true, ZuckFace: true },
+        boardOwner: { C1: null },
+        cash: { p1: 0, p2: 0 },
+        hand: { p1: [] },
+        // The tied branch used to append nothing at all — the one
+        // board-mutating placement outcome with no trace in the log.
+        logPhases: ['Placed a tile'],
+      },
+    },
+    {
+      name: 'a brand that is not one of the tied pair is refused',
+      intent: { type: 'chooseSurvivor', playerId: 'p1', startupId: 'Gobble' },
+      expectError: 'notATiedSurvivor',
+    },
+    {
+      name: 'Alex saves ZuckFace, so Messla is absorbed and pays out',
+      intent: { type: 'chooseSurvivor', playerId: 'p1', startupId: 'ZuckFace' },
+      then: {
+        stage: 'mergerLiquidation',
+        // 3 (ZuckFace) + 1 (C1) + 3 (absorbed Messla) = 7
+        chainSize: { ZuckFace: 7, Messla: 0 },
+        founded: { ZuckFace: true, Messla: false },
+        boardOwner: { C1: 'ZuckFace', B1: 'ZuckFace', D1: 'ZuckFace' },
+        // Messla at size 3, tier 0 → $300. Alex majority 4 → $3,000;
+        // Sam minority 2 → $1,500.
+        cash: { p1: 3000, p2: 1500 },
+        logPhases: ['Merger', 'Merger payout', 'Merger payout'],
+      },
+    },
+    {
+      name: 'Alex sells two Messla and trades the other two for one ZuckFace',
+      intent: { type: 'liquidate', playerId: 'p1', startupId: 'Messla', sell: 2, trade: 2, keep: 0 },
+      then: {
+        stage: 'mergerLiquidation',
+        cash: { p1: 3000 + 2 * 300 },
+        shares: { p1: { Messla: 0, ZuckFace: 1 } },
+        availableShares: { ZuckFace: 24 },
+        logPhases: ['Liquidated shares', 'Liquidated shares'],
+      },
+    },
+    {
+      name: 'Sam sells out, which closes the merger and returns Messla to the shelf',
+      intent: { type: 'liquidate', playerId: 'p2', startupId: 'Messla', sell: 2, trade: 0, keep: 0 },
+      then: {
+        stage: 'buy',
+        cash: { p2: 1500 + 2 * 300 },
+        shares: { p2: { Messla: 0 } },
+        // Messla is unfounded and its whole pool is available again.
+        availableShares: { Messla: 25 },
+      },
+    },
+  ],
+  final: { stage: 'buy', currentPlayer: 'p1', chainSize: { ZuckFace: 7, Messla: 0 } },
+};
+
+export const MERGER_GAMES: GoldenGame[] = [G2, G3, G4, G5, G6, G7, G13];

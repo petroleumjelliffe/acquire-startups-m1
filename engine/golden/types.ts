@@ -22,7 +22,6 @@ export interface StateAssertion {
   boardOwner?: Record<string, StartupId | null>;
   /** phases of the log entries this step appended, in order */
   logPhases?: string[];
-  bonuses?: { playerId: string; startupId: StartupId; type: string; amount: number }[];
   /** playerId → stock + bonus + cash, from finalScore() */
   finalScoreTotals?: Record<string, number>;
 }
