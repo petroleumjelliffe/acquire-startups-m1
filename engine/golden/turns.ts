@@ -1,4 +1,5 @@
 import type { GoldenGame } from './types';
+import type { Intent } from '../intents';
 
 /**
  * G1: the baseline turn — place, found, buy, end turn, and the next player
@@ -77,6 +78,25 @@ const G1: GoldenGame = {
       },
     },
     {
+      name: 'Sam cannot place a tile she does not hold',
+      intent: { type: 'placeTile', playerId: 'p2', coord: 'H8' },
+      expectError: 'tileNotInHand',
+    },
+    {
+      // A rejected intent leaves state byte-identical (the runner asserts
+      // this), so this can be dropped in anywhere without disturbing the
+      // steps around it — `unknownIntent` is checked unconditionally, in
+      // applyIntent's own switch default, before any stage/player/hand
+      // validation runs at all.
+      name: 'a genuinely unknown intent type is rejected',
+      // Deliberately malformed: `Intent` is a closed union and no real
+      // client can construct this. The cast is the point of the test — it
+      // is the one place the catalogue needs a shape the type system would
+      // otherwise forbid, to prove applyIntent's default branch works.
+      intent: { type: 'bogus', playerId: 'p2' } as unknown as Intent,
+      expectError: 'unknownIntent',
+    },
+    {
       name: 'Sam places an isolated tile and goes straight to buying',
       intent: { type: 'placeTile', playerId: 'p2', coord: 'A1' },
       then: { stage: 'buy', boardOwner: { A1: null }, logPhases: ['Placed a tile'] },
@@ -123,4 +143,34 @@ const G12: GoldenGame = {
   final: { currentPlayer: 'p2', chainSize: { Messla: 11, ZuckFace: 11 } },
 };
 
-export const TURN_GAMES: GoldenGame[] = [G1, G12];
+/**
+ * G16: founding a brand that is already on the board is refused.
+ *
+ * Fixture-authored directly at the `foundStartup` stage, the same technique
+ * `fixtures.ts` documents for boards "that cannot be reached by running
+ * intents in a test": within any single golden game, `foundStartup` is only
+ * ever reached for the *first* founding — by the time a founded brand
+ * exists to collide with, the game has already moved past that stage (see
+ * G1 above, whose only `foundStartup` moment is the one where Messla itself
+ * gets founded). `doChooseFoundingBrand` checks `startup.isFounded` before
+ * it ever looks at `pendingFoundTile`, so no legitimate pending-founding
+ * state is needed to reach this rejection.
+ */
+const G16: GoldenGame = {
+  id: 'G16',
+  title: 'founding a brand that already exists is refused',
+  setup: {
+    players: [{ name: 'Alex' }, { name: 'Sam' }],
+    chains: [{ id: 'Messla', coords: ['B1', 'B2', 'B3'] }],
+    stage: 'foundStartup',
+  },
+  steps: [
+    {
+      name: 'Messla is already founded, so choosing it again is refused',
+      intent: { type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' },
+      expectError: 'brandUnavailable',
+    },
+  ],
+};
+
+export const TURN_GAMES: GoldenGame[] = [G1, G12, G16];

@@ -20,7 +20,12 @@ const G2: GoldenGame = {
   setup: {
     players: [
       { name: 'Alex', cash: 0, hand: ['C1'], shares: { ZuckFace: 4 } },
-      { name: 'Sam',  cash: 0, shares: { ZuckFace: 2 } },
+      // Sam's Messla holding is not narrative — it exists purely to pin
+      // Messla's `availableShares` down to 1 (25 total − 24 held), so the
+      // rejected-liquidation steps below can exercise `notEnoughShares`
+      // against a real, non-zero survivor pool without disturbing Alex's
+      // own liquidation two steps later (which needs exactly 1 available).
+      { name: 'Sam',  cash: 0, shares: { ZuckFace: 2, Messla: 24 } },
     ],
     chains: [
       { id: 'Messla',   coords: row('B', 6) },
@@ -46,6 +51,23 @@ const G2: GoldenGame = {
         // payout entries land in this step and not a later one.
         logPhases: ['Placed a tile', 'Merger', 'Merger payout', 'Merger payout'],
       },
+    },
+    {
+      name: 'counts that do not add up to the 4 shares Alex holds are refused',
+      intent: { type: 'liquidate', playerId: 'p1', startupId: 'ZuckFace', sell: 1, trade: 1, keep: 1 },
+      expectError: 'shareCountMismatch',
+    },
+    {
+      name: 'an odd trade count is refused — shares trade two-for-one',
+      intent: { type: 'liquidate', playerId: 'p1', startupId: 'ZuckFace', sell: 0, trade: 3, keep: 1 },
+      expectError: 'oddTradeCount',
+    },
+    {
+      // Trading all 4 held shares asks for 2 survivor Messla shares, but
+      // Sam's 24-share holding (see setup) has left only 1 available.
+      name: 'trading for more survivor shares than Messla has available is refused',
+      intent: { type: 'liquidate', playerId: 'p1', startupId: 'ZuckFace', sell: 0, trade: 4, keep: 0 },
+      expectError: 'notEnoughShares',
     },
     {
       name: 'Alex sells two and trades two',
@@ -215,6 +237,15 @@ const G6: GoldenGame = {
         // same intent — so four entries, not two.
         logPhases: ['Placed a tile', 'Merger', 'Liquidated shares', 'Merger'],
       },
+    },
+    {
+      // Messla is the survivor (still founded), now size 10 (6 + 3 + C1):
+      // getSharePriceAtSize(0, 10) = 600. Alex's cash is still 0 — nobody
+      // has bought or sold anything in this game — so any purchase is
+      // refused, not silently free.
+      name: 'Alex has no cash, so buying a share is refused rather than free',
+      intent: { type: 'buyShares', playerId: 'p1', picks: ['Messla'] },
+      expectError: 'notEnoughCash',
     },
   ],
 };

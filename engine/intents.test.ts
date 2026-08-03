@@ -4,7 +4,7 @@ import { createTestGameState, giveShares, setupGameWithStartups } from './testHe
 import { buildFixture } from './golden/fixtures';
 import { createInitialGame } from './gameInit';
 import { generateAllCoords } from './gameHelpers';
-import type { GameState } from './gameTypes';
+import type { GameState, StartupId } from './gameTypes';
 import type { Coord, Row } from './gameHelpers';
 
 function playing(state: GameState = createTestGameState()): GameState {
@@ -303,6 +303,22 @@ describe('applyIntent — liquidate', () => {
     }))).toBe('notYourTurn');
   });
 
+  it('leaves state byte-identical when a liquidate is rejected mid-flight, in the middle of a two-holder queue', () => {
+    // `merged()` queues both alex and sam as ZuckFace holders. A rejected
+    // intent must not disturb the queue it was rejected out of — asserted
+    // here on the *unresolved* two-holder queue itself, not only on a
+    // final, fully-drained state the way the existing queue tests do.
+    const { state, alex } = merged();
+    expect(state.mergerContext!.shareholderQueue).toEqual([alex.id, expect.any(String)]);
+    const before = JSON.stringify(state);
+
+    expect(codeOf(() => applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 1, trade: 1, keep: 1,
+    }))).toBe('shareCountMismatch');
+
+    expect(JSON.stringify(state)).toBe(before);
+  });
+
   it('logs what was done with the shares', () => {
     const { state, alex } = merged();
     const next = applyIntent(state, {
@@ -335,6 +351,35 @@ describe('applyIntent — liquidate', () => {
     expect(afterSam.startups['ZuckFace'].availableShares).toBe(
       afterSam.startups['ZuckFace'].totalShares - 1,
     );
+  });
+
+  // Seed-independent regression for the share-conservation bug Task 5's
+  // random-play harness found: `completePlayerMergerLiquidation` used to
+  // remove absorbed shares from a player's portfolio without crediting
+  // `startups[absorbedId].availableShares`, so `held + available ===
+  // totalShares` broke BETWEEN queued liquidations and only reconciled once
+  // the last shareholder resolved (`advanceToNextAbsorbedStartup`'s own
+  // cleanup, gameLogic.ts ~line 739). The test above only checks
+  // `availableShares` after sam (the last holder) has also resolved — which
+  // is exactly why it wouldn't have caught this. This one checks
+  // conservation with sam still queued behind alex, i.e. genuinely mid-flight.
+  it('conserves ZuckFace shares (held + available === total) between two queued liquidations, not only after the whole queue resolves', () => {
+    const { state, alex, sam } = merged();
+    expect(state.mergerContext!.shareholderQueue).toEqual([alex.id, sam.id]);
+
+    // Alex, the head of the queue, sells out; sam is still queued behind him.
+    const afterAlex = applyIntent(state, {
+      type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 4, trade: 0, keep: 0,
+    });
+
+    expect(afterAlex.stage).toBe('mergerLiquidation'); // sam hasn't gone yet
+    expect(afterAlex.mergerContext!.currentShareholderIndex).toBe(1);
+
+    const zuckFace = afterAlex.startups['ZuckFace'];
+    const totalHeld = afterAlex.players.reduce(
+      (sum, p) => sum + (p.portfolio['ZuckFace'] ?? 0), 0,
+    );
+    expect(totalHeld + zuckFace.availableShares).toBe(zuckFace.totalShares);
   });
 
   // Regression coverage for the `trade` unit mismatch between the intent
@@ -397,6 +442,41 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     expect(next.currentBuyCount).toBe(2);
     expect(next.stage).toBe('buy');
     expect(next.log.at(-1)).toMatchObject({ phase: 'Bought shares' });
+  });
+
+  it('buys a basket spanning two different startups in one call', () => {
+    const state = buying();
+    const next = applyIntent(state, {
+      type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'ZuckFace'],
+    });
+    // Messla 3 tiles tier 0, ZuckFace 2 tiles tier 1 — see `buying()`'s own
+    // comment for the $300 + $300 derivation via getSharePrice.
+    expect(next.players[0].cash).toBe(1000 - 600);
+    expect(next.players[0].portfolio['Messla']).toBe(1);
+    expect(next.players[0].portfolio['ZuckFace']).toBe(1);
+    expect(next.startups['Messla'].availableShares).toBe(24);
+    expect(next.startups['ZuckFace'].availableShares).toBe(24);
+    expect(next.currentBuyCount).toBe(2);
+  });
+
+  it('rejects a malformed pick — a negative number standing in for a StartupId — as brandUnavailable, not shareCountMismatch', () => {
+    // `picks` is `StartupId[]`: there is no numeric "count" field for a
+    // negative value to land in, so the only way a negative number enters
+    // this intent at all is a malformed element cast past the type system,
+    // the way a badly-serialized client payload might arrive. `doBuyShares`
+    // looks it up as `state.startups[id]`, which simply misses (no such
+    // key) — the same path an unrecognized real-looking id would take — so
+    // this is `brandUnavailable`, not `shareCountMismatch`. Verified by
+    // running this exact call against the live engine (see task-7-report.md).
+    const state = buying();
+    const before = JSON.stringify(state);
+    expect(codeOf(() => applyIntent(state, {
+      type: 'buyShares',
+      playerId: state.players[0].id,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- the malformed element is the point of the test
+      picks: [-1] as unknown as StartupId[],
+    }))).toBe('brandUnavailable');
+    expect(JSON.stringify(state)).toBe(before);
   });
 
   it('caps the turn at three shares across calls', () => {

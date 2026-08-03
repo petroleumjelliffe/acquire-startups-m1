@@ -18,4 +18,18 @@ describe('golden games', () => {
       runGoldenGame(game);
     });
   }
+
+  it('exercises most rejection codes through the catalogue', () => {
+    const covered = new Set(
+      ALL_GOLDEN_GAMES.flatMap((g) => g.steps.map((s) => s.expectError).filter(Boolean)),
+    );
+    const uncovered = [
+      'wrongStage', 'notYourTurn', 'tileNotInHand', 'illegalPlacement',
+      'brandUnavailable', 'notATiedSurvivor', 'shareCountMismatch',
+      'oddTradeCount', 'notEnoughShares', 'notEnoughCash',
+      'tooManyPicks', 'notADeadTile', 'endNotAvailable', 'unknownIntent',
+    ].filter((c) => !covered.has(c as never));
+
+    expect(uncovered, `rejection codes with no golden coverage: ${uncovered.join(', ')}`).toHaveLength(0);
+  });
 });

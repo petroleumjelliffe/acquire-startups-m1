@@ -37,4 +37,32 @@ describe('log', () => {
     ]);
     expect(renderLogText(e)).toBe('Alex takes +$3,000 for 6× Gobble in Gobble at D5');
   });
+
+  // `money()`'s sign logic branches on both `amount < 0` and `delta` —
+  // 0 and negative amounts are the two edges neither of the tests above
+  // exercises (both only ever pass a positive amount).
+  describe('renderLogText — cash token edges', () => {
+    const entryFor = (amount: number, delta?: boolean) =>
+      pushLog(createTestGameState(), 'x', [tok.cash(amount, delta)]);
+
+    it('renders zero with no sign when not a delta', () => {
+      expect(renderLogText(entryFor(0, false))).toBe('$0');
+    });
+
+    it('renders zero with a leading + when it is a delta', () => {
+      // delta's sign check is `amount < 0`, which zero never satisfies —
+      // so a zero delta still gets the '+' branch, not a bare '$0'.
+      expect(renderLogText(entryFor(0, true))).toBe('+$0');
+    });
+
+    it('renders a negative amount with a leading - when not a delta', () => {
+      expect(renderLogText(entryFor(-500, false))).toBe('-$500');
+    });
+
+    it('renders a negative amount with a leading - (not --) when it is a delta', () => {
+      // Both branches of the sign ternary resolve to '-' for a negative
+      // amount, so the delta flag must not double up the minus sign.
+      expect(renderLogText(entryFor(-500, true))).toBe('-$500');
+    });
+  });
 });

@@ -30,6 +30,14 @@ const G8: GoldenGame = {
       then: { stage: 'play', hand: { p1: ['G6', 'I12'] }, logPhases: ['Traded a tile'] },
     },
     {
+      // G6 is genuinely placeable (confirmed by the very next step), so
+      // trading it in as though it were dead must be refused rather than
+      // silently accepted.
+      name: 'G6 is merely awkward, not dead, so trading it in is refused',
+      intent: { type: 'tradeInDeadTiles', playerId: 'p1', coords: ['G6'] },
+      expectError: 'notADeadTile',
+    },
+    {
       name: 'the turn really does continue — G6 is still placeable',
       intent: { type: 'placeTile', playerId: 'p1', coord: 'G6' },
       then: { stage: 'buy', boardOwner: { G6: null } },
