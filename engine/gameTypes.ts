@@ -94,6 +94,8 @@ export interface GameState {
   turnIndex: number;
   board: Record<Coord, TileCell>;
   bag: Coord[];
+  /** dead tiles traded in and permanently out of play; `placed + hands + bag + discarded` is always 108 */
+  discarded: Coord[];
   log: LogEntry[];
   nextStepId: number;
   //   startups: Record<string, Startup>;

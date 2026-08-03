@@ -81,6 +81,7 @@ export function buildFixture(spec: FixtureSpec): GameState {
     turnIndex: spec.currentPlayerIndex ?? 0,
     board,
     bag: [...(spec.bag ?? [])],
+    discarded: [],
     log: [],
     nextStepId: 1,
     startups,

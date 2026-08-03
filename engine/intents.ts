@@ -310,6 +310,7 @@ function doTradeInDeadTiles(state: GameState, intent: Extract<Intent, { type: 't
 
   for (const c of coords) {
     player.hand = player.hand.filter((x) => x !== c);
+    state.discarded.push(c);
     const replacement = state.bag.shift();
     const detail = [tok.tile(c)];
     if (replacement) {

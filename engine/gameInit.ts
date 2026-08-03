@@ -53,6 +53,7 @@ export function createInitialGame(seed: string, names: string[]): GameState {
     turnIndex: 0,
     board,
     bag,
+    discarded: [],
     startups,
     log: [],
     nextStepId: 1,

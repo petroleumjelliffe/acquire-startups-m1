@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { applyIntent, IllegalIntentError } from './intents';
 import { createTestGameState, giveShares, setupGameWithStartups } from './testHelpers';
+import { buildFixture } from './golden/fixtures';
+import { createInitialGame } from './gameInit';
+import { generateAllCoords } from './gameHelpers';
 import type { GameState } from './gameTypes';
-import type { Coord } from './gameHelpers';
+import type { Coord, Row } from './gameHelpers';
 
 function playing(state: GameState = createTestGameState()): GameState {
   state.stage = 'play';
@@ -586,5 +589,43 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     });
     expect(bought2.currentBuyCount).toBe(3);
     expect(bought2.players[1].portfolio['Messla']).toBe(4); // 1 founding share + 3 bought
+  });
+});
+
+describe('discard pile', () => {
+  const row = (letter: Row, n: number): Coord[] =>
+    Array.from({ length: n }, (_, i) => `${letter}${i + 1}` as Coord);
+
+  it('records a traded-in dead tile, keeping all 108 tiles accounted for', () => {
+    // Two safe chains with a single gap between them: C6 can never be played.
+    // Account for all 108 tiles: chains (22) + hands (2) + named bag coord (1) + remaining (83)
+    const allCoords = new Set(generateAllCoords());
+    const used = new Set([
+      ...row('B', 11),
+      ...row('D', 11),
+      'C6', 'G6', 'I12',
+    ]);
+    const remaining = Array.from(allCoords).filter((c) => !used.has(c));
+
+    const state = buildFixture({
+      players: [{ name: 'Alex', hand: ['C6', 'G6'] }, { name: 'Sam' }],
+      chains: [
+        { id: 'Messla', coords: row('B', 11) },
+        { id: 'ZuckFace', coords: row('D', 11) },
+      ],
+      bag: ['I12', ...remaining],
+    });
+
+    const next = applyIntent(state, { type: 'tradeInDeadTiles', playerId: 'p1', coords: ['C6'] });
+
+    expect(next.discarded).toEqual(['C6']);
+
+    const placed = Object.values(next.board).filter((c) => c.placed).length;
+    const inHands = next.players.reduce((n, p) => n + p.hand.length, 0);
+    expect(placed + inHands + next.bag.length + next.discarded.length).toBe(108);
+  });
+
+  it('starts empty on a new game', () => {
+    expect(createInitialGame('seed-1', ['Alex', 'Sam']).discarded).toEqual([]);
   });
 });
