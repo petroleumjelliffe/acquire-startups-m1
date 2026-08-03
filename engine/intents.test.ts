@@ -473,7 +473,8 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     expect(codeOf(() => applyIntent(state, {
       type: 'buyShares',
       playerId: state.players[0].id,
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- the malformed element is the point of the test
+      // The malformed element (a number where a StartupId belongs) is the
+      // point of the test, hence the cast.
       picks: [-1] as unknown as StartupId[],
     }))).toBe('brandUnavailable');
     expect(JSON.stringify(state)).toBe(before);
