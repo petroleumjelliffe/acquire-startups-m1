@@ -22,7 +22,7 @@ import type { Coord } from './gameHelpers';
  * holder plus two runners-up tied beneath them).
  */
 function setupThreePlayerGameWithStartups(
-  startups: Array<{ id: string; tiles: Coord[]; tier?: number }>
+  startups: Array<{ id: string; tiles: Coord[]; tier?: 0 | 1 | 2 }>
 ): GameState {
   const state = createInitialGame('test-seed', ['Alice', 'Bob', 'Cara']);
   startups.forEach(({ id, tiles, tier = 1 }) => {
@@ -78,6 +78,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       const bonuses = state.pendingBonuses;
 
       expect(bonuses).toBeDefined();
+      if (!bonuses) throw new Error('expected pendingBonuses to be set');
       expect(bonuses.length).toBeGreaterThan(0);
 
       // Majority bonus should be 10x the pre-merger price
@@ -219,7 +220,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       prepareMergerPayout(state, 'CamCrooned', ['Messla'], absorbedPrices);
 
       // Both players hold all their shares
-      handleLiquidationChoice(state, player1.id, 'Messla', 'hold', 3);
+      handleLiquidationChoice(state, player1.id, 'Messla', 'CamCrooned', 'hold');
       handleLiquidationChoice(state, player2.id, 'Messla', 'CamCrooned', 'hold');
 
       const startup = state.startups['Messla'];
@@ -302,6 +303,8 @@ describe('Merger Logic - Critical Bug Fixes', () => {
         (b) => b.playerId === player2.id && b.type === 'minority'
       );
 
+      if (!p1Bonus) throw new Error('expected a majority bonus for player1');
+      if (!p2Bonus) throw new Error('expected a minority bonus for player2');
       expect(p1Bonus.amount).toBe(preMergerPrice * 10);
       expect(p2Bonus.amount).toBe(preMergerPrice * 5);
 

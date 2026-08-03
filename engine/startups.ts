@@ -32,6 +32,19 @@ export const AVAILABLE_STARTUPS: readonly StartupConfig[] = [
   { id: 'WrecksonMobil', tier: 1, ticker: '$W'  },
 ];
 
+const STARTUP_ID_SET: ReadonlySet<string> = new Set(AVAILABLE_STARTUPS.map((s) => s.id));
+
+/**
+ * Narrowing guard for the many places `state.startups`/`TileCell.startupId`
+ * hand back a plain `string` (that field's declared type — see the `todo`
+ * on `Startup.id` in gameTypes.ts) where a `StartupId` is actually needed.
+ * Prefer this over `as StartupId`: it is a real runtime check against the
+ * fixed 7-startup set, not an unchecked assertion.
+ */
+export function isStartupId(id: string): id is StartupId {
+  return STARTUP_ID_SET.has(id);
+}
+
 /** Base prices at each entry in SIZE_THRESHOLDS, for tier 0. Tier n adds n × 100. */
 const TIER0_PRICES: readonly number[] = [200, 300, 400, 500, 600, 700, 800, 900, 1000];
 

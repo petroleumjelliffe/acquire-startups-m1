@@ -1,4 +1,4 @@
-import type { GameState, Player, MergerContext, StartupId } from "./gameTypes";
+import type { GameState, Player, MergerContext } from "./gameTypes";
 import { Coord,
   compareTiles,
   getAdjacentCoords,
@@ -13,6 +13,7 @@ import {
   MAX_BUYS_PER_TURN,
   HAND_SIZE,
   TRADE_RATIO,
+  isStartupId,
 } from "./startups";
 import { previewPlacement } from "./placement";
 import { computeChainBonuses, type BonusResult } from "./bonuses";
@@ -528,7 +529,7 @@ export function advanceTurn(state: GameState) {
 export function getSharePrice(state: GameState, startupId: string): number {
   const startup = state.startups[startupId];
   if (!startup) return 0;
-  return getSharePriceAtSize(startup.tier as 0 | 1 | 2, getStartupSize(state, startupId));
+  return getSharePriceAtSize(startup.tier, getStartupSize(state, startupId));
 }
 
 export const getAvailableStartups = function (state: GameState) {
@@ -625,7 +626,12 @@ export function prepareMergerPayout(
       shares: p.portfolio[absorbedId] || 0,
     }));
 
-    allBonuses.push(...computeChainBonuses(absorbedId as StartupId, price, holdings));
+    // `absorbedIds` is `string[]` (see the `todo` on `Startup.id` in
+    // gameTypes.ts), but every id here always came from a founded startup —
+    // `isStartupId` narrows it for real instead of asserting it away.
+    if (isStartupId(absorbedId)) {
+      allBonuses.push(...computeChainBonuses(absorbedId, price, holdings));
+    }
   }
 
   // Store merger context for UI

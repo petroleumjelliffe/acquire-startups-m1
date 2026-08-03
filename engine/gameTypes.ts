@@ -1,6 +1,6 @@
 import type { Coord } from "./gameHelpers";
 import type { BonusResult } from "./bonuses";
-export type { BonusResult };
+export type { BonusResult, Coord };
 export type Stage =
   | "setup"
   | "draw"
@@ -32,9 +32,15 @@ export type StartupId =
 export type LogToken =
   | { kind: 'text';  text: string }
   | { kind: 'tile';  coord: Coord }
-  | { kind: 'brand'; startupId: StartupId }
+  // `startupId` here is `string`, not `StartupId`: this token exists only
+  // to render a brand name in the log, and its callers (gameLogic.ts) carry
+  // startup ids as plain `string` throughout their board/portfolio
+  // bookkeeping (see `Startup.id` and `TileCell.startupId` below). Nothing
+  // reads `LogToken.startupId` back out as a `StartupId` — narrowing it here
+  // would only relocate the mismatch, not fix it.
+  | { kind: 'brand'; startupId: string }
   | { kind: 'cash';  amount: number; delta?: boolean }
-  | { kind: 'stack'; startupId: StartupId; count: number };
+  | { kind: 'stack'; startupId: string; count: number };
 
 export interface LogEntry {
   stepId: number;
@@ -42,7 +48,7 @@ export interface LogEntry {
   detail: LogToken[];
   playerId?: string;
 }
-// src/state/gameTypes.ts
+
 export interface MergerContext {
   survivorId: string;
   absorbedIds: string[];
@@ -74,7 +80,7 @@ export interface Startup {
   ticker: string;
   tiles: Coord[]; //TODO: deprecate in favor of getStartupTiles from Board
   foundingTile: Coord | null;
-  tier: number; //0-2
+  tier: 0 | 1 | 2;
   totalShares: number; //usually 25
   availableShares: number; //starts at totalShares
   isFounded: boolean;

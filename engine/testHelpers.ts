@@ -36,6 +36,7 @@ export function createTestStartup(overrides?: Partial<Startup>): Startup {
     id: 'TestCo',
     tier: 1,
     ticker: '$X',
+    tiles: [],
     isFounded: false,
     foundingTile: null,
     totalShares: 25,
@@ -51,7 +52,7 @@ export function createTestStartup(overrides?: Partial<Startup>): Startup {
  * only cares about chain size, not specific placement).
  */
 export function setupGameWithStartups(
-  startups: Array<{ id: string; tiles: Coord[] | number; tier?: number }>
+  startups: Array<{ id: string; tiles: Coord[] | number; tier?: 0 | 1 | 2 }>
 ): GameState {
   const state = createTestGameState();
   const autoCoords = generateAllCoords();

@@ -1,11 +1,11 @@
-import type { Coord, GameState, LogEntry, LogToken, StartupId } from './gameTypes';
+import type { Coord, GameState, LogEntry, LogToken } from './gameTypes';
 
 export const tok = {
   text:  (text: string): LogToken => ({ kind: 'text', text }),
   tile:  (coord: Coord): LogToken => ({ kind: 'tile', coord }),
-  brand: (startupId: StartupId): LogToken => ({ kind: 'brand', startupId }),
+  brand: (startupId: string): LogToken => ({ kind: 'brand', startupId }),
   cash:  (amount: number, delta = false): LogToken => ({ kind: 'cash', amount, delta }),
-  stack: (startupId: StartupId, count: number): LogToken => ({ kind: 'stack', startupId, count }),
+  stack: (startupId: string, count: number): LogToken => ({ kind: 'stack', startupId, count }),
 };
 
 export function pushLog(

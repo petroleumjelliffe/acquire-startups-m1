@@ -1,4 +1,5 @@
 import type { GoldenGame } from './types';
+import type { Coord, Row } from '../gameHelpers';
 
 /**
  * Shared layout for all six games: `Messla` on row B, `ZuckFace` on row D,
@@ -7,8 +8,8 @@ import type { GoldenGame } from './types';
  * empirically against the live engine for every game below (see
  * task-12-report.md), not just read off `INTERFACE-FACTS.md`.
  */
-const row = (letter: string, n: number) =>
-  Array.from({ length: n }, (_, i) => `${letter}${i + 1}` as const);
+const row = (letter: Row, n: number): Coord[] =>
+  Array.from({ length: n }, (_, i) => `${letter}${i + 1}` as Coord);
 
 /**
  * G2: two-way merger — bigger chain survives, holders liquidate.

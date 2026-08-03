@@ -1,6 +1,6 @@
 import type { GameState, StartupId } from './gameTypes';
 import { getStartupSize } from './gameHelpers';
-import { SAFE_SIZE, END_SIZE } from './startups';
+import { SAFE_SIZE, END_SIZE, isStartupId } from './startups';
 import { getSharePrice } from './gameLogic';
 import { computeChainBonuses } from './bonuses';
 
@@ -15,10 +15,16 @@ export interface EndCondition {
 
 /** Chains that are founded and currently standing on the board (size > 0). */
 function foundedChains(state: GameState): { id: StartupId; size: number }[] {
-  return Object.values(state.startups)
-    .filter((s) => s.isFounded)
-    .map((s) => ({ id: s.id as StartupId, size: getStartupSize(state, s.id) }))
-    .filter((c) => c.size > 0);
+  // `Startup.id` is declared `string` (see the `todo` in gameTypes.ts), but
+  // every founded startup's id is always one of the 7 `StartupId` literals —
+  // `isStartupId` narrows it for real instead of asserting it away.
+  const result: { id: StartupId; size: number }[] = [];
+  for (const s of Object.values(state.startups)) {
+    if (!s.isFounded || !isStartupId(s.id)) continue;
+    const size = getStartupSize(state, s.id);
+    if (size > 0) result.push({ id: s.id, size });
+  }
+  return result;
 }
 
 /**
