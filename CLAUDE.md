@@ -33,6 +33,8 @@ python3 -m http.server 8777          # or serve, then http://127.0.0.1:8777/prot
 
 ## Reference (not the current focus)
 
-- Rules engine: `src/state/gameLogic.ts` (+ `gameTypes.ts`, `gameHelpers.ts`) — pure, immutable `GameState`.
+- Rules engine: `engine/` — types, helpers, init, rules, and the `applyIntent(state, intent)`
+  reducer. Golden games (`engine/golden/`) are the executable rules spec: G1–G12, run by
+  `engine/golden/golden.test.ts`.
 - Client app: `src/` (React + Vite + react-router). Server: `server/` (Express + Socket.io + XState).
 - Commands (`npm run dev`, `build`, `test`, `dev:server`, …) matter only when work returns to `src/`/`server/`.

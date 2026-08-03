@@ -2,6 +2,7 @@
 import React from "react";
 import { GameState } from "../../engine/gameTypes";
 import { finalizeMergerPayout, completeTileTransaction } from "../../engine/gameLogic";
+import type { BonusResult } from "../../engine/bonuses";
 
 export default function MergerPayoutModal({
   state,
@@ -16,7 +17,7 @@ export default function MergerPayoutModal({
   isReadOnly?: boolean;
   currentPlayerName?: string;
 }) {
-  const bonuses: any[] = (state as any).pendingBonuses || [];
+  const bonuses: BonusResult[] = state.pendingBonuses || [];
   const survivor = state.mergerContext?.survivorId;
   const absorbed = state.mergerContext?.absorbedIds || [];
 
