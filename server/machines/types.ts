@@ -2,7 +2,7 @@
 // Shared types for XState machines
 
 import type { ActorRefFrom } from "xstate";
-import type { GameState } from "../../src/state/gameTypes.js";
+import type { GameState } from "../../engine/gameTypes.js";
 
 export type PlayerStatus = "waiting" | "active" | "disconnected" | "abandoned";
 

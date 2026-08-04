@@ -4,7 +4,7 @@
 import { createActor, type ActorRefFrom, type SnapshotFrom } from "xstate";
 import type { MultiplayerGameState, MultiplayerPlayer } from "./types.js";
 import { saveGame, loadAllGames } from "./persistence.js";
-import { createInitialGame } from "../src/state/gameInit.js";
+import { createInitialGame } from "../engine/gameInit.js";
 import { gameRoomMachine } from "./machines/gameRoomMachine.js";
 import type { GameRoomMachineEvent } from "./machines/types.js";
 
@@ -56,18 +56,28 @@ export class GameManagerXState {
       },
       inspect: (event) => {
         if (event.type === "@xstate.snapshot") {
-          console.log(
-            `[GameRoom ${gameId}] State: ${JSON.stringify(event.snapshot.value)}`
-          );
+          // `event.snapshot` is typed `Snapshot<unknown>` here (the inspect
+          // API isn't tied to this machine's specific snapshot type), and
+          // that union includes shapes without `value` — narrow instead of
+          // asserting, even though every snapshot this machine emits has one.
+          const value = "value" in event.snapshot ? event.snapshot.value : undefined;
+          console.log(`[GameRoom ${gameId}] State: ${JSON.stringify(value)}`);
         }
       },
     });
 
     // Subscribe to state changes for persistence
-    const unsubscribe = actor.subscribe((snapshot) => {
+    const subscription = actor.subscribe((snapshot) => {
       console.log(`[GameManager] Actor state changed for ${gameId}, stage: ${snapshot.context.gameState.stage}`);
       this.persistSnapshot(gameId, snapshot);
     });
+    // `gameSubscriptions` is `Map<string, () => void>`; `actor.subscribe`
+    // returns a `Subscription` object (with an `.unsubscribe()` method, not
+    // a call signature), same as the wrapping already done in
+    // `subscribeToGame` below. Storing the `Subscription` itself here was a
+    // latent bug: `deleteGame` calls the stored value as `unsubscribe()`,
+    // which would throw at runtime on any game restored from persistence.
+    const unsubscribe = () => subscription.unsubscribe();
 
     this.gameSubscriptions.set(gameId, unsubscribe);
     actor.start();

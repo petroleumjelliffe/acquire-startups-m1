@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
-import type { GameState } from "../state/gameTypes";
+import type { GameState } from "../../engine/gameTypes";
 import {
   resolveInitialDraw,
   dealOneRound,
   allHandsFull,
-} from "../state/gameLogic";
+} from "../../engine/gameLogic";
 export function DrawModal({
   state,
   setState,

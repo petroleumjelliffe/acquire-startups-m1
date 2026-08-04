@@ -4,7 +4,7 @@
 import { setup, assign, sendTo } from "xstate";
 import type { GameRoomMachineContext, GameRoomMachineEvent } from "./types.js";
 import { playerMachine } from "./playerMachine.js";
-import type { GameState } from "../../src/state/gameTypes.js";
+import type { GameState } from "../../engine/gameTypes.js";
 
 export const gameRoomMachine = setup({
   types: {

@@ -1,7 +1,7 @@
 // src/components/MergerLiquidation.tsx
 import React, { useState, useEffect } from "react";
-import { GameState } from "../state/gameTypes";
-import { completePlayerMergerLiquidation } from "../state/gameLogic";
+import { GameState } from "../../engine/gameTypes";
+import { completePlayerMergerLiquidation } from "../../engine/gameLogic";
 
 export const MergerLiquidationModal: React.FC<{
   state: GameState;
@@ -14,8 +14,13 @@ export const MergerLiquidationModal: React.FC<{
     currentLiquidationIndex,
     shareholderQueue,
     currentShareholderIndex,
-    sharePrice,
   } = ctx;
+  // `MergerContext` no longer has `sharePrice` (see `absorbedPrices` in
+  // gameTypes.ts) — this component is scheduled for deletion (it reads a
+  // field the engine stopped producing), so this is a type-level-only fix
+  // that keeps the existing (already-broken, always-undefined) runtime
+  // behaviour rather than trying to repair it.
+  const sharePrice = (ctx as { sharePrice?: number }).sharePrice;
 
   const absorbedId = absorbedIds[currentLiquidationIndex];
   const playerId = shareholderQueue[currentShareholderIndex];

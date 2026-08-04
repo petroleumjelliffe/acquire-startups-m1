@@ -1,12 +1,12 @@
 // src/components/BuyModal.tsx
 import React, { useState } from "react";
-import { GameState } from "../state/gameTypes";
+import { GameState } from "../../engine/gameTypes";
 import {
   getBuyableStartups,
   buyShares,
   endBuyPhase,
   completeTileTransaction,
-} from "../state/gameLogic";
+} from "../../engine/gameLogic";
 
 interface BuyModalProps {
   state: GameState;

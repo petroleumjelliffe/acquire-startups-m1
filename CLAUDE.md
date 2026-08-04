@@ -2,124 +2,58 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Current focus
 
-This is a React + TypeScript implementation of the board game "Acquire" (renamed with startup-themed brands). Players place tiles on a 9×12 grid, found startups, buy shares, and compete through mergers. The game is deployed to GitHub Pages.
+The **React app revamp**, following the roadmap in
+`docs/superpowers/specs/2026-07-31-react-app-revamp-roadmap-design.md`. Phases 0, 1a and 1b are
+done; **Phase 2a** wires the new component layer to real game state so pass-and-play is playable
+end to end.
+
+Design specs and implementation plans live in `docs/superpowers/{specs,plans}/`. Each phase ends
+with a carry-forward doc in `specs/` recording what it hands to the next one — read the newest
+before starting work.
+
+## Layout
+
+| Path | What it is |
+|---|---|
+| `engine/` | The rules. Pure, immutable, no React. `applyIntent(state, intent)` is the single reducer; `history.ts` adds snapshot undo. |
+| `engine/golden/` | Golden games G1–G16 — the executable rules spec, stored as data. Run by `golden.test.ts`. |
+| `src/game/` | The new component layer (Phase 1b). Pure, props-in, styled through `tokens.ts`. |
+| `src/game/catalog/` | `/catalog` route — every component state, mostly replayed from golden games. The acceptance surface. |
+| `src/components/`, `src/Game.tsx` | **Legacy.** Modal-driven UI, still serving `/room/:roomId`. Do not build on it. Deleted in Phase 3/5, not before — online depends on it. |
+| `server/` | Express + Socket.io + XState. Not authoritative yet; that is Phase 3. |
+| `prototype/` | The buildless design lab the component layer was ported from. Reference, not a build target. |
 
 ## Commands
 
-### Development
 ```bash
-npm run dev          # Start dev server on port 5173
-npm run build        # Build for production (outputs to dist/)
-npm run preview      # Preview production build
-npm run deploy       # Deploy to GitHub Pages using gh-pages
+npm run dev            # Vite dev server
+npx vitest run         # full suite (engine in node, src/server in jsdom)
+npm run typecheck      # never run bare `tsc`
+npx vite build
+npm run check:bundle   # guards vitest and golden data out of the main chunk
 ```
 
-Note: No test suite exists yet. No linter is configured.
+## Working rules
 
-## Architecture
+- **Derive from the engine, never hardcode.** Every price, total and board position in the UI comes
+  from replayed state. Phase 0 shipped a wrong-number bug from a copied figure; the catalog exists so
+  that cannot recur.
+- **No `as any`.** Narrow with the engine's type guards (`isStartupId`, …).
+- **Never import `engine/golden/runner` from `src/`** — it pulls vitest into the bundle. Use
+  `replayGoldenGame`.
+- **Verify in a browser.** jsdom reports zero for all layout, so a structural test can pass while the
+  thing it guards is visibly broken. This has happened. Measure real pages for anything about size,
+  fit or overflow.
 
-### State Management Pattern
+## Key concepts
 
-The game uses **immutable state updates** via React's `useState`. The main `GameState` object is cloned/updated in `gameLogic.ts` functions and passed back through `setState` callbacks. Avoid direct mutation—always return a new object.
-
-### Game Flow & Stage System
-
-The game progresses through discrete stages (defined in `src/state/gameTypes.ts`):
-
-- `setup` → `draw` (initial tile draw to determine turn order)
-- `dealHands` → `play` (main tile placement)
-- `foundStartup` (modal prompts player to choose startup brand)
-- `mergerPayout` → `mergerLiquidation` → `liquidationPrompt` (multi-step merger resolution)
-- `buy` (purchase up to 3 shares, then advance turn)
-- `end` (game over)
-
-Stage transitions happen in `src/state/gameLogic.ts`. The `Game.tsx` component renders different modals/UI based on `state.stage`.
-
-### File Organization
-
-**Core State Files:**
-- `src/state/gameTypes.ts` — TypeScript types for `GameState`, `Player`, `Startup`, `Stage`, `MergerContext`
-- `src/state/gameInit.ts` — `createInitialGame()` factory
-- `src/state/gameLogic.ts` — All game rules (tile placement, mergers, buying, liquidations)
-
-**Board & Coordinates:**
-- `src/utils/gameHelpers.ts` — Coord type (`"A1"` to `"I12"`), adjacency, flood fill, seeded shuffle
-- Board is stored as `Record<Coord, TileCell>` where each cell tracks `placed: boolean` and optional `startupId`
-
-**Components:**
-- `src/App.tsx` — Entry point; toggles between `SetupScreen` and `Game`
-- `src/Game.tsx` — Main game loop; renders board, hand, modals based on stage
-- `src/components/` — UI pieces: `Board`, `PlayerHand`, modals for founding/buying/mergers, `GameLog`
-
-**Barrel File:**
-- `src/components/index.ts` exports components for cleaner imports
-
-### Merger Logic
-
-Mergers are the most complex mechanic:
-
-1. **Trigger**: Placing a tile adjacent to 2+ startups triggers a merge (unless >1 safe chain exists, which blocks the placement per `handleTilePlacement:134-152`)
-2. **Survivor Selection**: Largest startup survives; ties prompt user via `window.prompt` (see `gameLogic.ts:219-225`)
-3. **Payout Phase** (`stage: "mergerPayout"`):
-   - `prepareMergerPayout()` calculates majority/minority bonuses for absorbed startups
-   - Bonuses stored in `state.pendingBonuses` (not in types—cast to `any`)
-   - `MergerPayoutModal` displays results and calls `finalizeMergerPayout()`
-4. **Liquidation Phase** (`stage: "mergerLiquidation"` → `liquidationPrompt`):
-   - Players decide how to handle absorbed shares: trade 2:1 for survivor shares, sell at share price, or hold
-   - `MergerLiquidation.tsx` modal handles UI (currently has syntax errors: `gameLogic.ts:18`, `gameLogic.ts:54`)
-   - Functions: `startLiquidations()`, `handleLiquidationChoice()`, `advanceLiquidationTurn()`, `completeLiquidation()`
-5. **Cleanup**: Absorbed startups reset `isFounded=false`, tiles reassigned to survivor, available shares reset
-
-### Share Pricing
-
-Computed in `getSharePrice(state, startupId)` (`gameLogic.ts:423-439`):
-- Based on startup **size** (number of tiles) and **tier** (0-2, set in `AVAILABLE_STARTUPS`)
-- Uses lookup table `sharePrices` with 9 tiers of prices
-- Safe chains (≥11 tiles) cannot merge with other safe chains (`gameLogic.ts:142`)
-
-### Seeded Randomness
-
-- Tile bag and initial draws use `shuffleSeeded()` from `gameHelpers.ts`
-- Accepts a string seed (e.g., `"scaffold-seed"`) for reproducible games
-- Useful for testing/debugging specific game states
-
-### Vite Configuration
-
-- Base path: `/acquire-startups-m1` (for GitHub Pages deployment)
-- Dev server runs on port 5173
-- Uses `@vitejs/plugin-react` for Fast Refresh
-
-## Common Patterns
-
-### Adding a New Modal
-
-1. Create component in `src/components/`, accept `{ state, onUpdate }` props
-2. Clone state with `structuredClone(state)` or spread operator
-3. Modify cloned state, then call `onUpdate(newState)`
-4. Add conditional render in `Game.tsx` based on `state.stage`
-5. Export from `src/components/index.ts` if desired
-
-### Modifying Game Rules
-
-- All game logic lives in `src/state/gameLogic.ts`
-- Board operations (flood fill, adjacency) use helpers from `gameHelpers.ts`
-- When changing stage transitions, update both the logic function and the modal rendering in `Game.tsx`
-
-### Debugging State
-
-- Check `state.log` array for game event history (displayed in `GameLog.tsx`)
-- Use `console.log("Game state:", state.stage)` (example in `Game.tsx:32`)
-- Seed value allows replaying exact games
-
-## Known Issues
-
-- `MergerLiquidation.tsx` has syntax errors (extra bracket on line 18, undefined `absorbedId` on line 54)
-- Some game logic uses `window.prompt()` for tie-breaking (see `gameLogic.ts:221-225`, `gameLogic.ts:302-306`)—consider replacing with modals for consistency
-- No TypeScript strict mode enabled (check `tsconfig.json` if it exists)
-- Liquidation phase implementation appears incomplete (multiple code paths for mergers/liquidations)
-
-## Deployment
-
-The project deploys to GitHub Pages via `npm run deploy` (uses `gh-pages` package). The production build is in the `dist/` folder. Ensure `vite.config.ts` `base` path matches your repository name.
+- **Safe chain** = ≥11 tiles; two safe chains cannot merge. A tile whose placement would join two
+  safe chains is permanently unplayable — a dead tile.
+- **Segment** = a run of steps by one actor, ending when a *different* player must act. It is the
+  undo boundary, the pass-the-device boundary, and (in Phase 3) the commit boundary.
+- **Panel-height stability**: panel zones must not resize as content changes — reveal via
+  transitions, never layout jumps.
+- Panel zone order: `stepstack → active → staging → hand → players`.
+- Respect `prefers-reduced-motion` (skip enter animations).

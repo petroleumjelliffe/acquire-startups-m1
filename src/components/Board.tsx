@@ -1,6 +1,6 @@
 import React from "react";
-import { Coord } from "../utils/gameHelpers";
-import { Startup, TileCell, Player } from "../state/gameTypes";
+import { Coord } from "../../engine/gameHelpers";
+import { Startup, TileCell, Player } from "../../engine/gameTypes";
 
 export function Board({
   board,

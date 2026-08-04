@@ -8,6 +8,8 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json",
+    "verify:layout": "node scripts/verify-layout.mjs",
     "build:server": "echo 'Using tsx directly, no build needed'",
     "start:server": "tsx server/index.ts",
     "preview": "vite preview",
@@ -15,6 +17,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
+    "check:bundle": "vite build && ! grep -rlE \"['\\\"]vitest['\\\"]\" dist/assets 2>/dev/null",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 // src/components/TilePlacementConfirmModal.tsx
 import React from 'react';
-import { Coord } from '../utils/gameHelpers';
+import { Coord } from '../../engine/gameHelpers';
 
 interface TilePlacementConfirmModalProps {
   tile: Coord;
