@@ -239,3 +239,32 @@ describe('the turn-order draw is a gate, not a turn', () => {
     expect(session.getView().undoableSteps).toEqual([]);
   });
 });
+
+describe('ending the game', () => {
+  function atDeclarableBuy() {
+    const g9 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G9')!;
+    const state = replayGoldenGame(g9).find((s) => s.stage === 'buy');
+    if (!state) throw new Error('G9 no longer passes through buy');
+    return state;
+  }
+
+  it('has no actor once the game is over', () => {
+    const session = createGameSession({ state: atDeclarableBuy() });
+    session.dispatch({ type: 'declareEnd', playerId: 'p1' });
+
+    expect(session.getView().state.stage).toBe('end');
+    expect(session.getView().actorId).toBeNull();
+  });
+
+  it('lets the declaring player take it back within their own segment', () => {
+    const session = createGameSession({ state: atDeclarableBuy() });
+    const stepId = session.getView().state.nextStepId;
+
+    session.dispatch({ type: 'declareEnd', playerId: 'p1' });
+    expect(session.getView().state.stage).toBe('end');
+
+    session.undoTo(stepId);
+    expect(session.getView().state.stage).toBe('buy');
+    expect(session.getView().actorId).toBe('p1');
+  });
+});

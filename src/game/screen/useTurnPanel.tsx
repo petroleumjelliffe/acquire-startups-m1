@@ -4,6 +4,8 @@ import type { GameState, StartupId } from '../../../engine/gameTypes';
 import type { SessionView } from '../session/GameSession';
 import type { Coord } from '../../../engine/gameHelpers';
 import { getDeadTilesInHand } from '../../../engine/placement';
+import { getEndCondition } from '../../../engine/endGame';
+import { reasonText } from '../FinalScoring';
 import { ActiveStep } from '../panel/ActiveStep';
 import { StagingZone } from '../panel/StagingZone';
 import { FoundGroups } from '../FoundGroups';
@@ -65,6 +67,25 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
   // nothing. Stages that stage something replace it below.
   const idleStaging = <StagingZone label="Staging" />;
 
+  // Derived every render, never latched: 'every founded chain is safe' stops
+  // being true the moment a merger makes one unsafe again, and an affordance
+  // remembered from an earlier render would offer an end the engine refuses.
+  const endCondition = getEndCondition(state);
+  const declareEnd = endCondition.met && actorId ? (
+    <div className="mt-2 flex flex-col gap-1 rounded-md bg-amber-50 px-2 py-1.5">
+      <span className="text-[13px] font-semibold text-amber-900">
+        {`${reasonText(endCondition.reasons[0] ?? null)}. You may end the game now.`}
+      </span>
+      <button
+        type="button"
+        onClick={() => dispatch({ type: 'declareEnd', playerId: actorId })}
+        className="m-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700"
+      >
+        End the game
+      </button>
+    </div>
+  ) : null;
+
   if (state.stage === 'draw') {
     return {
       staging: idleStaging,
@@ -110,6 +131,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
                   {`${dead.join(', ')} can never be played — ${dead.length === 1 ? 'it joins' : 'they join'} two safe chains.`}
                 </span>
               )}
+              {!canPlace && declareEnd}
               {problem}
             </>
           }
@@ -326,6 +348,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
                   );
                 })}
               </div>
+              {declareEnd}
               {problem}
             </>
           }

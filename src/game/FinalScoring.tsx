@@ -32,7 +32,13 @@ const BONUS_MARK = {
   },
 } as const;
 
-function reasonText(reason: FinalScoreReport['reason']): string {
+/**
+ * One sentence describing why a game ended.
+ *
+ * Exported so the panel's declare-end prompt and the final scoreboard cannot
+ * describe the same ending in two different ways.
+ */
+export function reasonText(reason: FinalScoreReport['reason']): string {
   if (reason == null) return 'Game over';
   if (reason.kind === 'size41') return `${reason.startupId} reached ${reason.size} tiles`;
   return 'Every founded startup is safe';

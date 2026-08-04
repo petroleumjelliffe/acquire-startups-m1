@@ -282,3 +282,37 @@ describe('useTurnPanel — dead tiles', () => {
     expect(screen.getByRole('button', { name: /end turn/i })).toBeInTheDocument();
   });
 });
+
+describe('useTurnPanel — declaring the end', () => {
+  it('offers the end during buy when a chain has reached 41 tiles', () => {
+    const g9 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G9')!;
+    const states = replayGoldenGame(g9);
+    const atBuy = states.find((s) => s.stage === 'buy');
+    if (!atBuy) throw new Error('G9 no longer passes through buy');
+
+    const dispatch = vi.fn();
+    render(<Harness session={createGameSession({ state: atBuy })} dispatch={dispatch} />);
+
+    expect(screen.getByText(/reached 41 tiles/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /end the game/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'declareEnd', playerId: 'p1' });
+  });
+
+  it('offers the end when every founded chain is safe', () => {
+    const g10 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G10')!;
+    const state = replayGoldenGame(g10)[0];
+
+    render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
+    expect(screen.getByText(/every founded startup is safe/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /end the game/i })).toBeInTheDocument();
+  });
+
+  it('offers nothing while no end condition holds', () => {
+    const session = sessionFor();
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+
+    render(<Harness session={session} dispatch={() => {}} />);
+    expect(screen.queryByRole('button', { name: /end the game/i })).toBeNull();
+  });
+});
