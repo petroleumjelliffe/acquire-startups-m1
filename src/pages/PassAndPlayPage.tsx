@@ -23,7 +23,18 @@ export function PassAndPlayPage() {
     [config],
   );
 
-  if (session) return <GameScreen session={session} />;
+  if (session) {
+    return (
+      <GameScreen
+        session={session}
+        // Dropping the config drops the session and its snapshot store with
+        // it — a genuine fresh game rather than a rewound one. Replaying a
+        // seed is what the setup screen's Advanced field is for.
+        onNewGame={() => setConfig(null)}
+        onExit={() => navigate('/')}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
