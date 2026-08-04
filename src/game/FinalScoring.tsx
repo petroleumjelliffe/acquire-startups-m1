@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Cash } from './atoms/Cash';
 import { Price } from './atoms/Price';
 import { Brand } from './atoms/Brand';
@@ -17,10 +18,21 @@ import type { FinalScoreReport } from '../../engine/endGame';
  * Sorting and totals are derived here (`stock + bonus + cash`). Bonus
  * *resolution* is a rules concern and arrives already computed.
  *
- * Deliberately terminal: no dismiss, no "New game". A real app needs a route
- * back to the lobby; that is Phase 2's, not this component's.
+ * Deliberately terminal: no dismiss, no "New game" of its own — `actions` is
+ * a plain slot the caller fills, not a route this component knows about.
+ *
+ * `actions` renders *inside* the card's own normal-flow column, below the
+ * table, rather than as a sibling of this component's root. The root is
+ * itself `absolute inset-0` (so the card can centre in whatever surface
+ * hosts it), which takes it out of flow — a caller that rendered its own
+ * button row as a following sibling found that row anchored to the *scrim's*
+ * top edge instead of the card's bottom, overlapping the winner banner
+ * whenever the vertically-centred card was tall enough to reach that high.
+ * Worse at narrow widths, where the banner has less width to spread into and
+ * the overlap became a full cover. Keeping the slot inside the card's own
+ * flow is what avoids that regardless of card height or viewport width.
  */
-export type FinalScoringProps = FinalScoreReport;
+export type FinalScoringProps = FinalScoreReport & { actions?: ReactNode };
 
 const BONUS_MARK = {
   majority: { mark: 'M', title: 'Majority shareholder', className: 'text-sm font-bold' },
@@ -46,7 +58,7 @@ export function reasonText(reason: FinalScoreReport['reason']): string {
 
 const Dash = () => <span className="text-gray-300">—</span>;
 
-export function FinalScoring({ reason, players, chains, holdings, bonuses }: FinalScoringProps) {
+export function FinalScoring({ reason, players, chains, holdings, bonuses, actions }: FinalScoringProps) {
   const columns = players
     .map((player) => {
       const held = holdings[player.id] ?? {};
@@ -132,6 +144,8 @@ export function FinalScoring({ reason, players, chains, holdings, bonuses }: Fin
             </tr>
           </tbody>
         </table>
+
+        {actions && <div className="mt-6 flex justify-center gap-3">{actions}</div>}
       </div>
     </div>
   );

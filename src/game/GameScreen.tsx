@@ -127,39 +127,43 @@ export function GameScreen({ session, onNewGame, onExit }: GameScreenProps) {
           {/*
             The scoreboard is `finalScore(state)` spread straight in — its
             props *are* the engine's report, which is why there is no adapter
-            here and no figure written down in `src/`. The actions live out
-            here rather than inside it: `FinalScoring` is deliberately
-            terminal and knows nothing about routes.
+            here and no figure written down in `src/`. `actions` is a plain
+            slot: `FinalScoring` renders whatever node it is given and still
+            owns no routes or click handlers of its own. It used to be a
+            sibling of `FinalScoring` instead — found by hand at 768px to sit
+            on top of the winner banner, because `FinalScoring`'s root is
+            `absolute inset-0` and contributes no flow height, so a "next"
+            sibling anchors to the scrim's top edge rather than the card's
+            bottom. Passing it as `actions` keeps it in the card's own flow,
+            below the table, at every width.
           */}
-          <FinalScoring {...finalScore(state)} />
-
-          {(onNewGame || onExit) && (
-            // `FinalScoring` paints its own `absolute inset-0 z-50` backdrop as
-            // this row's preceding sibling. Without a stacking context of its
-            // own, this row is a static-positioned sibling that paints *under*
-            // that backdrop — present in the DOM, invisible to hit-testing.
-            // `relative z-[60]` lifts it above z-50 so real clicks land here.
-            <div className="relative z-[60] mt-6 flex justify-center gap-3">
-              {onNewGame && (
-                <button
-                  type="button"
-                  onClick={onNewGame}
-                  className="m-0 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
-                >
-                  New game
-                </button>
-              )}
-              {onExit && (
-                <button
-                  type="button"
-                  onClick={onExit}
-                  className="m-0 rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
-                >
-                  Back to menu
-                </button>
-              )}
-            </div>
-          )}
+          <FinalScoring
+            {...finalScore(state)}
+            actions={
+              (onNewGame || onExit) && (
+                <>
+                  {onNewGame && (
+                    <button
+                      type="button"
+                      onClick={onNewGame}
+                      className="m-0 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                    >
+                      New game
+                    </button>
+                  )}
+                  {onExit && (
+                    <button
+                      type="button"
+                      onClick={onExit}
+                      className="m-0 rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
+                    >
+                      Back to menu
+                    </button>
+                  )}
+                </>
+              )
+            }
+          />
         </div>
       )}
     </div>

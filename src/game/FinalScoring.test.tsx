@@ -91,4 +91,28 @@ describe('FinalScoring', () => {
     const banner = container.querySelector('[data-fs-banner]') as HTMLElement;
     expect(within(banner).getByText(/Gobble reached 41 tiles/)).toBeInTheDocument();
   });
+
+  // Found by hand at 768px (Phase 2b Task 8): the card is centred by its own
+  // `absolute inset-0 flex items-center justify-center` root, which takes it
+  // out of normal flow. A caller-supplied action row rendered as a *sibling*
+  // of that root therefore does not sit "below" the card at all — it sits at
+  // the scrim's own top edge, which coincides with wherever the vertically
+  // centred card's top happens to land. At 1440px that overlapped the winner
+  // banner's cash figure by a few dozen pixels; at 768px, with less width to
+  // spread the banner across, it fully covered it. Rendering `actions` inside
+  // the card puts it in the same normal-flow column as the table, so it is
+  // never at the mercy of where the centred card lands.
+  it('renders supplied actions inside its own card, not as a loose sibling of the scrim', () => {
+    const { container } = render(
+      <FinalScoring {...REPORT} actions={<button type="button">New game</button>} />,
+    );
+    const card = container.querySelector('.rounded-2xl') as HTMLElement;
+    expect(card).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: /new game/i })).toBeInTheDocument();
+  });
+
+  it('renders no action row when none is supplied', () => {
+    const { container } = render(<FinalScoring {...REPORT} />);
+    expect(container.querySelectorAll('button')).toHaveLength(0);
+  });
 });
