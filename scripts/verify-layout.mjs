@@ -194,9 +194,12 @@ const MEASURE = `(async () => {
   for (let i = 0; i < 4; i += 1) await click(/add player/i, 'add player');
 
   await click(/start game/i, 'start game');
-  await click(/reveal/i, 'reveal (opening)');
+  // No curtain before the draw: it is a gate in front of the game and nobody's
+  // hand is on screen yet. The handoff after it is unconditional, because seat
+  // one pressed the button for the table and the winner's hand is about to
+  // appear — so this is a plain click, not a conditional one.
   await click(/draw for turn order/i, 'draw for turn order');
-  await clickIfPresent(/reveal/i);
+  await click(/reveal/i, 'reveal (first turn)');
 
   const stages = { play: geometry() };
   const zoneFloors = { play: floors() };
@@ -300,8 +303,11 @@ const CURTAIN = `(() => {
            curtain: { w: Math.round(c.width), h: Math.round(c.height) } };
 })()`;
 
-// The curtain lives behind the setup screen: a game has to be started before
-// there is a surface to cover at all.
+// The curtain lives behind the setup screen *and* behind the turn-order draw:
+// a game has to be started and drawn for before there is a curtain to measure.
+// The draw itself raises no curtain — it is a gate in front of the game and
+// shows nobody's hand — so the first one appears when play is handed to
+// whoever won it.
 const START_GAME = `(async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const find = (re) => [...document.querySelectorAll('button')].find((b) => re.test(b.innerText));
@@ -310,6 +316,10 @@ const START_GAME = `(async () => {
   if (!btn) throw new Error('no start game button');
   btn.click();
   await wait(400);
+  const draw = find(/draw for turn order/i);
+  if (!draw) throw new Error('no draw button after starting');
+  draw.click();
+  await wait(500);
   return true;
 })()`;
 

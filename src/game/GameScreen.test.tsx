@@ -69,3 +69,56 @@ describe('GameScreen', () => {
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
   });
 });
+
+describe('GameScreen at the turn-order draw', () => {
+  /** A fresh game: hands are dealt, but the draw has not happened. */
+  function atDraw() {
+    return createGameSession({ seed: 'draw-1', names: ['Alex', 'Sam'] });
+  }
+
+  /**
+   * The draw is a gate in front of the game, not seat one's turn. Seat one
+   * presses the button on behalf of the table, so none of their private state
+   * may be on screen: not their tiles on the board, not their shares in the
+   * hand zone. Showing them made the draw read as "Player 1's turn has begun",
+   * which is why handing play to whoever won it looked like a skipped turn.
+   */
+  it('puts nobody hand on the board before the draw', () => {
+    const { container } = render(<GameScreen session={atDraw()} />);
+    expect(container.querySelector('[data-board="grid"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-board="grid"] button')).toHaveLength(0);
+  });
+
+  it('names no player in the hand zone before the draw', () => {
+    render(<GameScreen session={atDraw()} />);
+    expect(screen.queryByText(/'s hand/i)).toBeNull();
+  });
+
+  it('shows no shares or balance for anyone before the draw', () => {
+    const { container } = render(<GameScreen session={atDraw()} />);
+    const hand = container.querySelector('[data-slot="hand"]')!;
+    expect(hand.textContent).not.toMatch(/\$6,000/);
+  });
+
+  it('goes straight to the draw with no curtain in the way', () => {
+    render(<GameScreen session={atDraw()} />);
+    expect(screen.queryByText(/pass to/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /draw for turn order/i })).toBeInTheDocument();
+  });
+
+  it('hands to the winner behind the curtain once the draw is done', () => {
+    render(<GameScreen session={atDraw()} />);
+    fireEvent.click(screen.getByRole('button', { name: /draw for turn order/i }));
+    expect(screen.getByText(/pass to/i)).toBeInTheDocument();
+  });
+});
+
+it('marks nobody as the active seat before the draw', () => {
+  // Highlighting seat one in the roster is the same conflation in miniature:
+  // they press the button, but no turn has begun and no seat is "up" yet.
+  const { container } = render(
+    <GameScreen session={createGameSession({ seed: 'draw-2', names: ['Alex', 'Sam'] })} />,
+  );
+  expect(container.querySelectorAll('[data-seat] .border-blue-600')).toHaveLength(0);
+  expect(container.querySelectorAll('[data-seat].border-blue-600')).toHaveLength(0);
+});

@@ -63,9 +63,13 @@ export function createGameSession(init: SessionInit): GameSession {
    */
   let actorId: string | null = getCurrentActor(state);
   let segmentStart: number = state.nextStepId;
-  // The very first segment starts behind the curtain too: whoever is holding
-  // the device has to claim seat one before they see anything.
-  let awaitingReveal = true;
+  // A session opens behind the curtain, because it opens on somebody's hand.
+  // The one exception is the turn-order draw: it is a gate in front of the
+  // game rather than anyone's turn, no player's tiles or shares are on screen
+  // during it, and so there is nothing to hide and nobody to hide it from.
+  let awaitingReveal = state.stage !== 'draw';
+  /** Whether the game is still in front of the turn-order draw. */
+  let drawPending = state.stage === 'draw';
 
   // Cached so `getView()` is referentially stable between changes —
   // `useSyncExternalStore` re-renders forever if the snapshot is a fresh
@@ -95,7 +99,14 @@ export function createGameSession(init: SessionInit): GameSession {
    */
   function syncSegment(): void {
     const next = getCurrentActor(state);
-    if (next === actorId) return;
+    // Leaving the draw always closes a segment, even when seat one wins their
+    // own draw and the actor id is unchanged. Seat one pressed the button for
+    // the table; the segment that follows belongs to the winner as a *player*,
+    // and their hand has not been seen by anyone yet. Without this the winner's
+    // tiles appeared in front of whoever happened to be holding the device.
+    const leftDraw = drawPending && state.stage !== 'draw';
+    drawPending = state.stage === 'draw';
+    if (next === actorId && !leftDraw) return;
 
     actorId = next;
     segmentStart = state.nextStepId;

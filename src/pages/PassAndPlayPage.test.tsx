@@ -10,26 +10,25 @@ describe('PassAndPlayPage', () => {
     expect(screen.queryByPlaceholderText(/comma/i)).toBeNull();
   });
 
-  it('starts a game and lands on the curtain, not a modal', () => {
+  it('starts a game and lands on the turn-order draw, not a modal', () => {
     render(<MemoryRouter><PassAndPlayPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /start game/i }));
 
     expect(screen.getByTestId('game-surface')).toBeInTheDocument();
-    expect(screen.getByText(/pass to/i)).toBeInTheDocument();
+    // The draw is a gate in front of the game: no curtain, because nobody's
+    // hand is on screen yet for a curtain to protect.
+    expect(screen.getByRole('button', { name: /draw for turn order/i })).toBeInTheDocument();
+    expect(screen.queryByText(/pass to/i)).toBeNull();
   });
 
   it('reaches the first turn without wedging at the draw stage', () => {
     render(<MemoryRouter><PassAndPlayPage /></MemoryRouter>);
     fireEvent.click(screen.getByRole('button', { name: /start game/i }));
-    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
-
     fireEvent.click(screen.getByRole('button', { name: /draw for turn order/i }));
 
-    // The seed is random per mount, so whether seat one wins the turn-order
-    // draw is too — and the curtain only rises when the actor changes. Claim
-    // it when it is there; either way the first turn must be reachable.
-    const handoff = screen.queryByRole('button', { name: /reveal/i });
-    if (handoff) fireEvent.click(handoff);
+    // The draw always hands off, whoever won it: seat one pressed the button
+    // for the table, so the winner's hand still has to be revealed to them.
+    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
 
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
   });

@@ -35,6 +35,19 @@ export function GameScreen({ session }: GameScreenProps) {
   const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent));
 
   const actor = state.players.find((p) => p.id === actorId);
+
+  /**
+   * Whose private state the screen is showing — their tiles on the board and
+   * their shares in the hand zone.
+   *
+   * This is the actor at every stage but one. At the turn-order draw seat one
+   * is the actor because they are the only seat allowed to open the game, but
+   * they are pressing the button for the table, not taking a turn: the draw is
+   * a hard gate in front of the game. Showing their hand there put six of
+   * their tiles on the board before play began and made handing the first turn
+   * to whoever won the draw look like seat one had been skipped.
+   */
+  const viewer = state.stage === 'draw' ? undefined : actor;
   const prices = Object.fromEntries(
     Object.values(state.startups)
       .filter((s) => s.isFounded && isStartupId(s.id))
@@ -49,9 +62,9 @@ export function GameScreen({ session }: GameScreenProps) {
       <div className="flex min-w-0 flex-1 items-center justify-center p-4">
         <Board
           board={state.board}
-          hand={actor?.hand ?? []}
-          placed={actor?.lastPlacedTile ?? null}
-          blocked={actorId ? getDeadTilesInHand(state, actorId) : []}
+          hand={viewer?.hand ?? []}
+          placed={viewer?.lastPlacedTile ?? null}
+          blocked={viewer ? getDeadTilesInHand(state, viewer.id) : []}
           onCellClick={(coord) =>
             actorId && session.dispatch({ type: 'placeTile', playerId: actorId, coord })
           }
@@ -69,9 +82,9 @@ export function GameScreen({ session }: GameScreenProps) {
         staging={staging}
         hand={
           <HandZone
-            name={actor?.name ?? ''}
-            portfolio={actor?.portfolio ?? {}}
-            cash={actor?.cash ?? 0}
+            name={viewer?.name ?? ''}
+            portfolio={viewer?.portfolio ?? {}}
+            cash={viewer?.cash}
             prices={prices}
           />
         }
@@ -82,7 +95,9 @@ export function GameScreen({ session }: GameScreenProps) {
               emoji: p.emoji,
               name: p.name,
               cash: p.cash,
-              active: p.id === actorId,
+              // Nobody is "up" until the draw has decided who is. Seat one
+              // presses the button; that is not the same as having the turn.
+              active: viewer !== undefined && p.id === actorId,
             }))}
           />
         }

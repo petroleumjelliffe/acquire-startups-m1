@@ -119,10 +119,23 @@ describe('segments', () => {
     expect(session.getView().awaitingReveal).toBe(false);
   });
 
-  it('starts with the curtain up so the first player has to claim the device', () => {
+  /**
+   * The turn-order draw is a gate in front of the whole game, not seat one's
+   * turn. Nobody's hand is on screen during it, so there is nothing to hide
+   * and no reason to make someone claim the device before it — the curtain
+   * that matters comes *after* the draw, when the winner's hand is about to
+   * appear.
+   */
+  it('opens the draw without a curtain, because nothing private is on screen yet', () => {
     const session = createGameSession({ seed: 'sess-2', names: ['Alex', 'Sam'] });
-    expect(session.getView().awaitingReveal).toBe(true);
+    expect(session.getView().state.stage).toBe('draw');
+    expect(session.getView().awaitingReveal).toBe(false);
     expect(session.getView().actorId).toBe('p1');
+  });
+
+  it('still opens behind the curtain when resumed mid-game', () => {
+    const session = createGameSession({ state: playableGame() });
+    expect(session.getView().awaitingReveal).toBe(true);
   });
 
   it('offers no undo across a turn boundary', () => {
@@ -182,5 +195,45 @@ describe('liquidation segments', () => {
     const first = session.getView().actorId;
     expect(first).not.toBeNull();
     expect(session.getView().state.mergerContext?.shareholderQueue).toContain(first);
+  });
+});
+
+describe('the turn-order draw is a gate, not a turn', () => {
+  /** An opening where the authored bag decides who wins the draw. */
+  function drawGame(bag: string[]) {
+    return buildFixture({
+      players: [{ name: 'Alex', hand: ['H8'] }, { name: 'Sam', hand: ['C4'] }],
+      bag: bag as never,
+      stage: 'draw',
+    });
+  }
+
+  it('raises the curtain after the draw even when seat one wins it', () => {
+    // p1 draws B4, p2 draws E5 — seat one wins, so the actor id never changes.
+    // The curtain must rise anyway: whoever pressed the button did it for the
+    // table, and the winner's hand has not been seen by anyone yet.
+    const session = createGameSession({ state: drawGame(['B4', 'E5']) });
+    expect(session.getView().awaitingReveal).toBe(false);
+
+    session.dispatch({ type: 'startGame', playerId: 'p1' });
+
+    expect(session.getView().state.turnIndex).toBe(0);
+    expect(session.getView().actorId).toBe('p1');
+    expect(session.getView().awaitingReveal).toBe(true);
+  });
+
+  it('raises the curtain after the draw when another seat wins it', () => {
+    const session = createGameSession({ state: drawGame(['E5', 'B4']) });
+    session.dispatch({ type: 'startGame', playerId: 'p1' });
+
+    expect(session.getView().state.turnIndex).toBe(1);
+    expect(session.getView().actorId).toBe('p2');
+    expect(session.getView().awaitingReveal).toBe(true);
+  });
+
+  it('leaves nothing of the draw undoable once play has begun', () => {
+    const session = createGameSession({ state: drawGame(['B4', 'E5']) });
+    session.dispatch({ type: 'startGame', playerId: 'p1' });
+    expect(session.getView().undoableSteps).toEqual([]);
   });
 });
