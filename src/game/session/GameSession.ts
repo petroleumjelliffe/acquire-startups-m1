@@ -8,6 +8,7 @@ import {
   type SnapshotStore,
 } from '../../../engine/history';
 import { createInitialGame } from '../../../engine/gameInit';
+import { getCurrentActor } from '../../../engine/actor';
 
 export interface SessionError {
   code: IllegalIntentCode;
@@ -55,6 +56,17 @@ export function createGameSession(init: SessionInit): GameSession {
   let error: SessionError | null = null;
   const listeners = new Set<() => void>();
 
+  /**
+   * A segment is a run of steps by one actor. Its start is the step id the
+   * incoming actor's first intent will be filed under, so any snapshot below
+   * it belongs to a closed segment and is not this player's to undo.
+   */
+  let actorId: string | null = getCurrentActor(state);
+  let segmentStart: number = state.nextStepId;
+  // The very first segment starts behind the curtain too: whoever is holding
+  // the device has to claim seat one before they see anything.
+  let awaitingReveal = true;
+
   // Cached so `getView()` is referentially stable between changes —
   // `useSyncExternalStore` re-renders forever if the snapshot is a fresh
   // object on every call.
@@ -68,11 +80,29 @@ export function createGameSession(init: SessionInit): GameSession {
   function buildView(): SessionView {
     return {
       state,
-      actorId: null,
-      awaitingReveal: false,
-      undoableSteps: [...store.keys()].sort((a, b) => a - b),
+      actorId,
+      awaitingReveal,
+      undoableSteps: [...store.keys()].filter((k) => k >= segmentStart).sort((a, b) => a - b),
       error,
     };
+  }
+
+  /**
+   * Closes the segment if the actor changed: curtain up, undo range reset, and
+   * every snapshot from the closed segment discarded — including the snapshot
+   * of the boundary-crossing intent itself, which belongs to the player who
+   * just finished, not to the one arriving.
+   */
+  function syncSegment(): void {
+    const next = getCurrentActor(state);
+    if (next === actorId) return;
+
+    actorId = next;
+    segmentStart = state.nextStepId;
+    awaitingReveal = true;
+    for (const key of [...store.keys()]) {
+      if (key < segmentStart) store.delete(key);
+    }
   }
 
   return {
@@ -94,6 +124,7 @@ export function createGameSession(init: SessionInit): GameSession {
         if (!(e instanceof IllegalIntentError)) throw e;
         error = { code: e.code, message: e.message };
       }
+      syncSegment();
       invalidate();
     },
 
@@ -104,6 +135,7 @@ export function createGameSession(init: SessionInit): GameSession {
     },
 
     reveal() {
+      awaitingReveal = false;
       invalidate();
     },
   };

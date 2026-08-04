@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGameSession } from './GameSession';
 import { buildFixture } from '../../../engine/golden/fixtures';
+import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
+import { replayGoldenGame } from '../../../engine/golden/replay';
 
 function playableGame() {
   return buildFixture({
@@ -93,5 +95,92 @@ describe('createGameSession', () => {
   it('returns the identical view object when nothing has changed', () => {
     const session = createGameSession({ state: playableGame() });
     expect(session.getView()).toBe(session.getView());
+  });
+});
+
+describe('segments', () => {
+  it('reports the active player as the actor', () => {
+    const session = createGameSession({ state: playableGame() });
+    expect(session.getView().actorId).toBe('p1');
+  });
+
+  it('raises the curtain when the actor changes and lowers it on reveal', () => {
+    const session = createGameSession({ state: playableGame() });
+    session.reveal(); // p1 claims the device; every session opens behind the curtain
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    expect(session.getView().awaitingReveal).toBe(false);
+
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+    expect(session.getView().actorId).toBe('p2');
+    expect(session.getView().awaitingReveal).toBe(true);
+
+    session.reveal();
+    expect(session.getView().awaitingReveal).toBe(false);
+  });
+
+  it('starts with the curtain up so the first player has to claim the device', () => {
+    const session = createGameSession({ seed: 'sess-2', names: ['Alex', 'Sam'] });
+    expect(session.getView().awaitingReveal).toBe(true);
+    expect(session.getView().actorId).toBe('p1');
+  });
+
+  it('offers no undo across a turn boundary', () => {
+    const session = createGameSession({ state: playableGame() });
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    expect(session.getView().undoableSteps.length).toBe(2);
+
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+    expect(session.getView().undoableSteps).toEqual([]);
+  });
+
+  it('accumulates undo points within one segment', () => {
+    const session = createGameSession({ state: playableGame() });
+    const first = session.getView().state.nextStepId;
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    expect(session.getView().undoableSteps).toEqual([first]);
+
+    const second = session.getView().state.nextStepId;
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    expect(session.getView().undoableSteps).toEqual([first, second]);
+  });
+
+  it('offers one undo point per intent, not per log entry', () => {
+    // Founding pushes two log entries under one intent (the founder share, then
+    // the founding itself), so step ids outrun snapshots. Only the intent is
+    // undoable.
+    const session = createGameSession({ state: playableGame() });
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    const beforeFound = session.getView().state.nextStepId;
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+
+    expect(session.getView().state.nextStepId).toBeGreaterThan(beforeFound + 1);
+    expect(session.getView().undoableSteps).toContain(beforeFound);
+    expect(session.getView().undoableSteps).not.toContain(beforeFound + 1);
+  });
+
+  it('leaves the curtain down after undoing within a segment', () => {
+    const session = createGameSession({ state: playableGame() });
+    session.reveal(); // p1 claims the device; every session opens behind the curtain
+    const stepId = session.getView().state.nextStepId;
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.undoTo(stepId);
+    expect(session.getView().awaitingReveal).toBe(false);
+    expect(session.getView().actorId).toBe('p1');
+  });
+});
+
+describe('liquidation segments', () => {
+  it('hands the device between shareholders during a merger', () => {
+    const g2 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G2')!;
+    const states = replayGoldenGame(g2);
+    const liquidating = states.find((s) => s.stage === 'mergerLiquidation');
+    if (!liquidating) throw new Error('G2 no longer reaches mergerLiquidation');
+
+    const session = createGameSession({ state: liquidating });
+    const first = session.getView().actorId;
+    expect(first).not.toBeNull();
+    expect(session.getView().state.mergerContext?.shareholderQueue).toContain(first);
   });
 });
