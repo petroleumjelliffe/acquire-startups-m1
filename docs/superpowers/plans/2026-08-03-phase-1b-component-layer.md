@@ -1,6 +1,6 @@
 # Phase 1b — Component Layer Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Rebuild the game's component layer in React + Tailwind against static fixtures, with a catalog route driven by the golden games as the acceptance surface.
 
@@ -53,7 +53,7 @@
 
 **The footgun this task exists to contain:** Tailwind's JIT scans source for *literal* class strings. `` `bg-${hue}-100` `` produces no CSS at all, and the failure is silent — an unstyled element, not an error. Every class name here must be a complete literal.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -87,12 +87,12 @@ describe('brand tokens', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to confirm it fails**
+- [x] **Step 2: Run it to confirm it fails**
 
 Run: `npx vitest run src/game/tokens.test.ts`
 Expected: FAIL — cannot resolve `./tokens`.
 
-- [ ] **Step 3: Write the module**
+- [x] **Step 3: Write the module**
 
 ```ts
 import type { StartupId } from '../../engine/gameTypes';
@@ -130,12 +130,12 @@ export function tickerFor(id: BrandKey): string {
 }
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `npx vitest run src/game/tokens.test.ts` → Expected: 3 passed
 Run: `npm run typecheck` → Expected: exit 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/game
@@ -161,7 +161,7 @@ Reference behaviour from `prototype/components.js:18-35`:
 - `Cash`: zero renders `$0` in a muted style. `sign: 'delta'` renders `+$1,200` / `−$1,200` (note: U+2212 MINUS SIGN, not a hyphen). Without `delta`, negative renders `−$1,200` and positive renders `$1,200` with no `+`.
 - `Price`: bare is `$300`, neutral. With `next` differing from `value`: `$300 ↑ $600`, arrow and next value tinted green when rising, red when falling.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 import { describe, it, expect } from 'vitest';
@@ -223,21 +223,21 @@ describe('Price', () => {
 });
 ```
 
-- [ ] **Step 2: Run them to confirm they fail**
+- [x] **Step 2: Run them to confirm they fail**
 
 Run: `npx vitest run src/game/atoms/`
 Expected: FAIL — modules do not resolve.
 
-- [ ] **Step 3: Implement both**
+- [x] **Step 3: Implement both**
 
 Use `toLocaleString('en-US')` for thousands separators, matching `engine/log.ts:26`. Tailwind classes: cash positive `text-green-700`, negative `text-red-700`, zero `text-gray-400`; price base `text-gray-600`, rising `text-green-700`, falling `text-red-700`. Use `tabular-nums` on both so columns of figures align — the final-scoring table depends on it.
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `npx vitest run src/game/atoms/` → Expected: 8 passed
 Run: `npm run typecheck` → Expected: exit 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/game
@@ -266,7 +266,7 @@ Depth thresholds from `prototype/components.js:70`: `|count| >= 6` → 2 layers,
 
 Cash is a special case throughout: it renders **landscape** like a dollar bill, shows `$$` with no per-share price, and its stack label is the total dollars (`price × count`) rather than `×N` (`prototype/components.js:79`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 import { describe, it, expect, vi } from 'vitest';
@@ -390,22 +390,22 @@ describe('StockStack — the primary interactive share entity', () => {
 
 `fireEvent` is used rather than `@testing-library/user-event`, which is **not** a dependency of this repo. Do not add it — these are click assertions, and `fireEvent` ships with `@testing-library/react`, which is already installed.
 
-- [ ] **Step 2: Run them to confirm they fail**
+- [x] **Step 2: Run them to confirm they fail**
 
 Run: `npx vitest run src/game/atoms/`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Portrait card: fixed width around `w-14`, `flex-col`, ticker bold on top, price small at the bottom. The `sm` variant is proportionally smaller — the buy row, found groups, liquidation lanes and player holdings all need it, and it is the reason the prototype introduced the variant at all.
 
 For depth, use two absolutely-positioned pseudo-elements or sibling `<span>`s offset down-right, behind the card, sharing its border colour. `::before` paints first and therefore furthest back (`prototype/components.css:227`).
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Run: `npx vitest run src/game/atoms/` → Expected: all pass
 Run: `npm run typecheck` → Expected: exit 0
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/game
@@ -435,7 +435,7 @@ Mapping, all Tailwind defaults:
 
 `founded` is the only state where the label is not the coordinate.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```tsx
 import { describe, it, expect } from 'vitest';
@@ -478,11 +478,11 @@ describe('Tile', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to confirm it fails, implement, verify**
+- [x] **Step 2: Run it to confirm it fails, implement, verify**
 
 Run: `npx vitest run src/game/atoms/Tile.test.tsx` → FAIL, then implement, then PASS.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/game
@@ -510,7 +510,7 @@ git commit -m "feat(game): the shared tile-state vocabulary"
 
 **Layout:** a CSS grid, `22px` row-header column then 12 equal columns, `aspect-ratio: 13/10`, `container-type: inline-size` on the grid so cell labels can size in `cqi` and scale with the board (`prototype/components.css:45-52`). This is what makes one board work from tablet to desktop without breakpoint-specific font sizes — do not replace it with fixed `text-` sizes.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 import { describe, it, expect } from 'vitest';
@@ -571,13 +571,13 @@ describe('Board', () => {
 });
 ```
 
-- [ ] **Step 2: Run, implement, verify**
+- [x] **Step 2: Run, implement, verify**
 
 Run: `npx vitest run src/game/Board.test.tsx` → FAIL, then implement, then PASS.
 
 Only `hand` tiles that are not `blocked`, plus the currently-`placed` tile, are clickable. Everything else gets `tabIndex={-1}` so keyboard traversal does not walk 108 dead cells.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/game
@@ -609,7 +609,7 @@ Three reserved-space rules, all from `prototype/components.css:113-120`:
 
 The panel is `flex-col` with `height: 100%`; the step stack takes the remaining space at the top and the other zones pin to the bottom.
 
-- [ ] **Step 1: Write the failing stability test**
+- [x] **Step 1: Write the failing stability test**
 
 This is the load-bearing test of this task.
 
@@ -655,11 +655,11 @@ describe('StagingZone height stability', () => {
 
 The `data-zone` attributes exist for this test. Keep them — they are cheaper than the alternative of asserting on Tailwind class soup, and they document which elements carry the reservation.
 
-- [ ] **Step 2: Run, implement all four components, verify**
+- [x] **Step 2: Run, implement all four components, verify**
 
 Also add a `Panel` test asserting the five slots render in the order `stepstack → active → staging → hand → players` regardless of the order the props are passed in.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/game
@@ -687,11 +687,11 @@ git commit -m "feat(game): the panel shell with height-stable zones"
 
 Nothing here dispatches. `onUndo` is called with the `stepId` and that is all — Phase 2 wires it.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Cover: entries render in order; the undo control appears once per entry when `onUndo` is given and not at all when it is not; clicking undo calls back with that entry's `stepId`; `ActiveStep` renders its button slot only when supplied.
 
-- [ ] **Step 2: Run, implement, verify. Commit.**
+- [x] **Step 2: Run, implement, verify. Commit.**
 
 ```bash
 git add src/game
@@ -719,11 +719,11 @@ git commit -m "feat(game): the step stack, with undo keyed by stepId"
 
 `LiqActions` is two buttons: sell one share for cash, and trade two absorbed shares for one survivor share. The 2-for-1 ratio is `TRADE_RATIO` in `engine/startups.ts` — import it, do not hardcode `2`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Cover: an empty bonus list renders the fallback copy; a `both` entry renders "Majority + minority"; the qty appears on each line; `LiqActions` disables the sell button when `canSell` is false and the trade button when `canTrade` is false; the trade button shows a stack of `TRADE_RATIO` absorbed shares.
 
-- [ ] **Step 2: Run, implement, verify. Commit.**
+- [x] **Step 2: Run, implement, verify. Commit.**
 
 ```bash
 git add src/game
@@ -749,11 +749,11 @@ This is built in the prototype already (`prototype/index.html:504-506`, `prototy
 
 Brands already on the board are rendered `disabled`, not hidden — a player learning the game should see the full field.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Cover: groups appear in ascending price order; every available brand appears exactly once; taken brands render disabled and do not fire `onSelect`; the group headers show prices derived from `getSharePriceAtSize`, asserted by calling that function in the test rather than by literal.
 
-- [ ] **Step 2: Run, implement, verify. Commit.**
+- [x] **Step 2: Run, implement, verify. Commit.**
 
 ```bash
 git add src/game
@@ -781,11 +781,11 @@ Reference: `prototype/components.js:242-308`.
 
 Sorting and totals are derived here (`stock + bonus + cash`), matching `scoreColumns` at `prototype/components.js:257-269`. Bonus *resolution* is a rules concern and arrives already computed.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Cover: columns sort by total descending; a player holding nothing in a chain shows the em-dash placeholder, not `×0`; a `both` bonus renders the `Mm` mark with a title naming the sole-holder case; the banner names the winner and their total; totals equal `stock + bonus + cash`.
 
-- [ ] **Step 2: Run, implement, verify. Commit.**
+- [x] **Step 2: Run, implement, verify. Commit.**
 
 ```bash
 git add src/game
@@ -806,11 +806,11 @@ git commit -m "feat(game): the terminal final-scoring overlay"
 
 This is the one place the prototype's "show the same thing to all players" principle is deliberately broken, and the roadmap records that the principle does not transfer past pass-and-play.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Cover: the player's name appears in the button; `onReveal` fires on click; the overlay renders a scrim that covers its container.
 
-- [ ] **Step 2: Run, implement, verify. Commit.**
+- [x] **Step 2: Run, implement, verify. Commit.**
 
 ```bash
 git add src/game
@@ -836,7 +836,7 @@ git commit -m "feat(game): the pass-and-play reveal overlay"
 
 If you find a state that *should* have engine backing but does not, report it — that is a coverage finding for the golden catalogue, not a licence to hand-author.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```ts
 import { describe, it, expect } from 'vitest';
@@ -866,7 +866,7 @@ describe('catalog fixtures', () => {
 });
 ```
 
-- [ ] **Step 2: Run, implement, verify. Commit.**
+- [x] **Step 2: Run, implement, verify. Commit.**
 
 ```bash
 git add src/game
@@ -904,17 +904,17 @@ const CatalogPage = React.lazy(() => import('./game/catalog/CatalogPage'));
 
 **The catalog is not an assertion surface.** No snapshot tests — snapshots churn constantly during a from-scratch rebuild, and churning snapshots get blind-approved.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Cover: the page renders every section heading; each golden-sourced state's caption names its game id; no section renders zero states; `render` completes without throwing for every state in the catalog (a smoke pass over the whole inventory).
 
-- [ ] **Step 2: Run, implement, verify**
+- [x] **Step 2: Run, implement, verify**
 
 Run: `npx vitest run src/game/` → all pass
 Run: `npm run typecheck` → exit 0
 Run: `npm run check:bundle` → exit 0 — this is the check that the lazy route kept vitest and the golden data out of the main chunk
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add src/game src/App.tsx
@@ -942,7 +942,7 @@ The side panel is `320px` fixed at desktop. Below roughly 1024px it needs to nar
 
 `prefers-reduced-motion` skips enter animations, matching the existing lab (`prototype/states.html:34`).
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```tsx
 import { describe, it, expect } from 'vitest';
@@ -965,7 +965,7 @@ describe('layout', () => {
 });
 ```
 
-- [ ] **Step 2: Add the reduced-motion rule**
+- [x] **Step 2: Add the reduced-motion rule**
 
 In `src/styles/index.css`:
 
@@ -978,11 +978,11 @@ In `src/styles/index.css`:
 }
 ```
 
-- [ ] **Step 3: Check it by hand at both widths**
+- [x] **Step 3: Check it by hand at both widths**
 
 Run: `npm run dev`, open `/catalog`, and check at 768px and 1440px. Confirm the board never scrolls and the panel zones do not jump when you switch a section's states. **Report what you saw at each width** — this is the one check in this plan that no test performs.
 
-- [ ] **Step 4: Verify and commit**
+- [x] **Step 4: Verify and commit**
 
 Run: `npx vitest run` → all pass
 Run: `npm run typecheck` → exit 0
