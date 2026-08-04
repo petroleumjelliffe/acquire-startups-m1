@@ -24,7 +24,13 @@ const ORDER = ['stepstack', 'active', 'staging', 'hand', 'players'] as const;
 
 export function Panel(props: PanelProps) {
   return (
-    <div className="flex h-full w-[264px] shrink-0 flex-col overflow-hidden border-l border-gray-200 lg:w-80">
+    // `overflow-y-auto`, not `overflow-hidden`: a tall active zone — a merger
+    // with four liquidators is the worst case — can push the column past the
+    // viewport, and clipping meant the zones at the bottom (your shares, your
+    // balance, the roster) silently disappeared. The step stack still scrolls
+    // within itself; this is the outer escape hatch for when even a collapsed
+    // stack is not enough.
+    <div className="flex h-full w-[264px] shrink-0 flex-col overflow-y-auto border-l border-gray-200 lg:w-80">
       {ORDER.map((slot) =>
         props[slot] == null ? null : (
           <div

@@ -119,11 +119,43 @@ const MEASURE = `(async () => {
     return out;
   };
 
-  // Four seats, not the default two: the players strip only overflowed its
-  // panel once there were more than two of them, and a gate that always plays
-  // heads-up would never see it.
-  await click(/add player/i, 'add player');
-  await click(/add player/i, 'add player');
+  // The roster clips on purpose, so the property worth guarding is that the
+  // seat whose turn it is stays on screen — which only holds because the strip
+  // rotates it to the front. Sampled at every stage, not once: whether the
+  // active seat happens to be visible at one arbitrary moment says nothing.
+  // Two halves, because either alone would pass while the guarantee is broken:
+  // "the active seat is the first one" is what rotation provides, and "the
+  // first seat is fully visible" is what makes that worth anything. Checking
+  // only whether the active seat happens to be on screen is not enough — with
+  // rotation removed it still reads true whenever the active player is one of
+  // the first few, which is most of the time.
+  const seatVisible = {};
+  const noteSeat = (tag) => {
+    const roster = document.querySelector('[data-zone="roster"]');
+    const seats = roster ? [...roster.querySelectorAll('[data-seat]')] : [];
+    const active = roster && roster.querySelector('.border-blue-600');
+    if (!roster || !active || seats.length === 0) return;
+    const r = roster.getBoundingClientRect();
+    const f = seats[0].getBoundingClientRect();
+    // Legibility, not just presence: with every seat allowed to shrink, a
+    // six-handed table rendered six 33px slivers that were all "visible" and
+    // none readable. The active seat's name must fit inside its own card.
+    const name = seats[0].querySelector('.truncate');
+    seatVisible[tag] = {
+      activeIsFirst: seats[0] === active,
+      firstSeatVisible: f.left >= r.left - 1 && f.right <= r.right + 1,
+      activeNameReadable: name ? name.scrollWidth <= name.clientWidth + 1 : null,
+      activeWidth: Math.round(f.width),
+      seats: seats.length,
+    };
+  };
+
+  // A full table of six, not the default two. The roster only clips once the
+  // seats can no longer shrink to fit — emoji, cash and padding put a floor of
+  // ~73px on each — which happens above four seats. A gate that played
+  // heads-up, or even four-handed, would never exercise the rotation that
+  // keeps the active seat on screen.
+  for (let i = 0; i < 4; i += 1) await click(/add player/i, 'add player');
 
   await click(/start game/i, 'start game');
   await click(/reveal/i, 'reveal (opening)');
@@ -131,6 +163,7 @@ const MEASURE = `(async () => {
   await clickIfPresent(/reveal/i);
 
   const stages = { play: geometry() };
+  noteSeat('play');
 
   // Place the first hand tile. Hand cells are the only clickable board cells.
   const handCell = document.querySelector('[data-board="grid"] button:not([disabled])');
@@ -138,6 +171,7 @@ const MEASURE = `(async () => {
   handCell.click();
   await wait(300);
   stages.afterPlace = geometry();
+  noteSeat('afterPlace');
 
   // Keep playing until a chain has been founded and its shares are on sale.
   // One placement is almost never enough: with a random seed the opening tile
@@ -155,6 +189,7 @@ const MEASURE = `(async () => {
       brand.click();
       await wait(250);
       if (!stages.afterFound) stages.afterFound = geometry();
+      noteSeat('found' + turn);
       continue;
     }
 
@@ -163,6 +198,7 @@ const MEASURE = `(async () => {
       buy.click();
       await wait(250);
       if (!stages.afterStaging) stages.afterStaging = geometry();
+      noteSeat('staging' + turn);
       continue;
     }
 
@@ -171,6 +207,10 @@ const MEASURE = `(async () => {
       endTurn.click();
       await wait(250);
       await clickIfPresent(/reveal/i);
+      // The sample that matters most: the turn has just changed hands, so the
+      // active seat is a different one each time round the table. Without
+      // rotation this is where a later seat is clipped off the end.
+      noteSeat('turn' + turn);
       continue;
     }
 
@@ -187,17 +227,21 @@ const MEASURE = `(async () => {
 
   const surface = document.querySelector('[data-testid="game-surface"]');
   const grid = document.querySelector('[data-board="grid"]');
-  const strip = document.querySelector('[data-slot="players"]');
+  const panel = document.querySelector('[data-slot="stepstack"]')?.parentElement ?? null;
+  noteSeat('final');
 
   return {
-    // Zones that clip their content rather than fitting it. The players strip
-    // did exactly this at four seats and up — six seats wanted 1061px inside a
-    // 319px panel — and nothing visible said so: the extra seats were just
-    // gone. Horizontal overflow inside a fixed-width panel is always a bug.
-    clipped: [strip, ...document.querySelectorAll('[data-zone]')]
-      .filter((el) => el && el.scrollWidth > el.clientWidth + 1)
-      .map((el) => (el.getAttribute('data-slot') ?? el.getAttribute('data-zone')) +
-        ' ' + el.scrollWidth + '>' + el.clientWidth),
+    seatVisible,
+    // Zones that clip their content rather than fitting it. Horizontal
+    // overflow inside a fixed-width panel is a bug everywhere except the
+    // roster, which is exempt above and by name.
+    clipped: [...document.querySelectorAll('[data-zone]')]
+      .filter((el) => el.getAttribute('data-zone') !== 'roster')
+      .filter((el) => el.scrollWidth > el.clientWidth + 1)
+      .map((el) => el.getAttribute('data-zone') + ' ' + el.scrollWidth + '>' + el.clientWidth),
+    // The panel scrolls rather than clipping, so a column taller than the
+    // viewport is survivable — but it should still be rare enough to notice.
+    panelScrolls: panel ? panel.scrollHeight > panel.clientHeight + 1 : null,
     docScrollWidth: document.documentElement.scrollWidth,
     innerWidth: window.innerWidth,
     surface: surface ? surface.getBoundingClientRect().toJSON() : null,
@@ -222,7 +266,7 @@ const CURTAIN = `(() => {
 const START_GAME = `(async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const find = (re) => [...document.querySelectorAll('button')].find((b) => re.test(b.innerText));
-  for (let i = 0; i < 2; i += 1) { const a = find(/add player/i); if (a) { a.click(); await wait(150); } }
+  for (let i = 0; i < 4; i += 1) { const a = find(/add player/i); if (a) { a.click(); await wait(150); } }
   const btn = find(/start game/i);
   if (!btn) throw new Error('no start game button');
   btn.click();
@@ -297,6 +341,31 @@ async function main() {
     for (const zone of m.clipped ?? []) {
       failures.push(`${width}px: zone clips its content horizontally — ${zone}`);
     }
+    const seatSamples = Object.entries(m.seatVisible ?? {});
+    if (seatSamples.length < 3) {
+      failures.push(
+        `${width}px: only ${seatSamples.length} roster samples — too few to say the ` +
+        `active seat stays visible as the turn moves round the table`,
+      );
+    }
+    for (const [tag, s] of seatSamples) {
+      if (!s.activeIsFirst) {
+        failures.push(
+          `${width}px: at ${tag} the active player is not the first seat in the roster — ` +
+          `the strip clips, so rotating them to the front is the only thing keeping ` +
+          `them on screen (${s.seats} seats)`,
+        );
+      }
+      if (!s.firstSeatVisible) {
+        failures.push(`${width}px: at ${tag} even the first roster seat is clipped (${s.seats} seats)`);
+      }
+      if (s.activeNameReadable === false) {
+        failures.push(
+          `${width}px: at ${tag} the active player's name does not fit its own seat ` +
+          `(${s.activeWidth}px wide, ${s.seats} seats) — being first is no use if it is unreadable`,
+        );
+      }
+    }
 
     // The load-bearing check. A panel zone that is 62px when empty and 68px
     // when filled passes every jsdom test ever written about it, because jsdom
@@ -335,7 +404,8 @@ async function main() {
     }
 
     console.log(
-      `${width}px  board ${m.board ? Math.round(m.board.width) + 'x' + Math.round(m.board.height) : 'none'}` +
+      `${width}px  roster samples ${JSON.stringify(m.seatVisible)}` +
+      `\n         board ${m.board ? Math.round(m.board.width) + 'x' + Math.round(m.board.height) : 'none'}` +
       `\n         ` + stageNames.map((n) => `${n} ${JSON.stringify(m.stages[n])}`).join('\n         '),
     );
     ws.close();
