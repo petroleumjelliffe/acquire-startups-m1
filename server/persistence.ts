@@ -7,7 +7,12 @@ import { existsSync } from "fs";
 import type { MultiplayerGameState, SavedGameState } from "./types.js";
 
 const GAMES_DIR = join(process.cwd(), "server", "games");
-const SAVE_VERSION = 1;
+// Bumped for engine hardening: GameState.discarded is now required. A save
+// written before this branch reloads with discarded === undefined, and the
+// first tradeInDeadTiles intent throws at engine/intents.ts:313 instead of
+// failing cleanly. Bumping the version makes a stale save refuse to load
+// (loadGame logs a version mismatch and returns null) rather than crash.
+const SAVE_VERSION = 2;
 
 // Ensure games directory exists
 export async function initPersistence(): Promise<void> {
