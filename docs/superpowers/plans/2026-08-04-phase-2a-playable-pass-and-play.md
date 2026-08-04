@@ -2525,7 +2525,14 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx -t mergers
 
 Expected: FAIL — nothing renders for `mergerLiquidation` or `chooseSurvivor`.
 
-If instead it fails with `no golden game reaches that state` for `chooseSurvivor`, find out which games reach which stages before writing any implementation:
+**Both stages are known to be reachable** — checked against the tree before this plan was written, so `stateWhere` will find them and no hand-built fixture is needed:
+
+| Stage | Golden games |
+|---|---|
+| `chooseSurvivor` | **G13** steps 1–2 |
+| `mergerLiquidation` | **G2** steps 1–5, **G3**:1, **G4**:1, **G5**:1, **G7** steps 1–3, **G13** steps 3–4 |
+
+If `stateWhere` ever throws `no golden game reaches that state`, a golden game has changed rather than the test being wrong. Re-run the scan before adjusting anything:
 
 ```bash
 npx tsx -e "
@@ -2539,8 +2546,6 @@ for (const g of ALL_GOLDEN_GAMES) {
   });
 }"
 ```
-
-If no golden game reaches `chooseSurvivor`, that is itself a finding — record it in Task 19's carry-forward and build the branch against a hand-built fixture with `pendingTiedStartups` set.
 
 - [ ] **Step 3: Implement the survivor choice**
 
@@ -3612,6 +3617,6 @@ git commit -m "docs: Phase 2a to 2b carry-forward punch list"
 1. The spec named `liquidation` and `liquidationPrompt` as the liquidation stages. The live stage in the `applyIntent` path is **`mergerLiquidation`** — the other two are assigned only by the legacy `gameLogic` path that `src/Game.tsx` uses. Task 1 uses the correct one.
 2. The spec's screen sketch puts every decision "in the panel's active zone", which reads as though the staging zone were part of it. It cannot be: the zone order `stepstack → active → staging → hand → players` is fixed, and a staging zone rendered only during buying and liquidation would move every zone beneath it — violating the panel-height-stability rule the same document states. Hence `useTurnPanel` returning **both** slots, and `GameScreen` passing all five on every render. This was caught by writing the plan's own layout gate and noticing it would fail.
 
-**Known open question, deliberately left to implementation.** Whether any golden game reaches `chooseSurvivor`. Task 13 Step 2 includes the command to find out and says what to do either way, including recording it as a finding if none does. Guessing in the plan would be worse than checking.
+**Fixture assumptions, all verified against the tree before execution.** `chooseSurvivor` is reached by G13:1–2 and `mergerLiquidation` by G2, G3, G4, G5, G7 and G13, so Task 13 needs no hand-built fixture. G2's payout pays two players, so Task 4's `bonuses.length > 1` holds. G2 and G7 each put two different players through liquidation, so Task 17's multi-actor assertion holds. None of these were assumed; each was replayed and printed.
 
 **Anti-regression checks worth noting.** Three tests exist specifically to catch the failure modes earlier phases hit: `useTurnPanel`'s "always renders the staging slot" and `GameScreen`'s "renders all five panel slots at every stage" guard the zone-order rule structurally; `verify:layout`'s stage-to-stage height comparison guards it dimensionally, which is the half jsdom cannot see; and Task 16 Step 4 requires proving the gate can actually fail, because Phase 1a shipped a `check:bundle` guard that silently protected nothing.
