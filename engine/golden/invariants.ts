@@ -1,7 +1,6 @@
 import type { GameState } from '../gameTypes';
 
 const TOTAL_TILES = 108;
-const SHARES_PER_STARTUP = 25;
 
 /**
  * Structural truths that must hold after every intent, in every game, forever.
@@ -27,10 +26,10 @@ export function checkInvariants(state: GameState): string[] {
 
   for (const [id, startup] of Object.entries(state.startups)) {
     const held = state.players.reduce((n, p) => n + (p.portfolio[id] ?? 0), 0);
-    if (held + startup.availableShares !== SHARES_PER_STARTUP) {
+    if (held + startup.availableShares !== startup.totalShares) {
       problems.push(
         `share conservation ${id}: held ${held} + available ${startup.availableShares} ` +
-          `= ${held + startup.availableShares}, expected ${SHARES_PER_STARTUP}`,
+          `= ${held + startup.availableShares}, expected ${startup.totalShares}`,
       );
     }
     if (startup.availableShares < 0) problems.push(`${id} has negative available shares`);
