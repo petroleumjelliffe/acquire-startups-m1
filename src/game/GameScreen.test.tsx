@@ -173,6 +173,24 @@ describe('GameScreen at the end of a game', () => {
     expect(onExit).toHaveBeenCalled();
   });
 
+  it('keeps the end-game actions inside the scoreboard card', () => {
+    // Regression: these buttons used to render as a sibling of `FinalScoring`
+    // rather than through its `actions` slot. `FinalScoring`'s root is
+    // `absolute inset-0`, which contributes no flow height — a sibling's
+    // `mt-6` was measured from the scrim's top edge, not the card's bottom,
+    // so the row landed on top of the winner banner (worst at 768px). An
+    // unscoped `getByRole` (the test above) cannot tell the two layouts
+    // apart, because the buttons are "present in the document" either way —
+    // it has to be scoped to the card itself.
+    const { container } = render(
+      <GameScreen session={ended()} onNewGame={() => {}} onExit={() => {}} />,
+    );
+    const card = container.querySelector('[data-testid="final-overlay"] .rounded-2xl');
+    expect(card).not.toBeNull();
+    expect(within(card as HTMLElement).getByRole('button', { name: /new game/i })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole('button', { name: /back to menu/i })).toBeInTheDocument();
+  });
+
   it('omits the buttons the page did not supply', () => {
     render(<GameScreen session={ended()} />);
     expect(screen.queryByRole('button', { name: /new game/i })).toBeNull();
