@@ -134,7 +134,12 @@ export function GameScreen({ session, onNewGame, onExit }: GameScreenProps) {
           <FinalScoring {...finalScore(state)} />
 
           {(onNewGame || onExit) && (
-            <div className="mt-6 flex justify-center gap-3">
+            // `FinalScoring` paints its own `absolute inset-0 z-50` backdrop as
+            // this row's preceding sibling. Without a stacking context of its
+            // own, this row is a static-positioned sibling that paints *under*
+            // that backdrop — present in the DOM, invisible to hit-testing.
+            // `relative z-[60]` lifts it above z-50 so real clicks land here.
+            <div className="relative z-[60] mt-6 flex justify-center gap-3">
               {onNewGame && (
                 <button
                   type="button"
