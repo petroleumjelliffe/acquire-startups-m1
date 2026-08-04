@@ -1,6 +1,6 @@
 # Phase 2b — Finishing the Game Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** A game that starts can now finish — dead tiles traded, stuck players passed, the end declared, and the score shown.
 
@@ -67,7 +67,7 @@
 
 **Why export the engine's predicate instead of recomputing it.** The obvious alternative is to ask in the hook: `player.hand.some((c) => previewPlacement(state, c, id).legal)`. That duplicates the engine's own gate in the UI, and if the two ever disagree the button appears and the intent rejects — or worse, the button hides and the player is wedged again. `hasLegalTile` already exists and is exactly the predicate `doEndTurn` gates on. Exporting it makes the button and the rule the same question.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/game/screen/useTurnPanel.test.tsx`:
 
@@ -108,7 +108,7 @@ describe('useTurnPanel — a player who cannot move', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx -t "cannot move"
@@ -118,7 +118,7 @@ Expected: FAIL — no button matching `/end turn/i` at the `play` stage.
 
 If instead the *fixture* fails to build (`Messla`/`ZuckFace` at 11 tiles are safe; `C1` touches `B1` and `D1`), print `previewPlacement(state, 'C1', 'p1')` and confirm `legal: false` before changing the test — a fixture that is not actually stuck proves nothing.
 
-- [ ] **Step 3: Export the engine predicate**
+- [x] **Step 3: Export the engine predicate**
 
 In `engine/intents.ts`, change the declaration of `hasLegalTile` from:
 
@@ -142,7 +142,7 @@ export function hasLegalTile(state: GameState, playerId: string): boolean {
 
 Nothing else changes: `engine/index.ts` already does `export * from './intents'`.
 
-- [ ] **Step 4: Offer the pass in the play branch**
+- [x] **Step 4: Offer the pass in the play branch**
 
 In `src/game/screen/useTurnPanel.tsx`, add to the imports:
 
@@ -188,7 +188,7 @@ Replace the whole `if (state.stage === 'play') { ... }` branch with:
   }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx
@@ -196,7 +196,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx
 
 Expected: PASS, including the three new cases.
 
-- [ ] **Step 6: Run the gates and commit**
+- [x] **Step 6: Run the gates and commit**
 
 ```bash
 npx vitest run && npm run typecheck && npx vite build && npm run check:bundle && npm run verify:layout
@@ -222,7 +222,7 @@ The intent is legal only in `play`, only for the current player, and it draws a 
 
 All dead tiles go at once. There is no reading of the rules where keeping a permanently unplayable tile helps, so a pick-which-ones UI would be ceremony. `tradeInDeadTiles` accepts a subset if that judgement ever changes.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/game/screen/useTurnPanel.test.tsx`:
 
@@ -285,7 +285,7 @@ describe('useTurnPanel — dead tiles', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx -t "dead tiles"
@@ -293,7 +293,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx -t "dead tiles"
 
 Expected: FAIL — no button matching `/trade in/i`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/game/screen/useTurnPanel.tsx`, add to the imports:
 
@@ -360,7 +360,7 @@ In the `play` branch from Task 1, compute the dead tiles and render both actions
 
 Note the `button` prop is now a `<div>` holding zero, one or two buttons. When both are absent it still renders an empty flex column — that is deliberate: `ActiveStep`'s slot keeps its height either way, and the panel does not move as the actions come and go.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx
@@ -368,7 +368,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx
 
 Expected: PASS — Task 1's three cases and these four.
 
-- [ ] **Step 5: Run the gates and commit**
+- [x] **Step 5: Run the gates and commit**
 
 ```bash
 npx vitest run && npm run typecheck && npx vite build && npm run check:bundle && npm run verify:layout
@@ -396,7 +396,7 @@ git commit -m "feat(screen): trade in dead tiles from the placement step"
 
 `FinalScoring` already contains the sentence that describes an end reason (`reasonText`). Export it rather than writing a second one, so the panel and the scoreboard cannot describe the same ending differently.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/game/screen/useTurnPanel.test.tsx`:
 
@@ -438,7 +438,7 @@ describe('useTurnPanel — declaring the end', () => {
 
 `ALL_GOLDEN_GAMES` and `replayGoldenGame` are already imported at the top of this file.
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx -t "declaring the end"
@@ -446,7 +446,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx -t "declaring the end"
 
 Expected: FAIL — no button matching `/end the game/i`.
 
-- [ ] **Step 3: Export the reason sentence**
+- [x] **Step 3: Export the reason sentence**
 
 In `src/game/FinalScoring.tsx`, change:
 
@@ -466,7 +466,7 @@ to:
 export function reasonText(reason: FinalScoreReport['reason']): string {
 ```
 
-- [ ] **Step 4: Offer the declaration**
+- [x] **Step 4: Offer the declaration**
 
 In `src/game/screen/useTurnPanel.tsx`, add to the imports:
 
@@ -507,7 +507,7 @@ Then render `{declareEnd}` in exactly two places, matching the intent's own gate
               {!canPlace && declareEnd}
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx
@@ -515,7 +515,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 6: Test that undo can un-end a game**
+- [x] **Step 6: Test that undo can un-end a game**
 
 Ending is a decision inside the declaring player's own segment, so undo reaches it. That is consistent with every other decision, and it is the one undo that resurrects a finished game — so it gets an explicit test rather than an assumption.
 
@@ -560,7 +560,7 @@ npx vitest run src/game/session/GameSession.test.ts -t "ending the game"
 
 Expected: PASS. **If the second case fails**, the declaration closed a segment and pruned its own snapshot — report that rather than working around it, because it means `getCurrentActor` going `null` is being treated as an actor change and the undo range is being reset by the very step it should still cover.
 
-- [ ] **Step 7: Run the gates and commit**
+- [x] **Step 7: Run the gates and commit**
 
 ```bash
 npx vitest run && npm run typecheck && npx vite build && npm run check:bundle && npm run verify:layout
@@ -593,7 +593,7 @@ git commit -m "feat(screen): declare the end where the engine allows it"
 
 Both callbacks are optional. The driven tests render `GameScreen` with no page behind it, and an absent handler simply omits its button.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/game/GameScreen.test.tsx`:
 
@@ -659,7 +659,7 @@ import { replayGoldenGame } from '../../engine/golden/replay';
 
 `vi` may already be imported; merge rather than duplicate the import.
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/GameScreen.test.tsx -t "end of a game"
@@ -667,7 +667,7 @@ npx vitest run src/game/GameScreen.test.tsx -t "end of a game"
 
 Expected: FAIL — no element with test id `final-overlay`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 In `src/game/GameScreen.tsx`, add to the imports:
 
@@ -739,7 +739,7 @@ Then add this immediately after the existing curtain block, as the last child of
 
 `z-30` sits above the curtain's `z-20`: at `end` there is no actor, so no curtain should be up, but if both ever were the result should be the scoreboard rather than a handoff to nobody.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/game/GameScreen.test.tsx
@@ -749,7 +749,7 @@ Expected: PASS — all six new cases plus the existing ones.
 
 If the totals assertion fails, **do not adjust the expected figures.** They are G9's declared totals, already asserted against the engine by `golden.test.ts`. A mismatch means the overlay is rendering something other than `finalScore(state)`.
 
-- [ ] **Step 5: Check the file is still composition**
+- [x] **Step 5: Check the file is still composition**
 
 ```bash
 wc -l src/game/GameScreen.tsx
@@ -757,7 +757,7 @@ wc -l src/game/GameScreen.tsx
 
 The phase-2a rule was that beats move into `src/game/screen/` if this file passes roughly 200 lines. Expect ~145. If it is over 200, extract the overlay into `src/game/screen/EndOverlay.tsx` taking `{ state, onNewGame, onExit }` and render that instead.
 
-- [ ] **Step 6: Run the gates and commit**
+- [x] **Step 6: Run the gates and commit**
 
 ```bash
 npx vitest run && npm run typecheck && npx vite build && npm run check:bundle && npm run verify:layout
@@ -779,7 +779,7 @@ git commit -m "feat(screen): final scoring overlay on real finalScore output"
 
 **Background.** The page already holds `config` in `useState` and derives the session from it with `useMemo`. Clearing the config drops the session **and its snapshot store**, which is the intended full reset — replaying the same seed and names is what the Advanced seed field is for.
 
-- [ ] **Step 1: Note why this task has no new unit test**
+- [x] **Step 1: Note why this task has no new unit test**
 
 There is no honest jsdom test for this seam, and writing a dishonest one is worse than writing none.
 
@@ -796,7 +796,7 @@ What actually covers this task:
 
 The three existing tests in `PassAndPlayPage.test.tsx` must keep passing; do not modify them.
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 In `src/pages/PassAndPlayPage.tsx`, replace the `if (session) return <GameScreen session={session} />;` line with:
 
@@ -815,7 +815,7 @@ In `src/pages/PassAndPlayPage.tsx`, replace the `if (session) return <GameScreen
   }
 ```
 
-- [ ] **Step 3: Run the tests**
+- [x] **Step 3: Run the tests**
 
 ```bash
 npx vitest run src/pages/PassAndPlayPage.test.tsx
@@ -823,7 +823,7 @@ npx vitest run src/pages/PassAndPlayPage.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 4: Run the gates and commit**
+- [x] **Step 4: Run the gates and commit**
 
 ```bash
 npx vitest run && npm run typecheck && npx vite build && npm run check:bundle && npm run verify:layout
@@ -846,7 +846,7 @@ git commit -m "feat(app): a finished game can be restarted or left"
 
 **Dispatch inside `act()`.** The file's `apply()` helper exists because a bare `dispatch` on an external store leaves React showing the previous render, and a test that then queries the DOM reads stale markup. This cost real time in 2a.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Append to `src/game/screen/drivenGolden.test.tsx`:
 
@@ -904,7 +904,7 @@ describe('driven golden games — the end', () => {
 });
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 ```bash
 npx vitest run src/game/screen/drivenGolden.test.tsx
@@ -914,7 +914,7 @@ Expected: PASS.
 
 The G9 figures are **not** to be edited if they fail — `golden.test.ts` already asserts them against the engine, so a mismatch here means the screen is showing something other than `finalScore(state)`. That is the exact defect class Phase 0 shipped by copying a number, and the reason this test exists.
 
-- [ ] **Step 3: Run the gates and commit**
+- [x] **Step 3: Run the gates and commit**
 
 ```bash
 npx vitest run && npm run typecheck && npx vite build && npm run check:bundle && npm run verify:layout
@@ -943,7 +943,7 @@ What is checked instead:
 
 This is a real gap, not a covered one, and it is recorded as such in the carry-forward.
 
-- [ ] **Step 1: Make the gate notice an end state if it ever reaches one**
+- [x] **Step 1: Make the gate notice an end state if it ever reaches one**
 
 Free insurance: if a future walk does reach `end`, measure the overlay rather than silently ignoring it. In `scripts/verify-layout.mjs`, inside the `MEASURE` block's returned object, add alongside `clipped`:
 
@@ -960,7 +960,7 @@ Free insurance: if a future walk does reach `end`, measure the overlay rather th
     })(),
 ```
 
-- [ ] **Step 2: Fail if it is present and does not cover**
+- [x] **Step 2: Fail if it is present and does not cover**
 
 In `main()`, after the `clipped` loop, add:
 
@@ -970,7 +970,7 @@ In `main()`, after the `clipped` loop, add:
     }
 ```
 
-- [ ] **Step 3: Confirm the gate still passes and still takes about as long**
+- [x] **Step 3: Confirm the gate still passes and still takes about as long**
 
 ```bash
 time npm run verify:layout
@@ -978,7 +978,7 @@ time npm run verify:layout
 
 Expected: `verify:layout OK`, in roughly the time it took before. If it has grown by minutes, something in this task started playing to the end — revert it; that is the trade this task exists to refuse.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add scripts/verify-layout.mjs
@@ -993,7 +993,7 @@ git commit -m "test(layout): hold the end overlay to the curtain's coverage rule
 
 **Background.** In 1b it produced two defects against 101 green tests. In 2a it produced three, including a players strip that silently hid half the table, against 341 green tests and four green gates. Budget for it.
 
-- [ ] **Step 1: Start the app**
+- [x] **Step 1: Start the app**
 
 ```bash
 npm run dev
@@ -1001,7 +1001,7 @@ npm run dev
 
 Open `http://localhost:5173/pass-and-play`.
 
-- [ ] **Step 2: Reach an end and look at it**
+- [x] **Step 2: Reach an end and look at it**
 
 The fastest reliable route to an end condition is a two-player game where you deliberately grow one chain: found early, then keep extending the same chain until it passes 41 tiles. Write down anything that looks wrong:
 
@@ -1015,19 +1015,19 @@ The fastest reliable route to an end condition is a two-player game where you de
 8. Does the overlay scroll if a 7-chain × 6-player table does not fit at 768px?
 9. "New game" — does it genuinely start a new game rather than the same one?
 
-- [ ] **Step 3: Check reduced motion and both widths**
+- [x] **Step 3: Check reduced motion and both widths**
 
 DevTools → Rendering → *Emulate prefers-reduced-motion: reduce*. The overlay must appear instantly. Then check the overlay at 768 and 1440.
 
-- [ ] **Step 4: Write the findings down**
+- [x] **Step 4: Write the findings down**
 
 Create `docs/superpowers/specs/2026-08-04-phase-2b-by-hand-notes.md`, including "nothing wrong here" for the checks that passed, so the next phase knows what was actually looked at.
 
-- [ ] **Step 5: Fix anything that is a defect, not a preference**
+- [x] **Step 5: Fix anything that is a defect, not a preference**
 
 Failing test first wherever a test can express it; a note in the findings file where one cannot.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-08-04-phase-2b-by-hand-notes.md
@@ -1042,7 +1042,7 @@ git commit -m "docs: Phase 2b by-hand play notes"
 - Create: `docs/superpowers/specs/2026-08-04-phase-2b-carry-forward.md`
 - Modify: `docs/superpowers/plans/2026-08-04-phase-2b-finishing-the-game.md` (this file — check every box)
 
-- [ ] **Step 1: Confirm the whole suite is green**
+- [x] **Step 1: Confirm the whole suite is green**
 
 ```bash
 npx vitest run && npm run typecheck && npx vite build && npm run check:bundle && npm run verify:layout
@@ -1050,7 +1050,7 @@ npx vitest run && npm run typecheck && npx vite build && npm run check:bundle &&
 
 Record the test and file counts from the vitest output.
 
-- [ ] **Step 2: Write the carry-forward**
+- [x] **Step 2: Write the carry-forward**
 
 Follow the shape of `2026-08-04-phase-2a-carry-forward.md`. Cover, with evidence rather than assertion:
 
@@ -1061,18 +1061,18 @@ Follow the shape of `2026-08-04-phase-2a-carry-forward.md`. Cover, with evidence
 - **Plan defects caught during implementation** — every phase so far has found some in the plan's own test code. Record them.
 - **What comes next inherits:** the draw screen (specified in the 2a carry-forward, still unbuilt), and Phase 3's transport work.
 
-- [ ] **Step 3: Check every box in this plan**
+- [x] **Step 3: Check every box in this plan**
 
 ```bash
 python3 - <<'PY'
 import pathlib
 p = pathlib.Path('docs/superpowers/plans/2026-08-04-phase-2b-finishing-the-game.md')
-p.write_text(p.read_text().replace('- [ ]', '- [x]'))
+p.write_text(p.read_text().replace('- [x]', '- [x]'))
 print('all steps marked complete')
 PY
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-08-04-phase-2b-carry-forward.md docs/superpowers/plans/2026-08-04-phase-2b-finishing-the-game.md
