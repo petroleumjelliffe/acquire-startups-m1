@@ -42,11 +42,23 @@ export type LogToken =
   | { kind: 'cash';  amount: number; delta?: boolean }
   | { kind: 'stack'; startupId: string; count: number };
 
+/**
+ * Structured data a log entry carries alongside its display tokens, for steps
+ * whose detail is a component rather than a sentence.
+ *
+ * A discriminated union so more step kinds can join without any consumer
+ * having to guess: the alternative Phase 1b had to use was a regex over
+ * rendered text, which is correct until someone rewords a log string.
+ */
+export type LogPayload =
+  | { kind: 'payout'; bonuses: BonusResult[] };
+
 export interface LogEntry {
   stepId: number;
   phase: string;
   detail: LogToken[];
   playerId?: string;
+  payload?: LogPayload;
 }
 
 export interface MergerContext {

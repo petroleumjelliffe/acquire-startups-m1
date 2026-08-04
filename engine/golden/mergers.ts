@@ -47,9 +47,10 @@ const G2: GoldenGame = {
         // Before that fix the log's account of a merger turn was "nothing
         // happened, then two chains merged somewhere". `doPlaceTile` settles
         // the merger payout synchronously in the same intent
-        // (`settleMergerPayout` — see intents.ts), which is why the two
-        // payout entries land in this step and not a later one.
-        logPhases: ['Placed a tile', 'Merger', 'Merger payout', 'Merger payout'],
+        // (`settleMergerPayout` — see intents.ts), which is why the payout
+        // entry lands in this step and not a later one. One entry covers the
+        // whole payout, however many payees: it carries them as a payload.
+        logPhases: ['Placed a tile', 'Merger', 'Merger payout'],
       },
     },
     {
@@ -428,7 +429,7 @@ const G13: GoldenGame = {
         // Messla at size 3, tier 0 → $300. Alex majority 4 → $3,000;
         // Sam minority 2 → $1,500.
         cash: { p1: 3000, p2: 1500 },
-        logPhases: ['Merger', 'Merger payout', 'Merger payout'],
+        logPhases: ['Merger', 'Merger payout'],
       },
     },
     {

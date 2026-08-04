@@ -671,16 +671,22 @@ function bonusLabel(type: 'majority' | 'minority' | 'both'): string {
 export function finalizeMergerPayout(state: GameState) {
   const bonuses: BonusResult[] = state.pendingBonuses ?? [];
 
-  // Award bonuses
+  // Award bonuses. One log entry for the whole payout, not one per payee:
+  // a payout is a single consequence of the merge, so it should be a single
+  // step in the stack — and `PayoutLines` renders the set, not a line at a
+  // time. The bonuses ride along as a payload because `pendingBonuses` is
+  // cleared a few lines below, inside this same `applyIntent` call.
   for (const b of bonuses) {
     const player = state.players.find((p) => p.id === b.playerId);
-    if (player) {
-      player.cash += b.amount;
-      pushLog(state, 'Merger payout', [
-        tok.text(`${bonusLabel(b.type)} bonus `),
-        tok.cash(b.amount, true),
-      ], player.id);
-    }
+    if (player) player.cash += b.amount;
+  }
+
+  if (bonuses.length > 0) {
+    const entry = pushLog(state, 'Merger payout', bonuses.flatMap((b, i) => [
+      tok.text(`${i === 0 ? '' : ', '}${b.playerName} ${bonusLabel(b.type).toLowerCase()} `),
+      tok.cash(b.amount, true),
+    ]));
+    entry.payload = { kind: 'payout', bonuses };
   }
 
   state.pendingBonuses = undefined;

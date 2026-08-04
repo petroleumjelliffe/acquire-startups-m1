@@ -4,6 +4,8 @@ import { createTestGameState, giveShares, setupGameWithStartups } from './testHe
 import { buildFixture } from './golden/fixtures';
 import { createInitialGame } from './gameInit';
 import { generateAllCoords, compareTiles } from './gameHelpers';
+import { ALL_GOLDEN_GAMES } from './golden';
+import { replayGoldenGame } from './golden/replay';
 import type { GameState, StartupId } from './gameTypes';
 import type { Coord, Row } from './gameHelpers';
 
@@ -773,5 +775,27 @@ describe('startGame', () => {
     const state = createInitialGame('open-6', ['Alex', 'Sam']);
     expect(() => applyIntent(state, { type: 'startGame', playerId: 'p2' }))
       .toThrow(IllegalIntentError);
+  });
+});
+
+describe('merger payout payload', () => {
+  it('emits one payout entry carrying every bonus', () => {
+    // Reuse the two-way merger fixture from the golden games so the payout is real.
+    const g2 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G2')!;
+    const states = replayGoldenGame(g2);
+    const withPayout = states.find((s) => s.log.some((e) => e.phase === 'Merger payout'))!;
+
+    const entries = withPayout.log.filter((e) => e.phase === 'Merger payout');
+    expect(entries).toHaveLength(1);
+
+    const payload = entries[0].payload;
+    expect(payload?.kind).toBe('payout');
+    if (payload?.kind !== 'payout') throw new Error('expected a payout payload');
+    expect(payload.bonuses.length).toBeGreaterThan(1);
+    for (const b of payload.bonuses) {
+      expect(typeof b.playerName).toBe('string');
+      expect(['majority', 'minority', 'both']).toContain(b.type);
+      expect(b.amount).toBeGreaterThan(0);
+    }
   });
 });

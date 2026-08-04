@@ -24,7 +24,7 @@ import { getSharePrice } from '../../../engine/gameLogic';
 import { floodFillUnclaimed } from '../../../engine/gameHelpers';
 import { getDeadTilesInHand } from '../../../engine/placement';
 import { finalScore } from '../../../engine/endGame';
-import type { Coord, GameState, LogToken, StartupId } from '../../../engine/gameTypes';
+import type { Coord, GameState, StartupId } from '../../../engine/gameTypes';
 
 /* ------------------------------------------------------------------ *
  * Derivations. Everything a catalog state shows is read back out of a
@@ -64,39 +64,30 @@ const ownersOf = (s: GameState): Record<Coord, string> => {
 const stepsOf = (s: GameState) =>
   s.log.map((e) => ({ stepId: e.stepId, phase: e.phase, detail: <LogDetail detail={e.detail} /> }));
 
-const textOf = (detail: LogToken[]): string =>
-  detail.map((t) => (t.kind === 'text' ? t.text : '')).join('');
-
-const amountOf = (detail: LogToken[]): number => {
-  for (const t of detail) if (t.kind === 'cash') return t.amount;
-  return 0;
-};
-
 /**
- * The payout lines the engine actually wrote to the log during the merge, with
- * each holder qty read back off their portfolio — absorbed shares are still
- * held until that player liquidates, so the qty is available at this state.
+ * The payout the engine actually recorded, read off the log entry's payload.
+ *
+ * Phase 1b derived the bonus *type* with a regex over the entry's rendered
+ * text, because the engine discarded `pendingBonuses` inside the same intent.
+ * The typed payload replaced that; the qty still comes off the portfolio,
+ * since absorbed shares are held until that player liquidates.
  */
 function payoutLinesOf(s: GameState): PayoutLine[] {
   const absorbedId = s.mergerContext?.absorbedIds[0];
-  return s.log
-    .filter((e) => e.phase === 'Merger payout')
-    .map((e) => {
-      const player = s.players.find((p) => p.id === e.playerId);
-      const label = textOf(e.detail);
-      const type: PayoutLine['type'] = /majority \+ minority/i.test(label)
-        ? 'both'
-        : /majority/i.test(label)
-          ? 'majority'
-          : 'minority';
-      return {
-        playerName: player?.name ?? e.playerId ?? '—',
-        emoji: player?.emoji,
-        qty: absorbedId ? (player?.portfolio[absorbedId] ?? 0) : undefined,
-        type,
-        amount: amountOf(e.detail),
-      };
-    });
+  const entry = s.log.find((e) => e.payload?.kind === 'payout');
+  const payload = entry?.payload;
+  if (payload?.kind !== 'payout') return [];
+
+  return payload.bonuses.map((b) => {
+    const player = s.players.find((p) => p.id === b.playerId);
+    return {
+      playerName: b.playerName,
+      emoji: player?.emoji,
+      qty: absorbedId ? (player?.portfolio[absorbedId] ?? 0) : undefined,
+      type: b.type,
+      amount: b.amount,
+    };
+  });
 }
 
 function liqHoldersOf(s: GameState): LiqHolder[] {
