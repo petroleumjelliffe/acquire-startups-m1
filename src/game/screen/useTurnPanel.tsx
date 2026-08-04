@@ -7,9 +7,12 @@ import { ActiveStep } from '../panel/ActiveStep';
 import { StagingZone } from '../panel/StagingZone';
 import { FoundGroups } from '../FoundGroups';
 import { floodFillUnclaimed } from '../../../engine/gameHelpers';
-import { isStartupId, MAX_BUYS_PER_TURN } from '../../../engine/startups';
+import { isStartupId, MAX_BUYS_PER_TURN, TRADE_RATIO } from '../../../engine/startups';
 import { StockStack } from '../atoms/StockStack';
 import { getSharePrice } from '../../../engine/gameLogic';
+import { LiqQueue } from '../merger/LiqQueue';
+import { LiqActions } from '../merger/LiqActions';
+import { Brand } from '../atoms/Brand';
 
 /**
  * The panel's two interactive slots for the current stage.
@@ -130,6 +133,119 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
         />
       ),
     };
+  }
+
+  if (state.stage === 'chooseSurvivor' && actorId) {
+    const tied = (state.pendingTiedStartups ?? []).filter(isStartupId);
+    return {
+      staging: idleStaging,
+      active: (
+        <ActiveStep
+          label="Which chain survives?"
+          body={
+            <>
+              {/*
+                `mode="select"` because Brand renders its own <button> in that
+                mode — wrapping it in another would nest buttons, which is
+                invalid HTML and breaks getByRole('button', { name }).
+              */}
+              <div className="flex flex-wrap gap-2">
+                {tied.map((id) => (
+                  <Brand
+                    key={id}
+                    id={id}
+                    mode="select"
+                    onClick={() =>
+                      dispatch({ type: 'chooseSurvivor', playerId: actorId, startupId: id })
+                    }
+                  />
+                ))}
+              </div>
+              {problem}
+            </>
+          }
+        />
+      ),
+    };
+  }
+
+  if (state.stage === 'mergerLiquidation' && actorId) {
+    const ctx = state.mergerContext;
+    const absorbedId = ctx?.absorbedIds[ctx.currentLiquidationIndex];
+    const player = state.players.find((p) => p.id === actorId);
+
+    if (ctx && absorbedId && isStartupId(absorbedId) && player && isStartupId(ctx.survivorId)) {
+      const survivorId = ctx.survivorId;
+      const held = player.portfolio[absorbedId] ?? 0;
+      const keep = held - staged.sell - staged.trade;
+      const unitPrice = ctx.absorbedPrices[absorbedId] ?? 0;
+
+      const holders = ctx.shareholderQueue.map((id, i) => {
+        const p = state.players.find((x) => x.id === id);
+        return {
+          emoji: p?.emoji,
+          name: p?.name ?? id,
+          qty: p?.portfolio[absorbedId] ?? 0,
+          status: (i < ctx.currentShareholderIndex
+            ? 'done'
+            : i === ctx.currentShareholderIndex
+              ? 'current'
+              : 'pending') as 'done' | 'current' | 'pending',
+        };
+      });
+
+      return {
+        active: (
+          <ActiveStep
+            label="Liquidate your shares"
+            body={
+              <>
+                <LiqQueue holders={holders} />
+                <LiqActions
+                  absorbedId={absorbedId}
+                  survivorId={survivorId}
+                  unitPrice={unitPrice}
+                  canSell={keep >= 1}
+                  canTrade={
+                    keep >= TRADE_RATIO &&
+                    (state.startups[survivorId]?.availableShares ?? 0) > staged.trade / TRADE_RATIO
+                  }
+                  onSell={() => setStaged({ ...staged, sell: staged.sell + 1 })}
+                  onTrade={() => setStaged({ ...staged, trade: staged.trade + TRADE_RATIO })}
+                />
+                {problem}
+              </>
+            }
+          />
+        ),
+        staging: (
+          <StagingZone
+            label={`Keeping ${keep}`}
+            cashDelta={staged.sell * unitPrice}
+            shares={<StockStack id={absorbedId} count={keep} size="sm" />}
+            action={
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch({
+                    type: 'liquidate',
+                    playerId: actorId,
+                    startupId: absorbedId,
+                    sell: staged.sell,
+                    trade: staged.trade,
+                    keep,
+                  });
+                  setStaged(NOTHING_STAGED);
+                }}
+                className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+              >
+                Confirm
+              </button>
+            }
+          />
+        ),
+      };
+    }
   }
 
   if (state.stage === 'buy' && actorId) {
