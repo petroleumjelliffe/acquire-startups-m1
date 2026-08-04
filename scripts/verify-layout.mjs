@@ -130,16 +130,18 @@ const MEASURE = `(async () => {
     const out = {};
     for (const el of document.querySelectorAll('[data-zone]')) {
       const key = el.getAttribute('data-zone');
-      // How many rows the content actually occupies, by counting distinct
-      // child tops. This is what separates the two kinds of height change:
-      // wrapping to a new row is the growth we allow, anything else is jitter.
-      const tops = new Set(
-        [...el.children].map((c) => Math.round(c.getBoundingClientRect().top)),
+      // How many rows the content actually occupies. Counted by distinct
+      // *bottom* edges, not tops: these zones are items-end, so a short label
+      // and a tall card share a row while their tops differ by design. Counting
+      // tops reported two rows for a hand holding nothing at all, which would
+      // have let a real jitter through as "it gained a row".
+      const rowEdges = new Set(
+        [...el.children].map((c) => Math.round(c.getBoundingClientRect().bottom)),
       );
       out[key] = {
         height: Math.round(el.getBoundingClientRect().height),
         min: Math.round(parseFloat(getComputedStyle(el).minHeight) || 0),
-        rows: tops.size,
+        rows: rowEdges.size,
         // A reservation smaller than the content it holds clips it. This is
         // the Phase 1b failure stated directly, and unlike comparing height to
         // min-height (which a min-height box can never fail) it is real: a
