@@ -256,15 +256,17 @@ describe('ending the game', () => {
     expect(session.getView().actorId).toBeNull();
   });
 
-  it('lets the declaring player take it back within their own segment', () => {
+  /**
+   * Ending the game is a handoff like any other: the actor goes from the
+   * declaring player to nobody, so the segment closes and its snapshots are
+   * pruned. The end is final, and the step stack offers no undo control past
+   * it — this is the segment model working, not a gap in it.
+   */
+  it('is final — no undo is offered once the game is over', () => {
     const session = createGameSession({ state: atDeclarableBuy() });
-    const stepId = session.getView().state.nextStepId;
-
     session.dispatch({ type: 'declareEnd', playerId: 'p1' });
-    expect(session.getView().state.stage).toBe('end');
 
-    session.undoTo(stepId);
-    expect(session.getView().state.stage).toBe('buy');
-    expect(session.getView().actorId).toBe('p1');
+    expect(session.getView().state.stage).toBe('end');
+    expect(session.getView().undoableSteps).toEqual([]);
   });
 });
