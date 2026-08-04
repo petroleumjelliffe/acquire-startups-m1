@@ -9,6 +9,7 @@
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
     "typecheck": "tsc -p tsconfig.json",
+    "verify:layout": "node scripts/verify-layout.mjs",
     "build:server": "echo 'Using tsx directly, no build needed'",
     "start:server": "tsx server/index.ts",
     "preview": "vite preview",

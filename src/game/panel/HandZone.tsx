@@ -24,7 +24,15 @@ export function HandZone({ name, portfolio, cash, prices = {} }: HandZoneProps) 
       <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-gray-400">
         {`${name}'s hand`}
       </div>
-      <div className="flex flex-wrap items-end gap-3">
+      {/*
+        Reserved at the height this row takes once the player holds a share:
+        a stock stack is taller than the "no shares" placeholder, so without
+        this the zone grew 57px -> 64px the moment anyone bought anything,
+        shifting every zone below it. The figure is measured on a real page by
+        `npm run verify:layout`, not derived — jsdom reports 0 for all of it.
+        Re-measure if the stack's size or this zone's padding changes.
+      */}
+      <div data-zone="holdings" className="flex h-[64px] min-h-[64px] flex-wrap items-end gap-3">
         {held.length === 0 ? (
           <span className="text-xs text-gray-400">no shares</span>
         ) : (
