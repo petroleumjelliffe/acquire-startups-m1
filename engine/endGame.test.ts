@@ -46,6 +46,19 @@ describe('getEndCondition', () => {
     const state = setupGameWithStartups([]);
     expect(getEndCondition(state).met).toBe(false);
   });
+
+  // Direct pin for G15's fixture position (engine/golden/endgame.ts): a lone
+  // Messla chain at size 5, tier 0 — well below SAFE_SIZE (11) and nowhere
+  // near END_SIZE (41). G15 only proves declareEnd's guard exists by
+  // watching it reject; that guard is only deterministic because
+  // getEndCondition currently satisfies `met === (reasons.length > 0)`. This
+  // asserts getEndCondition's actual return value for that exact position,
+  // so the pin does not depend on a downstream `reason.kind` crash if a
+  // future refactor ever returns `met: false` with a populated `reasons`.
+  it('is not met for G15\'s fixture position (size 5, tier 0)', () => {
+    const state = setupGameWithStartups([{ id: 'Messla', tiles: 5, tier: 0 }]);
+    expect(getEndCondition(state)).toEqual({ met: false, reasons: [] });
+  });
 });
 
 describe('finalScore', () => {
