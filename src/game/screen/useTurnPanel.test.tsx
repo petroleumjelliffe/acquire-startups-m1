@@ -190,3 +190,38 @@ describe('useTurnPanel — mergers', () => {
     );
   });
 });
+
+describe('useTurnPanel — a player who cannot move', () => {
+  /**
+   * Two safe chains with a one-cell gap between them. The only tile in hand
+   * joins them, which is permanently illegal, so this player cannot place —
+   * and the rules let them pass.
+   */
+  function stuck() {
+    return buildFixture({
+      players: [{ name: 'Alex', cash: 6000, hand: ['C1'] }, { name: 'Sam', cash: 6000 }],
+      chains: [
+        { id: 'Messla', coords: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11'] },
+        { id: 'ZuckFace', coords: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11'] },
+      ],
+    });
+  }
+
+  it('offers to end the turn when no placement is legal', () => {
+    const dispatch = vi.fn();
+    render(<Harness session={createGameSession({ state: stuck() })} dispatch={dispatch} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /end turn/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'endTurn', playerId: 'p1' });
+  });
+
+  it('says why the turn can be ended', () => {
+    render(<Harness session={createGameSession({ state: stuck() })} dispatch={() => {}} />);
+    expect(screen.getByText(/no tile you hold can be played/i)).toBeInTheDocument();
+  });
+
+  it('offers no such button while a placement is still legal', () => {
+    render(<Harness session={sessionFor()} dispatch={() => {}} />);
+    expect(screen.queryByRole('button', { name: /end turn/i })).toBeNull();
+  });
+});

@@ -238,7 +238,15 @@ function doBuyShares(state: GameState, intent: Extract<Intent, { type: 'buyShare
   }
 }
 
-function hasLegalTile(state: GameState, playerId: string): boolean {
+/**
+ * Whether this player can legally place anything they hold.
+ *
+ * Exported because the UI must gate the pass affordance on exactly the
+ * predicate `doEndTurn` gates on. Recomputing it in the screen would let the
+ * two drift, and a disagreement shows up as a button that rejects when
+ * pressed, or no button at all for a player who genuinely cannot move.
+ */
+export function hasLegalTile(state: GameState, playerId: string): boolean {
   const player = state.players.find((p) => p.id === playerId);
   return !!player && player.hand.some((c) => previewPlacement(state, c, playerId).legal);
 }

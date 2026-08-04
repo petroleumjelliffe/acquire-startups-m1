@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import type { Intent } from '../../../engine/intents';
+import { hasLegalTile, type Intent } from '../../../engine/intents';
 import type { GameState, StartupId } from '../../../engine/gameTypes';
 import type { SessionView } from '../session/GameSession';
 import type { Coord } from '../../../engine/gameHelpers';
@@ -89,6 +89,8 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
   }
 
   if (state.stage === 'play') {
+    const canPlace = actorId ? hasLegalTile(state, actorId) : false;
+
     return {
       staging: idleStaging,
       active: (
@@ -96,9 +98,24 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
           label="Place a tile"
           body={
             <>
-              <span className="text-[13px] text-gray-600">Choose one of your tiles on the board.</span>
+              <span className="text-[13px] text-gray-600">
+                {canPlace
+                  ? 'Choose one of your tiles on the board.'
+                  : 'No tile you hold can be played. You may end your turn.'}
+              </span>
               {problem}
             </>
+          }
+          button={
+            canPlace || !actorId ? undefined : (
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'endTurn', playerId: actorId })}
+                className="m-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+              >
+                End turn
+              </button>
+            )
           }
         />
       ),
