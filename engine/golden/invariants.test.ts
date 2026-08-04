@@ -3,8 +3,8 @@ import type { GameState } from '../gameTypes';
 import type { Intent } from '../intents';
 import { applyIntent, IllegalIntentError } from '../intents';
 import { generateAllCoords, shuffleSeeded } from '../gameHelpers';
-import { HAND_SIZE, TRADE_RATIO, isStartupId } from '../startups';
-import { buildFixture } from './fixtures';
+import { TRADE_RATIO, isStartupId } from '../startups';
+import { createInitialGame } from '../gameInit';
 import { checkInvariants, createProgressGuard } from './invariants';
 import { previewPlacement, isDeadTile } from '../placement';
 
@@ -35,16 +35,14 @@ const SEEDS = Array.from({ length: SEED_COUNT }, (_, i) => `prop-${SEED_CHARS[i]
 const NAMES = ['Alex', 'Sam', 'Jordan'];
 
 /**
- * An opening position `applyIntent` can actually advance. `createInitialGame`
- * cannot be used: it yields `stage: 'draw'`, which no intent accepts.
+ * The real opening. This used to be hand-built, because `createInitialGame`
+ * yielded `stage: 'draw'` and no intent accepted it — the deadlock the
+ * `startGame` intent closed. Running the genuine opening across all 60 seeds
+ * is what puts tile conservation on the turn-order draw, which is where the
+ * legacy `resolveInitialDraw` loses count.
  */
 function newGame(seed: string): GameState {
-  const all = shuffleSeeded(generateAllCoords(), seed);
-  return buildFixture({
-    players: NAMES.map((name, i) => ({ name, hand: all.slice(i * HAND_SIZE, (i + 1) * HAND_SIZE) })),
-    bag: all.slice(NAMES.length * HAND_SIZE),
-    stage: 'play',
-  });
+  return applyIntent(createInitialGame(seed, NAMES), { type: 'startGame', playerId: 'p1' });
 }
 
 /** A cheap deterministic picker: shuffles by seed+salt and takes the head. */

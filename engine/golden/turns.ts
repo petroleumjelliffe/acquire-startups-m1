@@ -173,4 +173,53 @@ const G16: GoldenGame = {
   ],
 };
 
-export const TURN_GAMES: GoldenGame[] = [G1, G12, G16];
+/**
+ * G17: the opening. Authored bag, so the draw is deterministic without
+ * depending on `shuffleSeeded`'s ordering.
+ *
+ * `hand` is authored here rather than dealt, because `buildFixture` does not
+ * deal — the point of this game is the turn-order draw and the starting tiles,
+ * not `createInitialGame`'s dealing loop (covered by invariants.test.ts).
+ */
+const G17: GoldenGame = {
+  id: 'G17',
+  title: 'the opening — turn order draw, starting tiles stay on the board',
+  setup: {
+    players: [
+      { name: 'Alex', cash: 6000, hand: ['H8'] },
+      { name: 'Sam',  cash: 6000, hand: ['C4'] },
+    ],
+    // Sam draws B4, which beats Alex's E5, so Sam goes first. B4 sits directly
+    // above C4 — diagonals do not connect, so B3 would found nothing.
+    bag: ['E5', 'B4', 'I12'],
+    stage: 'draw',
+  },
+  steps: [
+    {
+      name: 'seat one opens the game; the lower tile takes the first turn',
+      intent: { type: 'startGame', playerId: 'p1' },
+      then: {
+        stage: 'play',
+        currentPlayer: 'p2',
+        boardOwner: { E5: null, B4: null },
+        logPhases: ['Drew for turn order'],
+      },
+    },
+    {
+      name: 'Sam builds on a starting tile and founds a chain of two',
+      intent: { type: 'placeTile', playerId: 'p2', coord: 'C4' },
+      then: { stage: 'foundStartup', logPhases: ['Placed a tile'] },
+    },
+    {
+      name: 'the founded chain includes the starting tile',
+      intent: { type: 'chooseFoundingBrand', playerId: 'p2', startupId: 'Messla' },
+      then: {
+        stage: 'buy',
+        chainSize: { Messla: 2 },
+        boardOwner: { B4: 'Messla', C4: 'Messla' },
+      },
+    },
+  ],
+};
+
+export const TURN_GAMES: GoldenGame[] = [G1, G12, G16, G17];
