@@ -806,8 +806,8 @@ export function completePlayerMergerLiquidation(
   // Doing this here, at the moment the shares leave the portfolio, keeps
   // `held + availableShares === totalShares` true after *every* intent, not
   // only once `advanceToNextAbsorbedStartup`'s end-of-chain reconciliation
-  // (~line 739) runs; that reconciliation stays in place as a backstop and
-  // is now idempotent given this line already keeps the pool correct.
+  // runs; that reconciliation stays in place as a backstop and is now
+  // idempotent given this line already keeps the pool correct.
   absorbed.availableShares += beforeHolding - player.portfolio[absorbedId];
 
   // Add survivor shares if traded
@@ -914,6 +914,15 @@ export function getShareholders(state: GameState, startupId: string): Player[] {
 
 /**
  * Applies a player's liquidation choice and advances to the next shareholder.
+ *
+ * @deprecated — not on the intent path; see completePlayerMergerLiquidation.
+ * This legacy path has the same share-conservation bug that was fixed there
+ * (it credits `tradeCount * 2` / `shares` back to `availableShares` from the
+ * requested amount rather than from the portfolio's actual before/after
+ * delta), and it parks the game in `stage: "liquidationPrompt"`, which no
+ * intent accepts. Only `engine/gameLogic.test.ts` still reaches this
+ * function. Do not patch this one expecting it to affect real play — patch
+ * `completePlayerMergerLiquidation` instead.
  */
 export function handleLiquidationChoice(
   state: GameState,
