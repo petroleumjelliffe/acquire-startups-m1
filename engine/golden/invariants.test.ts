@@ -5,7 +5,8 @@ import { applyIntent, IllegalIntentError } from '../intents';
 import { generateAllCoords, shuffleSeeded } from '../gameHelpers';
 import { HAND_SIZE, TRADE_RATIO, isStartupId } from '../startups';
 import { buildFixture } from './fixtures';
-import { checkInvariants } from './invariants';
+import { checkInvariants, createProgressGuard } from './invariants';
+import { previewPlacement, isDeadTile } from '../placement';
 
 const MAX_STEPS = 400;
 
@@ -68,8 +69,28 @@ function nextIntent(state: GameState, seed: string, salt: number): Intent | null
 
   switch (state.stage) {
     case 'play': {
-      const coord = pick(me.hand, seed, salt);
-      return coord ? { type: 'placeTile', playerId: me.id, coord } : { type: 'endTurn', playerId: me.id };
+      // Pick only among tiles that are actually placeable. The previous
+      // version picked from the whole hand and let the reducer reject
+      // illegal picks, relying on a fresh salt eventually landing on a
+      // legal one — which never happens when *every* tile in hand is
+      // unplayable (Finding 1: a hand fully dead-ended, whether every tile
+      // merges two safe chains or, less commonly, every remaining spot
+      // would found a startup with no brands left). `doEndTurn`
+      // (intents.ts) accepts `endTurn` from `play` in exactly that
+      // situation — no legal placement anywhere in hand — but only once the
+      // genuinely dead tiles have been traded in via `tradeInDeadTiles`;
+      // otherwise the reducer's own `hasLegalTile` gate would just reject
+      // the endTurn too, since a dead tile isn't a hand-emptying reason.
+      const legal = me.hand.filter((c) => previewPlacement(state, c, me.id).legal);
+      if (legal.length > 0) {
+        const coord = pick(legal, seed, salt)!;
+        return { type: 'placeTile', playerId: me.id, coord };
+      }
+      const dead = me.hand.filter((c) => isDeadTile(state, c));
+      if (dead.length > 0) {
+        return { type: 'tradeInDeadTiles', playerId: me.id, coords: dead };
+      }
+      return { type: 'endTurn', playerId: me.id };
     }
     case 'foundStartup': {
       const startupId = pick(unfounded, seed, salt);
@@ -126,12 +147,22 @@ interface RunResult {
   history: Intent[];
 }
 
+// Finding 1: past this many consecutive IllegalIntentErrors, the run is not
+// "slow" — the driver has painted itself into a corner and is spending its
+// remaining step budget being rejected. A single rejection is normal (see
+// `nextIntent`'s `buy`/`chooseSurvivor` branches, which propose an option
+// this state can't accept about a third of the time by design); a long run
+// of them, with no successful intent in between, is not.
+const STALL_THRESHOLD = 20;
+
 function playOne(seed: string): RunResult {
   let state = newGame(seed);
   const history: Intent[] = [];
   const base = { seed, reachedEnd: false, emptiedBag: false, stalledAt: null as string | null };
   let emptiedBag = false;
   let salt = 0;
+  let consecutiveRejections = 0;
+  const progress = createProgressGuard();
 
   for (let step = 0; step < MAX_STEPS; step++) {
     if (state.stage === 'end') {
@@ -143,18 +174,49 @@ function playOne(seed: string): RunResult {
       return { ...base, steps: step, emptiedBag, stalledAt: state.stage, violation: null, history };
     }
 
+    let rejected = false;
     try {
       state = applyIntent(state, intent);
       history.push(intent);
+      consecutiveRejections = 0;
     } catch (e) {
-      if (e instanceof IllegalIntentError) continue;
-      return { ...base, steps: step, emptiedBag, violation: String(e), history };
+      if (e instanceof IllegalIntentError) {
+        rejected = true;
+        consecutiveRejections += 1;
+      } else {
+        return { ...base, steps: step, emptiedBag, violation: String(e), history };
+      }
     }
 
-    if (state.bag.length === 0) emptiedBag = true;
-    const problems = checkInvariants(state);
-    if (problems.length) {
-      return { ...base, steps: step, emptiedBag, violation: problems.join('; '), history };
+    if (!rejected) {
+      if (state.bag.length === 0) emptiedBag = true;
+      const problems = checkInvariants(state);
+      if (problems.length) {
+        return { ...base, steps: step, emptiedBag, violation: problems.join('; '), history };
+      }
+    }
+
+    // Finding 1: surfaces a wedged driver as a stall instead of silently
+    // exhausting MAX_STEPS and reporting nothing.
+    if (consecutiveRejections >= STALL_THRESHOLD) {
+      return {
+        ...base,
+        steps: step,
+        emptiedBag,
+        stalledAt: `${state.stage} (all intents rejected)`,
+        violation: null,
+        history,
+      };
+    }
+
+    // Finding 2 — the spec's fourth invariant ("Progress": no state repeats
+    // with an unchanged nextStepId). Catches the same failure shape as
+    // Finding 1 directly, via the state standing still rather than via the
+    // error type that happened to cause it — see createProgressGuard's doc
+    // comment in invariants.ts for why it lives there and how it's scoped.
+    const progressViolation = progress.check(state);
+    if (progressViolation) {
+      return { ...base, steps: step, emptiedBag, violation: progressViolation, history };
     }
   }
 
