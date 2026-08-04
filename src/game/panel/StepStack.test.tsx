@@ -3,10 +3,12 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { StepStack } from './StepStack';
 import { ActiveStep } from './ActiveStep';
 
+// Every entry is a real undo point here; the `undoable` flag's own behaviour is
+// covered by 'offers undo only on entries marked undoable' below.
 const ENTRIES = [
-  { stepId: 1, phase: 'Place a tile', detail: <span>Alex played E6</span> },
-  { stepId: 2, phase: 'Found a startup', detail: <span>Messla founded</span> },
-  { stepId: 3, phase: 'Buy shares', detail: <span>2 × Messla</span> },
+  { stepId: 1, phase: 'Place a tile', detail: <span>Alex played E6</span>, undoable: true },
+  { stepId: 2, phase: 'Found a startup', detail: <span>Messla founded</span>, undoable: true },
+  { stepId: 3, phase: 'Buy shares', detail: <span>2 × Messla</span>, undoable: true },
 ];
 
 describe('StepStack', () => {
@@ -21,7 +23,7 @@ describe('StepStack', () => {
   // The undo affordance is what makes a completed step a rewind point. It is
   // present exactly when a caller can act on it, which is how the catalog shows
   // the undoable and the read-only appearance from one component.
-  it('renders one undo control per entry when onUndo is supplied', () => {
+  it('renders one undo control per undoable entry when onUndo is supplied', () => {
     const { container } = render(<StepStack entries={ENTRIES} onUndo={() => {}} />);
     expect(container.querySelectorAll('[data-step-undo]')).toHaveLength(ENTRIES.length);
   });
@@ -58,4 +60,18 @@ describe('ActiveStep', () => {
     const { container: without } = render(<ActiveStep label="Buy shares" body={<p>body</p>} />);
     expect(without.querySelector('button')).toBeFalsy();
   });
+});
+
+it('offers undo only on entries marked undoable', () => {
+  const onUndo = vi.fn();
+  render(
+    <StepStack
+      onUndo={onUndo}
+      entries={[
+        { stepId: 1, phase: 'Placed a tile', detail: 'E5', undoable: true },
+        { stepId: 2, phase: 'Merger payout', detail: 'paid', undoable: false },
+      ]}
+    />,
+  );
+  expect(screen.getAllByRole('button')).toHaveLength(1);
 });
