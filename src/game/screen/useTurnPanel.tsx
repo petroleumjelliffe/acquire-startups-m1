@@ -7,7 +7,9 @@ import { ActiveStep } from '../panel/ActiveStep';
 import { StagingZone } from '../panel/StagingZone';
 import { FoundGroups } from '../FoundGroups';
 import { floodFillUnclaimed } from '../../../engine/gameHelpers';
-import { isStartupId } from '../../../engine/startups';
+import { isStartupId, MAX_BUYS_PER_TURN } from '../../../engine/startups';
+import { StockStack } from '../atoms/StockStack';
+import { getSharePrice } from '../../../engine/gameLogic';
 
 /**
  * The panel's two interactive slots for the current stage.
@@ -124,6 +126,86 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
               />
               {problem}
             </>
+          }
+        />
+      ),
+    };
+  }
+
+  if (state.stage === 'buy' && actorId) {
+    const player = state.players.find((p) => p.id === actorId);
+    const spent = staged.picks.reduce((sum, id) => sum + getSharePrice(state, id), 0);
+    const remaining = MAX_BUYS_PER_TURN - (state.currentBuyCount ?? 0) - staged.picks.length;
+
+    const forSale = Object.values(state.startups).filter((s) => s.isFounded && s.availableShares > 0);
+    const basket = Object.entries(
+      staged.picks.reduce<Record<string, number>>(
+        (acc, id) => ({ ...acc, [id]: (acc[id] ?? 0) + 1 }),
+        {},
+      ),
+    );
+
+    return {
+      active: (
+        <ActiveStep
+          label="Buy shares"
+          body={
+            <>
+              <div className="flex flex-wrap gap-2">
+                {forSale.map((s) => {
+                  // Bound to a const so the `isStartupId` narrowing survives
+                  // into the click handler; narrowing a mutable property does
+                  // not reach inside a closure.
+                  const id = s.id;
+                  if (!isStartupId(id)) return null;
+                  const price = getSharePrice(state, id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-label={`Buy one ${id}`}
+                      disabled={remaining <= 0 || (player?.cash ?? 0) < spent + price}
+                      onClick={() => setStaged({ ...staged, picks: [...staged.picks, id] })}
+                      className="m-0 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {`${s.ticker} $${price}`}
+                    </button>
+                  );
+                })}
+              </div>
+              {problem}
+            </>
+          }
+        />
+      ),
+      staging: (
+        <StagingZone
+          label="Buying"
+          cashDelta={-spent}
+          shares={basket.map(([id, n]) =>
+            isStartupId(id) ? <StockStack key={id} id={id} count={n} size="sm" /> : null,
+          )}
+          action={
+            <div className="flex w-full gap-2">
+              <button
+                type="button"
+                disabled={staged.picks.length === 0}
+                onClick={() => {
+                  dispatch({ type: 'buyShares', playerId: actorId, picks: staged.picks });
+                  setStaged(NOTHING_STAGED);
+                }}
+                className="m-0 flex-1 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Confirm purchase
+              </button>
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'endTurn', playerId: actorId })}
+                className="m-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm font-semibold hover:bg-gray-50"
+              >
+                End turn
+              </button>
+            </div>
           }
         />
       ),

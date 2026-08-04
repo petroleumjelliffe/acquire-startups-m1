@@ -75,3 +75,59 @@ describe('useTurnPanel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/turn/i);
   });
 });
+
+describe('useTurnPanel — buying', () => {
+  function atBuy() {
+    const session = sessionFor();
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    return session;
+  }
+
+  it('stages picks locally without dispatching', () => {
+    const dispatch = vi.fn();
+    render(<Harness session={atBuy()} dispatch={dispatch} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /buy one messla/i }));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('shows the staged basket and its cost in the staging slot', () => {
+    const { container } = render(<Harness session={atBuy()} dispatch={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /buy one messla/i }));
+
+    const staging = container.querySelector('[data-slot="staging"]')!;
+    expect(staging.textContent).toMatch(/200/);
+  });
+
+  it('sends the whole basket as one intent on confirm', () => {
+    const dispatch = vi.fn();
+    render(<Harness session={atBuy()} dispatch={dispatch} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /buy one messla/i }));
+    fireEvent.click(screen.getByRole('button', { name: /buy one messla/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm purchase/i }));
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'buyShares',
+      playerId: 'p1',
+      picks: ['Messla', 'Messla'],
+    });
+  });
+
+  it('stops at three shares a turn', () => {
+    render(<Harness session={atBuy()} dispatch={() => {}} />);
+    const buy = screen.getByRole('button', { name: /buy one messla/i });
+    fireEvent.click(buy);
+    fireEvent.click(buy);
+    fireEvent.click(buy);
+    expect(buy).toBeDisabled();
+  });
+
+  it('ends the turn without buying', () => {
+    const dispatch = vi.fn();
+    render(<Harness session={atBuy()} dispatch={dispatch} />);
+    fireEvent.click(screen.getByRole('button', { name: /end turn/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'endTurn', playerId: 'p1' });
+  });
+});
