@@ -67,7 +67,12 @@ export function resolveInitialDraw(state: GameState) {
     }
   }
 
-  const sorted = [...drawn].sort((a, b) => compareTiles(a.tile, b.tile));
+  // Highest letter, then highest number, goes first — the same rule the
+  // `startGame` intent applies. This legacy path still serves online play via
+  // `Game.tsx`, and one game cannot have two turn-order rules. (It also still
+  // double-counts its tiles a few lines below; that is a separate, documented
+  // defect this path takes to the grave in Phase 3.)
+  const sorted = [...drawn].sort((a, b) => compareTiles(b.tile, a.tile));
   const firstName = sorted[0].name;
   const firstIndex = state.players.findIndex((p) => p.name === firstName);
 

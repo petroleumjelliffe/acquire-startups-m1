@@ -189,14 +189,16 @@ const G17: GoldenGame = {
       { name: 'Alex', cash: 6000, hand: ['H8'] },
       { name: 'Sam',  cash: 6000, hand: ['C4'] },
     ],
-    // Sam draws B4, which beats Alex's E5, so Sam goes first. B4 sits directly
-    // above C4 — diagonals do not connect, so B3 would found nothing.
-    bag: ['E5', 'B4', 'I12'],
+    // Alex draws B4, Sam draws E5. The *highest* coordinate takes the first
+    // turn, so Sam goes first. B4 stays on the board as a starting tile and
+    // sits directly above C4 — diagonals do not connect, so B3 would found
+    // nothing.
+    bag: ['B4', 'E5', 'I12'],
     stage: 'draw',
   },
   steps: [
     {
-      name: 'seat one opens the game; the lower tile takes the first turn',
+      name: 'seat one opens the game; the higher tile takes the first turn',
       intent: { type: 'startGame', playerId: 'p1' },
       then: {
         stage: 'play',

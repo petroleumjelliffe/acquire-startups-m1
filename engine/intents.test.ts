@@ -748,11 +748,13 @@ describe('startGame', () => {
     expect(placed + inHands + next.bag.length + next.discarded.length).toBe(108);
   });
 
-  it('gives the turn to whoever drew the lowest coordinate', () => {
+  it('gives the turn to whoever drew the highest coordinate', () => {
+    // Highest letter, then highest number — so I12 beats A1. `compareTiles`
+    // orders row-then-column ascending, which makes the winner the last entry.
     const state = createInitialGame('open-3', ['Alex', 'Sam', 'Jo']);
     const drawnInOrder = state.bag.slice(0, 3);
-    const lowest = [...drawnInOrder].sort(compareTiles)[0];
-    const expectedIndex = drawnInOrder.indexOf(lowest);
+    const highest = [...drawnInOrder].sort(compareTiles).at(-1)!;
+    const expectedIndex = drawnInOrder.indexOf(highest);
 
     const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
     expect(next.turnIndex).toBe(expectedIndex);

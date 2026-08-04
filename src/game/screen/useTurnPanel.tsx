@@ -70,7 +70,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
       active: (
         <ActiveStep
           label="Open the game"
-          body={<span className="text-[13px] text-gray-600">Draw for turn order — lowest tile plays first.</span>}
+          body={<span className="text-[13px] text-gray-600">Draw for turn order — highest tile plays first.</span>}
           button={
             <>
               <button

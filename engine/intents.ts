@@ -368,7 +368,7 @@ function doDeclareEnd(state: GameState, intent: Extract<Intent, { type: 'declare
 }
 
 /**
- * Opens the game: one tile each for turn order, lowest coordinate goes first.
+ * Opens the game: one tile each for turn order, highest coordinate goes first.
  *
  * The drawn tiles stay on the board as unclaimed starting tiles, exactly as in
  * Acquire, and they leave the bag for good. The legacy `resolveInitialDraw`
@@ -396,7 +396,11 @@ function doStartGame(state: GameState, intent: Extract<Intent, { type: 'startGam
     return { player: p, tile };
   });
 
-  const sorted = [...drawn].sort((a, b) => compareTiles(a.tile, b.tile));
+  // Highest letter, then highest number, takes the first turn — I12 beats A1.
+  // `compareTiles` orders row-then-column ascending, so the winner is the last
+  // entry. (Tabletop Acquire gives it to the tile *closest* to A1; this game
+  // reverses that deliberately.)
+  const sorted = [...drawn].sort((a, b) => compareTiles(b.tile, a.tile));
   state.turnIndex = state.players.findIndex((p) => p.id === sorted[0].player.id);
 
   pushLog(state, 'Drew for turn order', sorted.flatMap((d, i) => [

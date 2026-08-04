@@ -147,6 +147,14 @@ deviation 1).
 **Still unspecified:** the declare-end affordance's own design pass, and the route back to the lobby
 from a finished game. Both were deferred by Phase 1b and are still deferred.
 
+**A draw screen, deferred by decision (2026-08-04).** The turn-order draw is now a hard gate in
+front of the game — no hand, no balance, no active seat, no curtain — but it resolves in a single
+click and the result only appears as a log line. It deserves its own opening screen that *shows*
+the draw: each player's drawn tile, side by side, and who won, before the first turn begins. Agreed
+as worth doing and explicitly postponed; the gate that makes it possible is already in place, so
+this is presentation only. Note the rule while building it: **highest letter, then highest number,
+goes first** (I12 beats A1) — the reverse of tabletop Acquire, and a deliberate house rule.
+
 **The seam is ready.** `GameSession` is the one place that owns state and turns rejection into
 something readable; `getCurrentActor` lives in `engine/` precisely so Phase 3's server can answer
 the same question. Substituting a networked `dispatch` should not require touching `GameScreen`.
@@ -158,6 +166,10 @@ the same question. Substituting a networked `dispatch` should not require touchi
 - **Seat names truncate hard at 768px**: a default "Player 1" renders as "P". The emoji avatar and
   the active outline still identify the seat, which is the identity the design chose. Design pass,
   not a correctness fix.
+- **`DrawModal.tsx` still tells online players "Lowest letter, then lowest number goes first".** The
+  rule changed to highest-first and both engine paths follow it, but that caption lives in
+  `src/components/`, which is off-limits until Phase 3/5 deletes it. It is wrong on screen for
+  `/room/:roomId` until then.
 - **`Board.tsx` renders a hand tile as a `<button>` even with no `onCellClick`** (Phase 1b finding
   A1), so a read-only board still puts hand cells in the keyboard order. Still true; still harmless
   until a spectator view exists.

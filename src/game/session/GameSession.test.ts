@@ -209,10 +209,11 @@ describe('the turn-order draw is a gate, not a turn', () => {
   }
 
   it('raises the curtain after the draw even when seat one wins it', () => {
-    // p1 draws B4, p2 draws E5 — seat one wins, so the actor id never changes.
-    // The curtain must rise anyway: whoever pressed the button did it for the
-    // table, and the winner's hand has not been seen by anyone yet.
-    const session = createGameSession({ state: drawGame(['B4', 'E5']) });
+    // p1 draws E5, p2 draws B4 — the highest coordinate wins, so seat one
+    // takes the turn and the actor id never changes. The curtain must rise
+    // anyway: whoever pressed the button did it for the table, and the
+    // winner's hand has not been seen by anyone yet.
+    const session = createGameSession({ state: drawGame(['E5', 'B4']) });
     expect(session.getView().awaitingReveal).toBe(false);
 
     session.dispatch({ type: 'startGame', playerId: 'p1' });
@@ -223,7 +224,8 @@ describe('the turn-order draw is a gate, not a turn', () => {
   });
 
   it('raises the curtain after the draw when another seat wins it', () => {
-    const session = createGameSession({ state: drawGame(['E5', 'B4']) });
+    // p1 draws B4, p2 draws E5 — the higher tile takes the turn.
+    const session = createGameSession({ state: drawGame(['B4', 'E5']) });
     session.dispatch({ type: 'startGame', playerId: 'p1' });
 
     expect(session.getView().state.turnIndex).toBe(1);
@@ -232,7 +234,7 @@ describe('the turn-order draw is a gate, not a turn', () => {
   });
 
   it('leaves nothing of the draw undoable once play has begun', () => {
-    const session = createGameSession({ state: drawGame(['B4', 'E5']) });
+    const session = createGameSession({ state: drawGame(['E5', 'B4']) });
     session.dispatch({ type: 'startGame', playerId: 'p1' });
     expect(session.getView().undoableSteps).toEqual([]);
   });
