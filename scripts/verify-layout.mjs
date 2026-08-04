@@ -119,6 +119,40 @@ const MEASURE = `(async () => {
     return out;
   };
 
+  // A zone's reservation is a *floor*, not a fixed height. The rule it exists
+  // for is "do not jitter": reserve enough that ordinary content changes move
+  // nothing, and grow gracefully when content genuinely needs another row.
+  // So there are two things to check, and height equality is neither of them:
+  //   - the floor is honoured (a zone shorter than its own min-height is the
+  //     Phase 1b bug, where 62px of reservation held 68px of content);
+  //   - zones that have not declared they may grow do not change at all.
+  const floors = () => {
+    const out = {};
+    for (const el of document.querySelectorAll('[data-zone]')) {
+      const key = el.getAttribute('data-zone');
+      // How many rows the content actually occupies, by counting distinct
+      // child tops. This is what separates the two kinds of height change:
+      // wrapping to a new row is the growth we allow, anything else is jitter.
+      const tops = new Set(
+        [...el.children].map((c) => Math.round(c.getBoundingClientRect().top)),
+      );
+      out[key] = {
+        height: Math.round(el.getBoundingClientRect().height),
+        min: Math.round(parseFloat(getComputedStyle(el).minHeight) || 0),
+        rows: tops.size,
+        // A reservation smaller than the content it holds clips it. This is
+        // the Phase 1b failure stated directly, and unlike comparing height to
+        // min-height (which a min-height box can never fail) it is real: a
+        // fixed height too small for its content overflows silently.
+        // NB: no backticks anywhere in here — this whole block is a template
+        // literal, and one would end it mid-comment.
+        overflows: el.scrollHeight > el.clientHeight + 1,
+        mayGrow: el.getAttribute('data-may-grow') === 'true',
+      };
+    }
+    return out;
+  };
+
   // The roster clips on purpose, so the property worth guarding is that the
   // seat whose turn it is stays on screen — which only holds because the strip
   // rotates it to the front. Sampled at every stage, not once: whether the
@@ -163,6 +197,7 @@ const MEASURE = `(async () => {
   await clickIfPresent(/reveal/i);
 
   const stages = { play: geometry() };
+  const zoneFloors = { play: floors() };
   noteSeat('play');
 
   // Place the first hand tile. Hand cells are the only clickable board cells.
@@ -171,6 +206,7 @@ const MEASURE = `(async () => {
   handCell.click();
   await wait(300);
   stages.afterPlace = geometry();
+  zoneFloors.afterPlace = floors();
   noteSeat('afterPlace');
 
   // Keep playing until a chain has been founded and its shares are on sale.
@@ -188,7 +224,7 @@ const MEASURE = `(async () => {
     if (brand) {
       brand.click();
       await wait(250);
-      if (!stages.afterFound) stages.afterFound = geometry();
+      if (!stages.afterFound) { stages.afterFound = geometry(); zoneFloors.afterFound = floors(); }
       noteSeat('found' + turn);
       continue;
     }
@@ -197,7 +233,7 @@ const MEASURE = `(async () => {
     if (buy && !buy.disabled) {
       buy.click();
       await wait(250);
-      if (!stages.afterStaging) stages.afterStaging = geometry();
+      if (!stages.afterStaging) { stages.afterStaging = geometry(); zoneFloors.afterStaging = floors(); }
       noteSeat('staging' + turn);
       continue;
     }
@@ -232,6 +268,7 @@ const MEASURE = `(async () => {
 
   return {
     seatVisible,
+    zoneFloors,
     // Zones that clip their content rather than fitting it. Horizontal
     // overflow inside a fixed-width panel is a bug everywhere except the
     // roster, which is exempt above and by name.
@@ -381,6 +418,44 @@ async function main() {
     const SPACER_PAIR = ['stepstack', 'active'];
     const sumOf = (g) => SPACER_PAIR.reduce((n, k) => n + (g[k] ?? 0), 0);
 
+    // A reservation too small for its content clips it — Phase 1b's bug, and
+    // the one thing a `min-height` box genuinely can get wrong.
+    for (const [stage, zones] of Object.entries(m.zoneFloors ?? {})) {
+      for (const [key, z] of Object.entries(zones)) {
+        if (z.overflows) {
+          failures.push(
+            `${width}px: at ${stage} zone "${key}" clips its own content ` +
+            `(${z.height}px tall, reservation ${z.min}px)`,
+          );
+        }
+      }
+    }
+
+    // Growth is fine when a row was added; the same change with the same row
+    // count is jitter, which is the whole thing the reservations exist to stop.
+    const floorStages = Object.keys(m.zoneFloors ?? {});
+    for (const stage of floorStages.slice(1)) {
+      const before = m.zoneFloors[floorStages[0]];
+      const after = m.zoneFloors[stage];
+      for (const [key, z] of Object.entries(after)) {
+        const was = before[key];
+        if (!was || !z.mayGrow) continue;
+        if (z.height !== was.height && z.rows === was.rows) {
+          failures.push(
+            `${width}px: zone "${key}" changed ${was.height}px -> ${z.height}px between ` +
+            `${floorStages[0]} and ${stage} without gaining a row — that is jitter, ` +
+            `not growth (${was.rows} rows both times)`,
+          );
+        }
+      }
+    }
+
+    const growable = new Set(
+      Object.values(m.zoneFloors ?? {}).flatMap((zones) =>
+        Object.entries(zones).filter(([, z]) => z.mayGrow).map(([key]) => key),
+      ),
+    );
+
     const stageNames = Object.keys(m.stages);
     const baseline = m.stages[stageNames[0]];
     for (const name of stageNames.slice(1)) {
@@ -388,6 +463,19 @@ async function main() {
       for (const key of Object.keys(baseline)) {
         if (!(key in current)) continue; // zone legitimately absent at this stage
         if (SPACER_PAIR.includes(key)) continue;
+        // Zones that declare `data-may-grow` are allowed to get taller when
+        // their content genuinely needs another row — that is graceful growth,
+        // not jitter. They may never get *shorter* than they started, which
+        // would be the same jump in reverse.
+        if (growable.has(key)) {
+          if (current[key] < baseline[key]) {
+            failures.push(
+              `${width}px: growable zone "${key}" shrank ${baseline[key]}px -> ${current[key]}px ` +
+              `between ${stageNames[0]} and ${name}`,
+            );
+          }
+          continue;
+        }
         if (current[key] !== baseline[key]) {
           failures.push(
             `${width}px: zone "${key}" moved ${baseline[key]}px -> ${current[key]}px ` +
@@ -395,7 +483,10 @@ async function main() {
           );
         }
       }
-      if (sumOf(current) !== sumOf(baseline)) {
+      // The spacer pair absorbs growth elsewhere in the column, so it is only
+      // meaningful to compare when nothing growable actually grew.
+      const grew = [...growable].some((k) => (current[k] ?? 0) !== (baseline[k] ?? 0));
+      if (!grew && sumOf(current) !== sumOf(baseline)) {
         failures.push(
           `${width}px: stepstack+active grew ${sumOf(baseline)}px -> ${sumOf(current)}px ` +
           `between ${stageNames[0]} and ${name} — the panel resized`,

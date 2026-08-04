@@ -25,14 +25,20 @@ export function HandZone({ name, portfolio, cash, prices = {} }: HandZoneProps) 
         {`${name}'s hand`}
       </div>
       {/*
-        Reserved at the height this row takes once the player holds a share:
-        a stock stack is taller than the "no shares" placeholder, so without
-        this the zone grew 57px -> 64px the moment anyone bought anything,
-        shifting every zone below it. The figure is measured on a real page by
-        `npm run verify:layout`, not derived — jsdom reports 0 for all of it.
-        Re-measure if the stack's size or this zone's padding changes.
+        A floor, not a fixed height. 64px is one row of stock stacks, measured
+        on a real page by `npm run verify:layout` rather than derived — jsdom
+        reports 0 for all of it. The floor is what stops the jitter the
+        reservation exists for: without it the zone snapped 57px -> 64px the
+        moment a player bought their first share, shifting every zone below.
+        Growing past it is fine and expected — a player can hold all seven
+        brands, which needs a second row — and the panel scrolls to suit.
+        Re-measure the floor if the stack's size or this zone's padding changes.
       */}
-      <div data-zone="holdings" className="flex h-[64px] min-h-[64px] flex-wrap items-end gap-3">
+      <div
+        data-zone="holdings"
+        data-may-grow="true"
+        className="flex min-h-[64px] flex-wrap items-end gap-3 transition-[min-height] duration-200 motion-reduce:transition-none"
+      >
         {held.length === 0 ? (
           <span className="text-xs text-gray-400">no shares</span>
         ) : (

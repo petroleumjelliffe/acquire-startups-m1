@@ -53,7 +53,11 @@ npm run check:bundle   # guards vitest and golden data out of the main chunk
   safe chains is permanently unplayable — a dead tile.
 - **Segment** = a run of steps by one actor, ending when a *different* player must act. It is the
   undo boundary, the pass-the-device boundary, and (in Phase 3) the commit boundary.
-- **Panel-height stability**: panel zones must not resize as content changes — reveal via
-  transitions, never layout jumps.
+- **Panel-height stability**: a zone's reservation is a *floor*, not a fixed height. Reserve enough
+  that ordinary content changes move nothing (the point is to stop labels and controls jittering
+  between transitions). Growing to fit a genuinely new row is fine — mark the zone
+  `data-may-grow="true"` and let it adjust gracefully; the panel scrolls. What is not fine is a zone
+  changing height *without* gaining a row, or clipping its own content. `npm run verify:layout`
+  checks all three on a real page.
 - Panel zone order: `stepstack → active → staging → hand → players`.
 - Respect `prefers-reduced-motion` (skip enter animations).
