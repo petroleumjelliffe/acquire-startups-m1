@@ -30,8 +30,10 @@ export interface TileProps {
   selected?: boolean;
 }
 
+// `m-0` is deliberate: a legacy global `button{margin:1px}` in styles/index.css
+// would otherwise shrink every interactive cell inside the board's grid track.
 const BASE =
-  'relative inline-flex flex-none items-center justify-center rounded border border-solid p-0 align-middle font-semibold leading-none';
+  'relative m-0 inline-flex flex-none items-center justify-center rounded border border-solid p-0 align-middle font-semibold leading-none';
 
 const DARK = 'bg-gray-700 border-gray-700 text-gray-50 font-bold';
 

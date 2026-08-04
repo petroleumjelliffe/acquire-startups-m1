@@ -21,7 +21,9 @@ export function StepEntry({ phase, detail, stepId, onUndo }: StepEntryProps) {
   const undoable = onUndo != null && stepId != null;
 
   return (
-    <div className="flex flex-col gap-[3px]">
+    // `step-enter` is the arrival animation, defined in src/styles/index.css
+    // and skipped under prefers-reduced-motion.
+    <div className="step-enter flex flex-col gap-[3px]">
       <div className="flex items-center gap-2">
         <span
           data-step-phase

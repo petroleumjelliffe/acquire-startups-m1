@@ -7,6 +7,10 @@ import type { ReactNode } from 'react';
  *
  * The column is full-height and the step stack is the flex spacer, which is
  * what pins the remaining zones to the bottom of the panel.
+ *
+ * The panel owns its width because it is the fixed side of the layout and the
+ * board takes whatever is left: 320px on desktop, narrowing below 1024px so a
+ * tablet squeezes the panel rather than the board's aspect ratio.
  */
 export interface PanelProps {
   stepstack?: ReactNode;
@@ -20,7 +24,7 @@ const ORDER = ['stepstack', 'active', 'staging', 'hand', 'players'] as const;
 
 export function Panel(props: PanelProps) {
   return (
-    <div className="flex h-full flex-col overflow-hidden border-l border-gray-200">
+    <div className="flex h-full w-[264px] shrink-0 flex-col overflow-hidden border-l border-gray-200 lg:w-80">
       {ORDER.map((slot) =>
         props[slot] == null ? null : (
           <div

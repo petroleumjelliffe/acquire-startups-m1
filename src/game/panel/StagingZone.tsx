@@ -27,10 +27,22 @@ export interface StagingZoneProps {
 
 export function StagingZone({ label, shares, cashDelta = 0, action }: StagingZoneProps) {
   return (
-    <div className="flex-none border-t border-dashed border-[#e7dfbf] bg-[#fffdf5] px-4 py-3">
+    <div
+      data-zone="staging"
+      className="flex-none border-t border-dashed border-[#e7dfbf] bg-[#fffdf5] px-4 py-3"
+    >
       <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-gray-400">{label}</div>
 
-      <div data-zone="pile" className="flex min-h-[62px] flex-wrap items-end gap-3">
+      {/*
+        Fixed, not merely minimum. A `min-h` sized to a *typical* row still
+        grows when the row is taller: measured in Chrome, an empty pile sat at
+        62px while a staged stack pushed it to 68px, and the depth margin on a
+        6+ stack adds another 3px on top of that. 72px clears the tallest thing
+        the pile can hold — an `sm` stack at depth 2 — so the zone is the same
+        height in every state. jsdom reports 0 for layout, so no test catches
+        this; it took measuring the real page.
+      */}
+      <div data-zone="pile" className="flex h-[72px] min-h-[72px] flex-wrap items-end gap-3">
         {shares ?? <span className="self-center text-[13px] text-[#c9bd93]">empty</span>}
       </div>
 
@@ -44,7 +56,9 @@ export function StagingZone({ label, shares, cashDelta = 0, action }: StagingZon
         </span>
       </div>
 
-      <div data-zone="action" className="mt-3 flex min-h-[32px] items-stretch">
+      {/* Same story: the phase-advance button measures 38px, so a 32px
+          reservation shifted the zone by 6px whenever a button appeared. */}
+      <div data-zone="action" className="mt-3 flex h-10 min-h-[40px] items-stretch">
         {action}
       </div>
     </div>

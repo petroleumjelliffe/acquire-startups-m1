@@ -475,7 +475,8 @@ export const SECTIONS: CatalogSection[] = [
         kind: 'wide',
         fixture: fromGolden('G1', 2),
         node: (
-          <div className="h-[560px] w-80 border border-gray-200">
+          // Height only: the Panel owns its own width, narrowing below 1024px.
+          <div className="h-[560px] border border-gray-200">
             <Panel
               stepstack={<StepStack entries={stepsOf(G1_BUY)} onUndo={noop} />}
               active={<ActiveStep label="Buy shares" body={buyRow(G1_BUY)} />}
