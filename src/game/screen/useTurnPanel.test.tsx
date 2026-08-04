@@ -7,6 +7,7 @@ import { buildFixture } from '../../../engine/golden/fixtures';
 import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
 import { replayGoldenGame } from '../../../engine/golden/replay';
 import type { GameState } from '../../../engine/gameTypes';
+import { getEndCondition } from '../../../engine/endGame';
 
 function sessionFor(state = buildFixture({
   players: [{ name: 'Alex', cash: 6000, hand: ['E6', 'H8'] }, { name: 'Sam', cash: 6000, hand: ['A1'] }],
@@ -305,6 +306,45 @@ describe('useTurnPanel — declaring the end', () => {
     render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
     expect(screen.getByText(/every founded startup is safe/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /end the game/i })).toBeInTheDocument();
+  });
+
+  it('un-latches when a chain that was safe becomes unsafe again', () => {
+    // "Every founded chain is safe" is derived every render, not remembered:
+    // a merger can knock a chain below SAFE_SIZE, and the offer to end the
+    // game must go away with it. G10's setup gives the met side (both chains
+    // safe); the unmet side needs a fixture of its own — G10 alone never
+    // exercises a state where the condition stops holding.
+    const g10 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G10')!;
+    const met = replayGoldenGame(g10)[0];
+
+    const unmet = buildFixture({
+      players: [
+        { name: 'Alex', cash: 1000, hand: ['H8'] },
+        { name: 'Sam', cash: 2000 },
+      ],
+      chains: [
+        // Still 12 tiles, still safe on its own.
+        { id: 'Messla', coords: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11', 'B12'] },
+        // Only 5 tiles — below SAFE_SIZE (11) — so not every founded chain
+        // is safe, and nothing has reached END_SIZE (41) either.
+        { id: 'ZuckFace', coords: ['D1', 'D2', 'D3', 'D4', 'D5'] },
+      ],
+      stage: 'buy',
+    });
+
+    // Prove the two fixtures actually differ in `.met` before trusting
+    // anything rendered from them.
+    expect(getEndCondition(met).met).toBe(true);
+    expect(getEndCondition(unmet).met).toBe(false);
+
+    const { rerender } = render(
+      <Harness session={createGameSession({ state: met })} dispatch={() => {}} />,
+    );
+    expect(screen.getByText(/every founded startup is safe/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /end the game/i })).toBeInTheDocument();
+
+    rerender(<Harness session={createGameSession({ state: unmet })} dispatch={() => {}} />);
+    expect(screen.queryByRole('button', { name: /end the game/i })).toBeNull();
   });
 
   it('offers nothing while no end condition holds', () => {

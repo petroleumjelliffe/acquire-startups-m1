@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, within, fireEvent, act } from '@testing-library/react';
 import { GameScreen } from '../GameScreen';
 import { createGameSession } from '../session/GameSession';
 import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
@@ -116,8 +116,14 @@ describe('driven golden games — the end', () => {
     }
 
     const expected = replayGoldenGame(game).at(-1)!;
-    expect(session.getView().state.stage).toBe('end');
-    expect(session.getView().state.stage).toBe(expected.stage);
+    const actual = session.getView().state;
+    expect(actual.stage).toBe('end');
+    expect(actual.stage).toBe(expected.stage);
+    // Reach the golden terminal state for real, not just its stage — the
+    // same comparison G2 and G7 make above, on the values that matter once
+    // the game is over: what each player walked away with.
+    expect(actual.players.map((p) => p.cash)).toEqual(expected.players.map((p) => p.cash));
+    expect(actual.players.map((p) => p.portfolio)).toEqual(expected.players.map((p) => p.portfolio));
 
     // The overlay is showing, and the figures on it are the engine's.
     //
@@ -146,8 +152,15 @@ describe('driven golden games — the end', () => {
     }
 
     expect(session.getView().state.stage).toBe('end');
-    expect(screen.getByTestId('final-overlay')).toBeInTheDocument();
-    expect(screen.getByText(/every founded startup is safe/i)).toBeInTheDocument();
+    const overlay = screen.getByTestId('final-overlay');
+    expect(overlay).toBeInTheDocument();
+    // Scoped to the overlay, not a bare `getByText`: the engine's own log
+    // says "every founded chain is safe" while this UI copy says "startup" —
+    // if that wording is ever aligned, an unscoped query would match both
+    // and throw on the collision. Scoping keeps the assertion meaningful
+    // (it still fails if the overlay is missing the sentence) without
+    // depending on the copy staying inconsistent.
+    expect(within(overlay).getByText(/every founded startup is safe/i)).toBeInTheDocument();
   });
 
   it('G11: an end that is declined leaves the game running', () => {

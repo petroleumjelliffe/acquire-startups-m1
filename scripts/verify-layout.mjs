@@ -522,6 +522,7 @@ async function main() {
     console.log(
       `${width}px  roster samples ${JSON.stringify(m.seatVisible)}` +
       `\n         board ${m.board ? Math.round(m.board.width) + 'x' + Math.round(m.board.height) : 'none'}` +
+      `\n         finalOverlay: ${JSON.stringify(m.finalOverlay)}` +
       `\n         ` + stageNames.map((n) => `${n} ${JSON.stringify(m.stages[n])}`).join('\n         '),
     );
     ws.close();

@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-04
 **Status:** Phase 2b complete; this is the punch list it hands forward
-**Branch:** `revamp/phase-2b-finishing-the-game` (13 commits, not pushed, not on `main`)
+**Branch:** `revamp/phase-2b-finishing-the-game` (14 commits, not pushed, not on `main`)
 **Plan:** [2026-08-04-phase-2b-finishing-the-game.md](../plans/2026-08-04-phase-2b-finishing-the-game.md)
 **Design:** [2026-08-04-phase-2b-finishing-the-game-design.md](./2026-08-04-phase-2b-finishing-the-game-design.md)
 **Predecessor:** [2026-08-04-phase-2a-carry-forward.md](./2026-08-04-phase-2a-carry-forward.md)
@@ -32,7 +32,8 @@ diverged). Both runs report 44 files; the branch added 24 tests and zero new fil
 what the design predicted: three affordances inside an existing stage switch, one overlay in an
 existing screen, two callbacks on an existing page.
 
-**No new files anywhere.** `git diff --stat main..HEAD` shows 14 files touched, all of them
+**No new files anywhere.** `git diff --stat main..HEAD` shows 15 files touched (including this
+carry-forward doc, committed after the count above was first measured), all of them
 either pre-existing implementation files or this phase's own docs — no new component, no new
 test file, no new script.
 
@@ -237,6 +238,7 @@ on any given commit is the by-hand pass and the structural jsdom assertion.
 | 2 | The declared end is undoable within the declaring player's segment (design risk section, plan Task 3 Step 6) | It is final; no undo is offered past a declaration | See "The human adjudication on undo" above. `declareEnd` moving the actor to `null` closes the segment like any other actor change, by the existing, deliberate segment model — code governs. |
 | 3 | Task 4's brief: do not modify `FinalScoring.tsx` | `FinalScoring` gained an `actions?: ReactNode` slot (Task 8, by-hand fix) | The by-hand pass found that the button row's position was wrong regardless of the z-index fix, and the only correct fix was moving the buttons inside the card's own flow. Disclosed explicitly; the property the constraint protected (the component owns no routes/handlers) still holds. |
 | 4 | Task 8's brief: reach an end by playing a real two-player game | A mix of real play (one genuine 41-tile end reached) and direct fixture mounting via a throwaway debug route, deleted before committing | Two of three real walks stalled for several minutes without reaching an end state and were abandoned per the coordinator's direction not to wait on a stalled walk indefinitely. Fixture mounting reaches the same real component tree, hit-tested the same way, for the states real play could not reach in budget. |
+| 5 | "The final board position stays visible behind the overlay, dimmed" (design, Risks section) | The board is not, in fact, visible. `GameScreen.tsx`'s overlay wrapper is `bg-white/95`, and `FinalScoring` renders its own `bg-gray-900/60` scrim on top of that — the two together read as opaque, not dimmed. | The by-hand pass verified and approved the current look; this is not a bug to fix, it is the design doc stating an intention that shipped differently. Recorded here rather than silently left wrong, per the same "an honest carry-forward doesn't only record other people's mistakes" standard as the rest of this document. The visual is not being changed to match the sentence — the sentence was aspirational and the shipped look is the approved one. |
 
 ## What comes next inherits
 
