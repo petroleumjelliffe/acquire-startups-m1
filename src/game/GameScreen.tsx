@@ -6,11 +6,13 @@ import { StepStack } from './panel/StepStack';
 import { HandZone } from './panel/HandZone';
 import { PlayersStrip } from './panel/PlayersStrip';
 import { RevealOverlay } from './RevealOverlay';
+import { FinalScoring } from './FinalScoring';
 import { useTurnPanel } from './screen/useTurnPanel';
 import { stepsOf } from './screen/stepsOf';
 import { getDeadTilesInHand } from '../../engine/placement';
 import { isStartupId } from '../../engine/startups';
 import { getSharePrice } from '../../engine/gameLogic';
+import { finalScore } from '../../engine/endGame';
 
 /**
  * The composed game: board left, panel right, one curtain over both.
@@ -27,9 +29,13 @@ import { getSharePrice } from '../../engine/gameLogic';
  */
 export interface GameScreenProps {
   session: GameSession;
+  /** Start over from setup. Omitted when nothing is hosting the screen. */
+  onNewGame?: () => void;
+  /** Leave the game entirely. Omitted when nothing is hosting the screen. */
+  onExit?: () => void;
 }
 
-export function GameScreen({ session }: GameScreenProps) {
+export function GameScreen({ session, onNewGame, onExit }: GameScreenProps) {
   const view = useGameSession(session);
   const { state, actorId, awaitingReveal, undoableSteps } = view;
   const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent));
@@ -110,6 +116,45 @@ export function GameScreen({ session }: GameScreenProps) {
             emoji={actor.emoji}
             onReveal={() => session.reveal()}
           />
+        </div>
+      )}
+
+      {state.stage === 'end' && (
+        <div
+          data-testid="final-overlay"
+          className="absolute inset-0 z-30 overflow-y-auto bg-white/95 p-6"
+        >
+          {/*
+            The scoreboard is `finalScore(state)` spread straight in — its
+            props *are* the engine's report, which is why there is no adapter
+            here and no figure written down in `src/`. The actions live out
+            here rather than inside it: `FinalScoring` is deliberately
+            terminal and knows nothing about routes.
+          */}
+          <FinalScoring {...finalScore(state)} />
+
+          {(onNewGame || onExit) && (
+            <div className="mt-6 flex justify-center gap-3">
+              {onNewGame && (
+                <button
+                  type="button"
+                  onClick={onNewGame}
+                  className="m-0 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                >
+                  New game
+                </button>
+              )}
+              {onExit && (
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="m-0 rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
+                >
+                  Back to menu
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

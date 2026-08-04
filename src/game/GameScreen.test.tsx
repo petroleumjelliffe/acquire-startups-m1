@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { GameScreen } from './GameScreen';
 import { createGameSession } from './session/GameSession';
 import { buildFixture } from '../../engine/golden/fixtures';
+import { ALL_GOLDEN_GAMES } from '../../engine/golden';
+import { replayGoldenGame } from '../../engine/golden/replay';
 
 function playable() {
   return buildFixture({
@@ -121,4 +123,64 @@ it('marks nobody as the active seat before the draw', () => {
   );
   expect(container.querySelectorAll('[data-seat] .border-blue-600')).toHaveLength(0);
   expect(container.querySelectorAll('[data-seat].border-blue-600')).toHaveLength(0);
+});
+
+describe('GameScreen at the end of a game', () => {
+  function ended() {
+    const g9 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G9')!;
+    const state = replayGoldenGame(g9).at(-1)!;
+    if (state.stage !== 'end') throw new Error('G9 no longer ends');
+    return createGameSession({ state });
+  }
+
+  it('covers the whole surface with the scoreboard', () => {
+    render(<GameScreen session={ended()} />);
+    const overlay = screen.getByTestId('final-overlay');
+    expect(overlay.className).toMatch(/inset-0/);
+  });
+
+  it('shows the totals the engine reports', () => {
+    const { container } = render(<GameScreen session={ended()} />);
+    // G9's declared totals, derived — not written down anywhere in src/.
+    // Scoped to the Total row: the winner's figure also headlines
+    // `FinalScoring`'s banner ("X wins with $Y"), so a plain `getByText`
+    // matches twice for whichever total is highest.
+    const totals = [...container.querySelectorAll('[data-fs-row="total"]')].map(
+      (el) => el.textContent,
+    );
+    expect(totals).toContain('$27,800');
+    expect(totals).toContain('$21,600');
+    expect(totals).toContain('$4,300');
+  });
+
+  it('says why the game ended', () => {
+    render(<GameScreen session={ended()} />);
+    // Scoped to the overlay: the step stack already logs a "Game over" entry
+    // with the same reason text (from the `declareEnd` step in G9's history),
+    // so an unscoped query matches both it and the overlay's banner.
+    const overlay = screen.getByTestId('final-overlay');
+    expect(within(overlay).getByText(/reached 41 tiles/i)).toBeInTheDocument();
+  });
+
+  it('offers a new game and a way out when the page supplies them', () => {
+    const onNewGame = vi.fn();
+    const onExit = vi.fn();
+    render(<GameScreen session={ended()} onNewGame={onNewGame} onExit={onExit} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /new game/i }));
+    expect(onNewGame).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /back to menu/i }));
+    expect(onExit).toHaveBeenCalled();
+  });
+
+  it('omits the buttons the page did not supply', () => {
+    render(<GameScreen session={ended()} />);
+    expect(screen.queryByRole('button', { name: /new game/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /back to menu/i })).toBeNull();
+  });
+
+  it('shows no overlay while the game is still running', () => {
+    render(<GameScreen session={createGameSession({ state: playable() })} />);
+    expect(screen.queryByTestId('final-overlay')).toBeNull();
+  });
 });
