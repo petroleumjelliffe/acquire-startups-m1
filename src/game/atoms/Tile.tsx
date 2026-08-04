@@ -21,6 +21,13 @@ export interface TileProps {
    * scales with the board rather than with a breakpoint.
    */
   fill?: boolean;
+  /**
+   * The "placed this turn, still undoable" ring, as an orthogonal modifier so
+   * it composes with brand affiliation — the tile that founds a chain is both
+   * the HQ and the undoable tile. The `placed` state is the same cue baked in,
+   * for inline use in the log where there is no affiliation to compose with.
+   */
+  selected?: boolean;
 }
 
 const BASE =
@@ -32,14 +39,16 @@ const DARK = 'bg-gray-700 border-gray-700 text-gray-50 font-bold';
 const STATE_CLASSES: Record<TileState, string> = {
   empty: 'bg-gray-100 border-gray-300 text-gray-500 font-medium',
   filled: DARK,
-  placed: `${DARK} outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]`,
+  placed: `${DARK} outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]`, // == filled + selected
   hand: 'bg-blue-100 border-2 border-blue-500 text-blue-700 font-bold cursor-pointer hover:bg-blue-200',
   blocked: 'bg-blue-100 border-2 border-blue-500 text-blue-700/30 font-bold cursor-not-allowed',
   chain: `${DARK} z-[1]`,
   founded: 'border-2 font-extrabold z-[2]',
 };
 
-export function Tile({ coord, state, brand, onClick, fill }: TileProps) {
+const SELECTED = 'outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]';
+
+export function Tile({ coord, state, brand, onClick, fill, selected }: TileProps) {
   const brandClasses = brand ? BRAND_CLASSES[brand] : null;
 
   // Chain members wear the brand ring so neighbouring rings overlap into a
@@ -52,7 +61,8 @@ export function Tile({ coord, state, brand, onClick, fill }: TileProps) {
         : '';
 
   const box = fill ? 'h-full w-full' : 'h-[34px] w-[34px]';
-  const className = `${BASE} ${box} ${STATE_CLASSES[state]} ${brandPaint}`.trim();
+  const className =
+    `${BASE} ${box} ${STATE_CLASSES[state]} ${brandPaint} ${selected ? SELECTED : ''}`.trim();
 
   // `founded` is the only state whose label is not the coordinate — but the
   // coordinate stays reachable through the title in every state.
