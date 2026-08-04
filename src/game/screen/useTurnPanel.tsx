@@ -3,6 +3,7 @@ import { hasLegalTile, type Intent } from '../../../engine/intents';
 import type { GameState, StartupId } from '../../../engine/gameTypes';
 import type { SessionView } from '../session/GameSession';
 import type { Coord } from '../../../engine/gameHelpers';
+import { getDeadTilesInHand } from '../../../engine/placement';
 import { ActiveStep } from '../panel/ActiveStep';
 import { StagingZone } from '../panel/StagingZone';
 import { FoundGroups } from '../FoundGroups';
@@ -90,6 +91,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
 
   if (state.stage === 'play') {
     const canPlace = actorId ? hasLegalTile(state, actorId) : false;
+    const dead = actorId ? getDeadTilesInHand(state, actorId) : [];
 
     return {
       staging: idleStaging,
@@ -103,18 +105,36 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
                   ? 'Choose one of your tiles on the board.'
                   : 'No tile you hold can be played. You may end your turn.'}
               </span>
+              {dead.length > 0 && (
+                <span className="text-[13px] text-gray-600">
+                  {`${dead.join(', ')} can never be played — ${dead.length === 1 ? 'it joins' : 'they join'} two safe chains.`}
+                </span>
+              )}
               {problem}
             </>
           }
           button={
-            canPlace || !actorId ? undefined : (
-              <button
-                type="button"
-                onClick={() => dispatch({ type: 'endTurn', playerId: actorId })}
-                className="m-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold hover:bg-gray-50"
-              >
-                End turn
-              </button>
+            !actorId ? undefined : (
+              <div className="flex w-full flex-col gap-2">
+                {dead.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: 'tradeInDeadTiles', playerId: actorId, coords: dead })}
+                    className="m-0 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  >
+                    {`Trade in ${dead.length} dead tile${dead.length === 1 ? '' : 's'}`}
+                  </button>
+                )}
+                {!canPlace && (
+                  <button
+                    type="button"
+                    onClick={() => dispatch({ type: 'endTurn', playerId: actorId })}
+                    className="m-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    End turn
+                  </button>
+                )}
+              </div>
             )
           }
         />

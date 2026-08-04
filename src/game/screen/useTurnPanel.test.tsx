@@ -225,3 +225,60 @@ describe('useTurnPanel — a player who cannot move', () => {
     expect(screen.queryByRole('button', { name: /end turn/i })).toBeNull();
   });
 });
+
+describe('useTurnPanel — dead tiles', () => {
+  /**
+   * Two safe chains with a gap at C1. `C1` in hand is dead; `H8` is fine.
+   * The player is therefore not stuck — which is the point: the trade-in has
+   * to be on offer independently of the pass.
+   */
+  function holdingDeadTile() {
+    return buildFixture({
+      players: [{ name: 'Alex', cash: 6000, hand: ['C1', 'H8'] }, { name: 'Sam', cash: 6000 }],
+      chains: [
+        { id: 'Messla', coords: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11'] },
+        { id: 'ZuckFace', coords: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11'] },
+      ],
+      bag: ['I11', 'I12'],
+    });
+  }
+
+  it('offers to trade every dead tile at once', () => {
+    const dispatch = vi.fn();
+    render(<Harness session={createGameSession({ state: holdingDeadTile() })} dispatch={dispatch} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /trade in 1 dead tile/i }));
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'tradeInDeadTiles',
+      playerId: 'p1',
+      coords: ['C1'],
+    });
+  });
+
+  it('names the dead tiles so the player can see which they are', () => {
+    render(<Harness session={createGameSession({ state: holdingDeadTile() })} dispatch={() => {}} />);
+    expect(screen.getByText(/C1/)).toBeInTheDocument();
+  });
+
+  it('offers nothing when no tile in hand is dead', () => {
+    render(<Harness session={sessionFor()} dispatch={() => {}} />);
+    expect(screen.queryByRole('button', { name: /trade in/i })).toBeNull();
+  });
+
+  it('offers the trade alongside the pass, not instead of it', () => {
+    // Every tile dead: the player is stuck *and* holds dead tiles, so both
+    // affordances must be present — trading may hand them a playable tile.
+    const state = buildFixture({
+      players: [{ name: 'Alex', cash: 6000, hand: ['C1'] }, { name: 'Sam', cash: 6000 }],
+      chains: [
+        { id: 'Messla', coords: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11'] },
+        { id: 'ZuckFace', coords: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11'] },
+      ],
+      bag: ['I11'],
+    });
+    render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
+
+    expect(screen.getByRole('button', { name: /trade in 1 dead tile/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /end turn/i })).toBeInTheDocument();
+  });
+});
