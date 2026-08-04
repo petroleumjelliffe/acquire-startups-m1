@@ -111,12 +111,32 @@ instead of playing thirty turns to reach one.
 | `startGame` intent | `{ type: 'startGame'; playerId: string }`, legal only in `draw` and only from seat one. Draws one tile per player from the bag, **places them permanently on the board**, sets `turnIndex` to the lowest coordinate, logs the draw, and leaves `stage: 'play'`. Supersedes `resolveInitialDraw`, which stays until `DrawModal` dies in Phase 3. |
 | `getCurrentActor(state)` | Pure; as above. |
 | `LogEntry.payload?: LogPayload` | A discriminated union whose first member is `{ kind: 'payout'; bonuses: BonusResult[] }`, emitted where `finalizeMergerPayout` writes its entry. `BonusResult` already carries `playerName`, `shares`, `type` and `amount` — everything `PayoutLines` needs. |
-| A golden game for the opening | No golden currently starts from `createInitialGame`. One new game pins the opening: hands are dealt, order is deterministic from the seed, the drawn tiles are on the board, and a tile placed beside one founds a chain. |
+| A golden game for `startGame` | One new game, authored bag: order is deterministic, the drawn tiles are on the board, and they have left the bag. Nothing more — see below. |
 
 **Starting tiles stay on the board**, as in Acquire. `previewPlacement` already handles unclaimed
 placed tiles through `loneAdj` and `floodFillUnclaimed` (`engine/placement.ts:48,86`), so this costs
-nothing in the rules layer — but it does mean a 2a game opens with N unclaimed tiles present, and
-the opening golden game exists to pin that.
+nothing in the rules layer — but it does mean a 2a game opens with N unclaimed tiles present.
+
+### The existing golden games are not touched
+
+`buildFixture` already supports `loners`, and **G1 uses it** — `loners: ['E5']`, Alex places `E6`
+beside it and founds Messla at size 2 (`engine/golden/turns.ts:16`). A turn-order starting tile *is*
+a loner, so the rule the opening depends on is pinned by the first golden game. Retrofitting
+starting tiles into G1–G16 would perturb positions that were authored deliberately, for no coverage
+gain; the roadmap's point about authored setups is that they are not meant to be reachable game
+histories.
+
+What is genuinely uncovered is the opening *sequence*, and the best place for it is not a new golden
+game at all. `engine/golden/invariants.test.ts:38` builds its opening position by hand across 60
+seeds, with a comment explaining why: "`createInitialGame` cannot be used: it yields `stage: 'draw'`,
+which no intent accepts." Once `startGame` exists, `newGame(seed)` becomes `createInitialGame` plus
+`startGame` — the real opening, the workaround deleted, and 60 seeded games of opening coverage for
+free.
+
+That harness is also the one that would have caught the legacy bug: `checkInvariants` asserts
+`placed + hands + bag + discarded === 108`, while `resolveInitialDraw` marks each drawn tile
+`placed: true` *and* pushes it back onto the bag (`engine/gameLogic.ts:60,75`). No test currently
+runs that code, which is why the violation has sat there.
 
 ## The screen
 
@@ -192,7 +212,7 @@ online code.
 | Layer | Runner | What it covers |
 |---|---|---|
 | Session | vitest / node | Segment boundaries, undo range, snapshot pruning, illegal-intent capture, `{state}` construction. No React. |
-| Engine | vitest / node | The four additive changes, plus the opening golden game. |
+| Engine | vitest / node | The four additive changes, the `startGame` golden game, and `invariants.test.ts` switched to the real opening across its 60 seeds. |
 | Components | vitest / jsdom | Setup roster and `GameScreen` wiring, as in Phase 1b. |
 | Driven games | vitest / jsdom | **G2** (two-way merger, distinct majority and minority) and **G7** (three-way, sequential absorptions) built as sessions from their fixtures and driven through the real `GameScreen` by clicking, asserting the engine reaches the golden's asserted terminal state. |
 | Layout | `npm run verify:layout` | Headless Chrome over CDP: panel zone heights at 768 and 1440, board fits without scrolling, the curtain's covered area equals the surface. Fails on drift. |
