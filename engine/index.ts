@@ -8,4 +8,5 @@ export * from './placement';
 export * from './bonuses';
 export * from './endGame';
 export * from './intents';
+export * from './actor';
 export * from './history';
