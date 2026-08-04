@@ -387,7 +387,12 @@ function doStartGame(state: GameState, intent: Extract<Intent, { type: 'startGam
     const tile = state.bag.shift();
     if (!tile) reject('shareCountMismatch', 'bag exhausted during the opening draw');
     state.board[tile] = { placed: true };
-    p.lastPlacedTile = tile;
+    // Deliberately NOT `p.lastPlacedTile = tile`, which is what the legacy
+    // `resolveInitialDraw` does. That field means "the tile placed this turn,
+    // still undoable": the board gives it a selection ring and keeps it
+    // clickable so it can be taken back. A turn-order tile is neither, and
+    // marking it put a phantom undoable tile on the opening board that
+    // rejected the very click it invited.
     return { player: p, tile };
   });
 

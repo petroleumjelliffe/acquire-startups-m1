@@ -799,3 +799,15 @@ describe('merger payout payload', () => {
     }
   });
 });
+
+describe('startGame and the undo indicator', () => {
+  it('does not mark a starting tile as the player last placement', () => {
+    // `lastPlacedTile` means "the tile placed this turn, still undoable": the
+    // board draws it with a selection ring and keeps it clickable so it can be
+    // taken back. A turn-order tile is neither — marking it made the opening
+    // board show a phantom undoable tile that rejected the click it invited.
+    const state = createInitialGame('open-7', ['Alex', 'Sam', 'Jo']);
+    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+    expect(next.players.every((p) => p.lastPlacedTile === undefined)).toBe(true);
+  });
+});

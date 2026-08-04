@@ -119,6 +119,12 @@ const MEASURE = `(async () => {
     return out;
   };
 
+  // Four seats, not the default two: the players strip only overflowed its
+  // panel once there were more than two of them, and a gate that always plays
+  // heads-up would never see it.
+  await click(/add player/i, 'add player');
+  await click(/add player/i, 'add player');
+
   await click(/start game/i, 'start game');
   await click(/reveal/i, 'reveal (opening)');
   await click(/draw for turn order/i, 'draw for turn order');
@@ -181,8 +187,17 @@ const MEASURE = `(async () => {
 
   const surface = document.querySelector('[data-testid="game-surface"]');
   const grid = document.querySelector('[data-board="grid"]');
+  const strip = document.querySelector('[data-slot="players"]');
 
   return {
+    // Zones that clip their content rather than fitting it. The players strip
+    // did exactly this at four seats and up — six seats wanted 1061px inside a
+    // 319px panel — and nothing visible said so: the extra seats were just
+    // gone. Horizontal overflow inside a fixed-width panel is always a bug.
+    clipped: [strip, ...document.querySelectorAll('[data-zone]')]
+      .filter((el) => el && el.scrollWidth > el.clientWidth + 1)
+      .map((el) => (el.getAttribute('data-slot') ?? el.getAttribute('data-zone')) +
+        ' ' + el.scrollWidth + '>' + el.clientWidth),
     docScrollWidth: document.documentElement.scrollWidth,
     innerWidth: window.innerWidth,
     surface: surface ? surface.getBoundingClientRect().toJSON() : null,
@@ -206,7 +221,9 @@ const CURTAIN = `(() => {
 // there is a surface to cover at all.
 const START_GAME = `(async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const btn = [...document.querySelectorAll('button')].find((b) => /start game/i.test(b.innerText));
+  const find = (re) => [...document.querySelectorAll('button')].find((b) => re.test(b.innerText));
+  for (let i = 0; i < 2; i += 1) { const a = find(/add player/i); if (a) { a.click(); await wait(150); } }
+  const btn = find(/start game/i);
   if (!btn) throw new Error('no start game button');
   btn.click();
   await wait(400);
@@ -276,6 +293,9 @@ async function main() {
     }
     if (!m.reachedFirstTurn) {
       failures.push(`${width}px: never reached the first turn`);
+    }
+    for (const zone of m.clipped ?? []) {
+      failures.push(`${width}px: zone clips its content horizontally — ${zone}`);
     }
 
     // The load-bearing check. A panel zone that is 62px when empty and 68px
