@@ -103,3 +103,71 @@ describe('driven golden games', () => {
     expect(curtains).toBeGreaterThan(0);
   });
 });
+
+describe('driven golden games — the end', () => {
+  it('G9: a declared 41-tile end scores through the real screen', () => {
+    const game = golden('G9');
+    const session = createGameSession({ state: buildFixture(game.setup) });
+    render(<GameScreen session={session} />);
+
+    for (const step of game.steps) {
+      passDevice();
+      apply(session, step.intent);
+    }
+
+    const expected = replayGoldenGame(game).at(-1)!;
+    expect(session.getView().state.stage).toBe('end');
+    expect(session.getView().state.stage).toBe(expected.stage);
+
+    // The overlay is showing, and the figures on it are the engine's.
+    //
+    // Scoped to `[data-fs-row="total"]`, not a bare `getByText`: the
+    // scoreboard's winner banner restates the winner's total in its own
+    // sentence, so `$27,800` appears twice in the overlay and a bare text
+    // query throws on the collision. Reading the total row's cells keeps
+    // the assertion meaningful — it still fails if the scoreboard is absent
+    // or shows the wrong figures — without matching the banner instead.
+    const overlay = screen.getByTestId('final-overlay');
+    expect(overlay).toBeInTheDocument();
+    const totals = Array.from(overlay.querySelectorAll('[data-fs-row="total"]'), (el) => el.textContent);
+    expect(totals).toContain('$27,800');
+    expect(totals).toContain('$21,600');
+    expect(totals).toContain('$4,300');
+  });
+
+  it('G10: an all-safe end scores through the real screen', () => {
+    const game = golden('G10');
+    const session = createGameSession({ state: buildFixture(game.setup) });
+    render(<GameScreen session={session} />);
+
+    for (const step of game.steps) {
+      passDevice();
+      apply(session, step.intent);
+    }
+
+    expect(session.getView().state.stage).toBe('end');
+    expect(screen.getByTestId('final-overlay')).toBeInTheDocument();
+    expect(screen.getByText(/every founded startup is safe/i)).toBeInTheDocument();
+  });
+
+  it('G11: an end that is declined leaves the game running', () => {
+    const game = golden('G11');
+    const session = createGameSession({ state: buildFixture(game.setup) });
+    render(<GameScreen session={session} />);
+
+    // G11's own steps run past the decline: its third step has Sam declare
+    // the end himself, and that genuinely does end the game (that's the
+    // point of the golden game — declining doesn't forfeit the option
+    // forever). This test is about the decline specifically — that meeting
+    // the end condition once doesn't latch the game into "over" — so it
+    // stops short of that final `declareEnd` and drives only the decline
+    // (step 1) and the normal turn that follows it (step 2).
+    for (const step of game.steps.slice(0, -1)) {
+      passDevice();
+      apply(session, step.intent);
+    }
+
+    expect(session.getView().state.stage).not.toBe('end');
+    expect(screen.queryByTestId('final-overlay')).toBeNull();
+  });
+});
