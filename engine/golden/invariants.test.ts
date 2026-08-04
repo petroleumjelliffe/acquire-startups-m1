@@ -8,7 +8,29 @@ import { buildFixture } from './fixtures';
 import { checkInvariants } from './invariants';
 
 const MAX_STEPS = 400;
-const SEEDS = Array.from({ length: 60 }, (_, i) => `prop-${i}`);
+
+/**
+ * `shuffleSeeded` (gameHelpers.ts) derives its RNG seed as the *sum of the
+ * string's char codes*, not a real hash. Seeds sharing a "prop-" prefix plus
+ * a numeric suffix collide whenever those suffixes share a digit sum —
+ * "prop-17", "prop-26", "prop-35", "prop-44", "prop-53" all sum to 598 and
+ * so replay byte-identical games. Across the old `prop-0..prop-59` scheme
+ * there were only 24 distinct hash values behind 60 "seeds".
+ *
+ * Fixed here in the harness only (not in `shuffleSeeded`, which would change
+ * real game seeding): each seed's distinguishing suffix is a single
+ * character drawn from a pool of `SEED_COUNT` mutually distinct characters.
+ * The shared "prop-" prefix contributes an identical constant to every sum,
+ * so two seeds' sums differ exactly when their trailing characters' char
+ * codes differ — true for any two distinct characters, independent of what
+ * digits or letters they look like. `it('produces distinct shuffleSeeded
+ * orderings ...')` below asserts this holds, so a future edit that
+ * reintroduces collisions fails loudly instead of silently shrinking the
+ * sample.
+ */
+const SEED_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+const SEED_COUNT = 60;
+const SEEDS = Array.from({ length: SEED_COUNT }, (_, i) => `prop-${SEED_CHARS[i]}`);
 const NAMES = ['Alex', 'Sam', 'Jordan'];
 
 /**
@@ -165,5 +187,15 @@ describe('random-play invariants', () => {
 
   it('reaches terminal states — at least one game ends', () => {
     expect(runs.some((r) => r.reachedEnd)).toBe(true);
+  });
+
+  // Guards the fix above: if SEEDS ever regresses to a scheme where
+  // shuffleSeeded's char-code-sum hash collides, this catches it directly
+  // rather than letting the sample silently shrink to fewer distinct games.
+  it('SEEDS produces SEED_COUNT distinct shuffleSeeded orderings', () => {
+    const coords = generateAllCoords();
+    const orderings = new Set(SEEDS.map((seed) => shuffleSeeded(coords, seed).join(',')));
+    expect(SEEDS.length).toBe(SEED_COUNT);
+    expect(orderings.size).toBe(SEED_COUNT);
   });
 });
