@@ -1,5 +1,6 @@
 import type { GameState, Player, Stage, StartupId } from './gameTypes';
 import type { Coord } from './gameHelpers';
+import { compareTiles } from './gameHelpers';
 import { previewPlacement, isDeadTile } from './placement';
 import { getEndCondition } from './endGame';
 import { tok, pushLog } from './log';
@@ -20,6 +21,7 @@ import {
  * fixed by the roadmap spec — do not rename them.
  */
 export type Intent =
+  | { type: 'startGame';           playerId: string }
   | { type: 'placeTile';           playerId: string; coord: Coord }
   | { type: 'chooseFoundingBrand'; playerId: string; startupId: StartupId }
   | { type: 'chooseSurvivor';      playerId: string; startupId: StartupId }
@@ -366,6 +368,41 @@ function doDeclareEnd(state: GameState, intent: Extract<Intent, { type: 'declare
 }
 
 /**
+ * Opens the game: one tile each for turn order, lowest coordinate goes first.
+ *
+ * The drawn tiles stay on the board as unclaimed starting tiles, exactly as in
+ * Acquire, and they leave the bag for good. The legacy `resolveInitialDraw`
+ * marks them placed *and* pushes them back onto the bag, which counts them
+ * twice — `checkInvariants`' tile conservation catches that, and nothing
+ * currently runs that code. Do not reproduce it here.
+ *
+ * Only seat one may open the game: turn order does not exist yet, so there is
+ * no "current player" to check against, and something has to be the authority.
+ */
+function doStartGame(state: GameState, intent: Extract<Intent, { type: 'startGame' }>): void {
+  requireStage(state, 'draw');
+  if (state.players[0]?.id !== intent.playerId) reject('notYourTurn', 'only seat one opens the game');
+
+  const drawn = state.players.map((p) => {
+    const tile = state.bag.shift();
+    if (!tile) reject('shareCountMismatch', 'bag exhausted during the opening draw');
+    state.board[tile] = { placed: true };
+    p.lastPlacedTile = tile;
+    return { player: p, tile };
+  });
+
+  const sorted = [...drawn].sort((a, b) => compareTiles(a.tile, b.tile));
+  state.turnIndex = state.players.findIndex((p) => p.id === sorted[0].player.id);
+
+  pushLog(state, 'Drew for turn order', sorted.flatMap((d, i) => [
+    tok.text(i === 0 ? `${d.player.name} ` : `, ${d.player.name} `),
+    tok.tile(d.tile),
+  ]), intent.playerId);
+
+  state.stage = 'play';
+}
+
+/**
  * The one entry point for player actions. Pure by contract: it clones the
  * incoming state, then delegates to the (mutating) rules functions.
  * Throws `IllegalIntentError` and leaves the caller's state untouched if the
@@ -374,6 +411,7 @@ function doDeclareEnd(state: GameState, intent: Extract<Intent, { type: 'declare
 export function applyIntent(state: GameState, intent: Intent): GameState {
   const next = structuredClone(state);
   switch (intent.type) {
+    case 'startGame':           doStartGame(next, intent); break;
     case 'placeTile':           doPlaceTile(next, intent); break;
     case 'chooseFoundingBrand': doChooseFoundingBrand(next, intent); break;
     case 'chooseSurvivor':      doChooseSurvivor(next, intent); break;

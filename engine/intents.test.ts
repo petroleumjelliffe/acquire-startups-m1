@@ -3,7 +3,7 @@ import { applyIntent, IllegalIntentError } from './intents';
 import { createTestGameState, giveShares, setupGameWithStartups } from './testHelpers';
 import { buildFixture } from './golden/fixtures';
 import { createInitialGame } from './gameInit';
-import { generateAllCoords } from './gameHelpers';
+import { generateAllCoords, compareTiles } from './gameHelpers';
 import type { GameState, StartupId } from './gameTypes';
 import type { Coord, Row } from './gameHelpers';
 
@@ -708,5 +708,70 @@ describe('discard pile', () => {
 
   it('starts empty on a new game', () => {
     expect(createInitialGame('seed-1', ['Alex', 'Sam']).discarded).toEqual([]);
+  });
+});
+
+describe('startGame', () => {
+  it('turns a fresh game into a playable position', () => {
+    const state = createInitialGame('open-1', ['Alex', 'Sam', 'Jo']);
+    expect(state.stage).toBe('draw');
+
+    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+
+    expect(next.stage).toBe('play');
+    // One starting tile per player, placed and unclaimed.
+    const placed = Object.entries(next.board).filter(([, c]) => c.placed);
+    expect(placed).toHaveLength(3);
+    expect(placed.every(([, c]) => c.startupId === undefined)).toBe(true);
+  });
+
+  it('takes the starting tiles out of the bag rather than returning them', () => {
+    const state = createInitialGame('open-1', ['Alex', 'Sam', 'Jo']);
+    const before = state.bag.length;
+    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+
+    expect(next.bag).toHaveLength(before - 3);
+    const placedCoords = Object.entries(next.board)
+      .filter(([, c]) => c.placed)
+      .map(([coord]) => coord);
+    for (const coord of placedCoords) expect(next.bag).not.toContain(coord);
+  });
+
+  it('preserves tile conservation across the opening', () => {
+    const state = createInitialGame('open-2', ['Alex', 'Sam']);
+    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+
+    const placed = Object.values(next.board).filter((c) => c.placed).length;
+    const inHands = next.players.reduce((n, p) => n + p.hand.length, 0);
+    expect(placed + inHands + next.bag.length + next.discarded.length).toBe(108);
+  });
+
+  it('gives the turn to whoever drew the lowest coordinate', () => {
+    const state = createInitialGame('open-3', ['Alex', 'Sam', 'Jo']);
+    const drawnInOrder = state.bag.slice(0, 3);
+    const lowest = [...drawnInOrder].sort(compareTiles)[0];
+    const expectedIndex = drawnInOrder.indexOf(lowest);
+
+    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+    expect(next.turnIndex).toBe(expectedIndex);
+  });
+
+  it('logs the draw so the step stack can narrate it', () => {
+    const state = createInitialGame('open-4', ['Alex', 'Sam']);
+    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+    expect(next.log.map((e) => e.phase)).toContain('Drew for turn order');
+  });
+
+  it('is rejected once the game is under way', () => {
+    const state = createInitialGame('open-5', ['Alex', 'Sam']);
+    const started = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+    expect(() => applyIntent(started, { type: 'startGame', playerId: 'p1' }))
+      .toThrow(IllegalIntentError);
+  });
+
+  it('is rejected from a seat other than the first', () => {
+    const state = createInitialGame('open-6', ['Alex', 'Sam']);
+    expect(() => applyIntent(state, { type: 'startGame', playerId: 'p2' }))
+      .toThrow(IllegalIntentError);
   });
 });
