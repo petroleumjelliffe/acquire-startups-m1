@@ -1,59 +1,42 @@
 // src/pages/PassAndPlayPage.tsx
-// Pass-and-play mode setup and game
+// Pass-and-play on the Phase 2a stack.
+//
+// `Game.tsx`, `SetupScreen` and the modal family are deliberately left in
+// place: `RoomPage` still serves online play from them, so they cannot be
+// deleted until Phase 3/5 replaces the online screen. This route simply
+// stops using them.
 
-import React, { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SetupScreen } from '../components/SetupScreen';
-import { Game } from '../Game';
+import { LocalSetupScreen } from '../game/setup/LocalSetupScreen';
+import { GameScreen } from '../game/GameScreen';
+import { createGameSession } from '../game/session/GameSession';
 
 export function PassAndPlayPage() {
   const navigate = useNavigate();
-  const [config, setConfig] = useState<{
-    seed: string;
-    names: string[];
-  } | null>(null);
+  const [config, setConfig] = useState<{ seed: string; names: string[] } | null>(null);
 
-  const handleStart = (seed: string, names: string[]) => {
-    setConfig({ seed, names });
-  };
+  // One session per game. Recreating it on every render would throw the
+  // snapshot store away, taking undo with it.
+  const session = useMemo(
+    () => (config ? createGameSession({ seed: config.seed, names: config.names }) : null),
+    [config],
+  );
 
-  const handleBack = () => {
-    if (config) {
-      // If in game, confirm before going back
-      if (window.confirm('Are you sure you want to quit this game?')) {
-        setConfig(null);
-      }
-    } else {
-      // If in setup, just navigate back
-      navigate('/');
-    }
-  };
+  if (session) return <GameScreen session={session} />;
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      {!config ? (
-        <div className="max-w-md mx-auto">
-          <div className="mb-4">
-            <button
-              onClick={handleBack}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              ← Back
-            </button>
-          </div>
-          <SetupScreen
-            defaultSeed="scaffold-seed"
-            defaultPlayers="Dad, Maya, Nina, Monty, Baby Cat, Ricky Boy"
-            onStart={handleStart}
-          />
-        </div>
-      ) : (
-        <Game
-          seed={config.seed}
-          playerNames={config.names}
-          isMultiplayer={false}
-        />
-      )}
+      <div className="mx-auto max-w-md">
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="m-0 mb-4 rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
+        >
+          ← Back
+        </button>
+        <LocalSetupScreen onStart={setConfig} />
+      </div>
     </div>
   );
 }
