@@ -281,6 +281,16 @@ const MEASURE = `(async () => {
       .filter((el) => el.getAttribute('data-zone') !== 'roster')
       .filter((el) => el.scrollWidth > el.clientWidth + 1)
       .map((el) => el.getAttribute('data-zone') + ' ' + el.scrollWidth + '>' + el.clientWidth),
+    // If the walk ever does reach a finished game, hold the overlay to the
+    // same coverage rule as the curtain. Normally absent — reaching an end
+    // state by playing takes far longer than this gate should run.
+    finalOverlay: (() => {
+      const o = document.querySelector('[data-testid="final-overlay"]');
+      if (!o || !surface) return null;
+      const s = surface.getBoundingClientRect();
+      const r = o.getBoundingClientRect();
+      return { covers: Math.round(r.width) === Math.round(s.width) && Math.round(r.height) === Math.round(s.height) };
+    })(),
     // The panel scrolls rather than clipping, so a column taller than the
     // viewport is survivable — but it should still be rare enough to notice.
     panelScrolls: panel ? panel.scrollHeight > panel.clientHeight + 1 : null,
@@ -389,6 +399,9 @@ async function main() {
     }
     for (const zone of m.clipped ?? []) {
       failures.push(`${width}px: zone clips its content horizontally — ${zone}`);
+    }
+    if (m.finalOverlay && !m.finalOverlay.covers) {
+      failures.push(`${width}px: the final scoring overlay does not cover the surface`);
     }
     const seatSamples = Object.entries(m.seatVisible ?? {});
     if (seatSamples.length < 3) {
