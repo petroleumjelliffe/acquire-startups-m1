@@ -1,6 +1,6 @@
 # Phase 2a — Playable Pass-and-Play Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Make a game of Acquire playable from setup through mergers on one device, wiring the Phase 1b component layer to the real engine.
 
@@ -98,7 +98,7 @@
 
 **Background.** The live stages in the `applyIntent` path are `play`, `foundStartup`, `chooseSurvivor`, `mergerLiquidation`, `buy`, `end`, plus `draw` from `createInitialGame`. `mergerPayout`, `liquidation`, `liquidationPrompt`, `setup` and `dealHands` exist in the `Stage` union but are only reachable through the legacy `gameLogic` path that `src/Game.tsx` uses. They must still return something sane rather than crash.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `engine/actor.test.ts`:
 
@@ -157,7 +157,7 @@ describe('getCurrentActor', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run engine/actor.test.ts
@@ -165,7 +165,7 @@ npx vitest run engine/actor.test.ts
 
 Expected: FAIL — `Failed to resolve import "./actor"`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `engine/actor.ts`:
 
@@ -203,7 +203,7 @@ export function getCurrentActor(state: GameState): string | null {
 }
 ```
 
-- [ ] **Step 4: Export it from the barrel**
+- [x] **Step 4: Export it from the barrel**
 
 In `engine/index.ts`, add after the `export * from './intents';` line:
 
@@ -211,7 +211,7 @@ In `engine/index.ts`, add after the `export * from './intents';` line:
 export * from './actor';
 ```
 
-- [ ] **Step 5: Run the test and the gates**
+- [x] **Step 5: Run the test and the gates**
 
 ```bash
 npx vitest run engine/actor.test.ts
@@ -220,7 +220,7 @@ npm run typecheck; echo "TYPECHECK_EXIT=$?"
 
 Expected: PASS, `TYPECHECK_EXIT=0`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add engine/actor.ts engine/actor.test.ts engine/index.ts
@@ -243,7 +243,7 @@ git commit -m "feat(engine): getCurrentActor, the segment boundary both sides ne
 
 The tiles do **not** go back to the bag. The legacy `resolveInitialDraw` marks them placed *and* pushes them back (`engine/gameLogic.ts:60,75`), which double-counts them — a tile-conservation violation. Do not copy it.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `engine/intents.test.ts`:
 
@@ -322,7 +322,7 @@ import { compareTiles } from './gameHelpers';
 
 Confirm `IllegalIntentError` and `applyIntent` are already imported in that file; they are used by existing tests.
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run engine/intents.test.ts -t startGame
@@ -330,7 +330,7 @@ npx vitest run engine/intents.test.ts -t startGame
 
 Expected: FAIL — `unknownIntent: no handler for startGame`.
 
-- [ ] **Step 3: Add the intent to the union**
+- [x] **Step 3: Add the intent to the union**
 
 In `engine/intents.ts`, add as the **first** member of the `Intent` union (it is the only intent legal before play begins):
 
@@ -340,7 +340,7 @@ export type Intent =
   | { type: 'placeTile';           playerId: string; coord: Coord }
 ```
 
-- [ ] **Step 4: Implement the handler**
+- [x] **Step 4: Implement the handler**
 
 In `engine/intents.ts`, add `compareTiles` to the existing `./gameHelpers` import, then add this function immediately above `applyIntent`:
 
@@ -381,7 +381,7 @@ function doStartGame(state: GameState, intent: Extract<Intent, { type: 'startGam
 }
 ```
 
-- [ ] **Step 5: Wire it into the dispatcher**
+- [x] **Step 5: Wire it into the dispatcher**
 
 In `applyIntent`'s switch, add as the first case:
 
@@ -389,7 +389,7 @@ In `applyIntent`'s switch, add as the first case:
     case 'startGame':           doStartGame(next, intent); break;
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 ```bash
 npx vitest run engine/intents.test.ts
@@ -397,7 +397,7 @@ npx vitest run engine/intents.test.ts
 
 Expected: PASS, including the seven new cases.
 
-- [ ] **Step 7: Run the gates and commit**
+- [x] **Step 7: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -422,7 +422,7 @@ git commit -m "feat(engine): startGame intent closes the draw-stage deadlock"
 
 `engine/golden/invariants.test.ts:38` builds an opening position by hand across 60 seeds with a comment explaining why: `createInitialGame` parks at `draw`. That workaround now goes away, which buys 60 seeded games of opening coverage — including the tile conservation check that the legacy draw violates.
 
-- [ ] **Step 1: Write the failing golden game**
+- [x] **Step 1: Write the failing golden game**
 
 In `engine/golden/turns.ts`, add before the `TURN_GAMES` export:
 
@@ -478,7 +478,7 @@ const G17: GoldenGame = {
 
 Then add `G17` to the `TURN_GAMES` array export at the bottom of the file.
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run engine/golden/golden.test.ts -t G17
@@ -486,7 +486,7 @@ npx vitest run engine/golden/golden.test.ts -t G17
 
 Expected: FAIL. If Task 2 is complete this should already pass — if so, verify the *assertions* are meaningful by temporarily changing `currentPlayer: 'p2'` to `'p1'` and confirming a failure, then change it back.
 
-- [ ] **Step 3: Confirm B3 and C4 are actually adjacent**
+- [x] **Step 3: Confirm B3 and C4 are actually adjacent**
 
 Coordinates run `A1`–`I12` (9 rows × 12 columns). `B3` and `C4` are diagonal, **not** adjacent — diagonals do not connect in Acquire. Change the authored bag to draw `B4` instead of `B3` so the starting tile sits directly above `C4`:
 
@@ -502,7 +502,7 @@ npx vitest run engine/golden/golden.test.ts -t G17
 
 Expected: PASS with `chainSize: { Messla: 2 }`.
 
-- [ ] **Step 4: Switch the property harness to the real opening**
+- [x] **Step 4: Switch the property harness to the real opening**
 
 In `engine/golden/invariants.test.ts`, replace the `newGame` function and its comment:
 
@@ -527,7 +527,7 @@ grep -n "shuffleSeeded\|generateAllCoords\|HAND_SIZE\|buildFixture" engine/golde
 
 `shuffleSeeded` is still used by `pick()`, so it stays.
 
-- [ ] **Step 5: Run the full property sweep**
+- [x] **Step 5: Run the full property sweep**
 
 ```bash
 npx vitest run engine/golden/invariants.test.ts
@@ -535,7 +535,7 @@ npx vitest run engine/golden/invariants.test.ts
 
 Expected: PASS across all 60 seeds. **If tile conservation fails here, stop** — it means `doStartGame` is losing or duplicating tiles, and that is the exact bug this task exists to catch.
 
-- [ ] **Step 6: Run the gates and commit**
+- [x] **Step 6: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -565,7 +565,7 @@ git commit -m "test(engine): pin the opening — G17 plus 60 seeds of real openi
 
 `pushLog` already returns the entry it created, so no signature change is needed.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `engine/intents.test.ts` (it already has merger fixtures and imports):
 
@@ -600,7 +600,7 @@ import { ALL_GOLDEN_GAMES } from './golden';
 import { replayGoldenGame } from './golden/replay';
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run engine/intents.test.ts -t "payout payload"
@@ -608,7 +608,7 @@ npx vitest run engine/intents.test.ts -t "payout payload"
 
 Expected: FAIL — `expected length 2 to be 1` (two per-payee entries today).
 
-- [ ] **Step 3: Add the payload type**
+- [x] **Step 3: Add the payload type**
 
 In `engine/gameTypes.ts`, add above `LogEntry` and extend it:
 
@@ -635,7 +635,7 @@ export interface LogEntry {
 
 `BonusResult` is already imported at the top of `gameTypes.ts` (line 2) and re-exported, so no import change is needed.
 
-- [ ] **Step 4: Emit one entry with the payload**
+- [x] **Step 4: Emit one entry with the payload**
 
 In `engine/gameLogic.ts`, replace the award loop in `finalizeMergerPayout` (currently lines 673–684, from `// Award bonuses` through the closing brace of the `for` loop) with:
 
@@ -661,7 +661,7 @@ In `engine/gameLogic.ts`, replace the award loop in `finalizeMergerPayout` (curr
 
 `bonusLabel` is already defined directly above `finalizeMergerPayout` and stays in use.
 
-- [ ] **Step 5: Update the two golden assertions**
+- [x] **Step 5: Update the two golden assertions**
 
 In `engine/golden/mergers.ts` line 52, change:
 
@@ -687,7 +687,7 @@ to:
         logPhases: ['Merger', 'Merger payout'],
 ```
 
-- [ ] **Step 6: Replace the catalog's regex derivation**
+- [x] **Step 6: Replace the catalog's regex derivation**
 
 In `src/game/catalog/sections.tsx`, replace the whole `payoutLinesOf` function (its doc comment and body) with:
 
@@ -725,7 +725,7 @@ If `textOf` is now unused in that file, remove it; check with:
 grep -n "textOf" src/game/catalog/sections.tsx
 ```
 
-- [ ] **Step 7: Run everything**
+- [x] **Step 7: Run everything**
 
 ```bash
 npx vitest run
@@ -733,7 +733,7 @@ npx vitest run
 
 Expected: PASS. The catalog's payout section must still render the same names and amounts — they now come from the payload rather than the regex.
 
-- [ ] **Step 8: Run the remaining gates and commit**
+- [x] **Step 8: Run the remaining gates and commit**
 
 ```bash
 npm run typecheck; echo "TYPECHECK_EXIT=$?"
@@ -761,7 +761,7 @@ Note: `src/**/*.test.ts` runs under the **jsdom** project per `vite.config.ts`. 
 
 This task covers construction, dispatch, error capture and undo. Task 6 adds segments.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/game/session/GameSession.test.ts`:
 
@@ -865,7 +865,7 @@ describe('createGameSession', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/session/GameSession.test.ts
@@ -873,7 +873,7 @@ npx vitest run src/game/session/GameSession.test.ts
 
 Expected: FAIL — cannot resolve `./GameSession`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `src/game/session/GameSession.ts`:
 
@@ -990,7 +990,7 @@ export function createGameSession(init: SessionInit): GameSession {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 ```bash
 npx vitest run src/game/session/GameSession.test.ts
@@ -998,7 +998,7 @@ npx vitest run src/game/session/GameSession.test.ts
 
 Expected: PASS — all eleven cases.
 
-- [ ] **Step 5: Run the gates and commit**
+- [x] **Step 5: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -1025,7 +1025,7 @@ git commit -m "feat(session): GameSession owning state, snapshots and rejection"
 
 A boundary-crossing intent's own snapshot (say `endTurn`) belongs to the segment that just closed and must be pruned, or the incoming player could rewind the outgoing player's turn.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/game/session/GameSession.test.ts`:
 
@@ -1102,7 +1102,7 @@ describe('segments', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/session/GameSession.test.ts -t segments
@@ -1110,7 +1110,7 @@ npx vitest run src/game/session/GameSession.test.ts -t segments
 
 Expected: FAIL — `actorId` is `null`, `awaitingReveal` is `false`.
 
-- [ ] **Step 3: Implement segments**
+- [x] **Step 3: Implement segments**
 
 In `src/game/session/GameSession.ts`, add the import:
 
@@ -1197,7 +1197,7 @@ Replace `reveal`:
 
 `undoTo` needs no `syncSegment` call — rewinding within a segment cannot change the actor, since the actor is what defines the segment. Leave it as it is.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/game/session/GameSession.test.ts
@@ -1205,7 +1205,7 @@ npx vitest run src/game/session/GameSession.test.ts
 
 Expected: PASS — all eighteen cases.
 
-- [ ] **Step 5: Verify the liquidation handoff specifically**
+- [x] **Step 5: Verify the liquidation handoff specifically**
 
 Append one more test, then re-run:
 
@@ -1238,7 +1238,7 @@ npx vitest run src/game/session/GameSession.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 6: Run the gates and commit**
+- [x] **Step 6: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -1260,7 +1260,7 @@ git commit -m "feat(session): segments unify curtain, undo scope and snapshot pr
 - Consumes: `GameSession`, `SessionView` (Tasks 5–6).
 - Produces: `useGameSession(session: GameSession): SessionView`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/game/session/useGameSession.test.tsx`:
 
@@ -1303,7 +1303,7 @@ describe('useGameSession', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/session/useGameSession.test.tsx
@@ -1311,7 +1311,7 @@ npx vitest run src/game/session/useGameSession.test.tsx
 
 Expected: FAIL — cannot resolve `./useGameSession`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `src/game/session/useGameSession.ts`:
 
@@ -1332,7 +1332,7 @@ export function useGameSession(session: GameSession): SessionView {
 }
 ```
 
-- [ ] **Step 4: Run the test**
+- [x] **Step 4: Run the test**
 
 ```bash
 npx vitest run src/game/session/useGameSession.test.tsx
@@ -1340,7 +1340,7 @@ npx vitest run src/game/session/useGameSession.test.tsx
 
 Expected: PASS.
 
-- [ ] **Step 5: Run the gates and commit**
+- [x] **Step 5: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -1376,7 +1376,7 @@ git commit -m "feat(session): useGameSession binding via useSyncExternalStore"
 
 Emoji is a **seat avatar**, taken from `engine/startups.ts:21`'s `PLAYER_EMOJI` by seat index. There are exactly six emoji and at most six seats, so avatars are distinct by construction and there is no collision logic to get wrong. `src/utils/emojiNames.ts` is a different thing — a name *generator* for anonymous online players — and is not used here.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/game/setup/PlayerRoster.test.tsx`:
 
@@ -1438,7 +1438,7 @@ describe('PlayerRoster', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/setup/PlayerRoster.test.tsx
@@ -1446,7 +1446,7 @@ npx vitest run src/game/setup/PlayerRoster.test.tsx
 
 Expected: FAIL — cannot resolve `./PlayerRoster`.
 
-- [ ] **Step 3: Implement `SeatRow`**
+- [x] **Step 3: Implement `SeatRow`**
 
 Create `src/game/setup/SeatRow.tsx`:
 
@@ -1490,7 +1490,7 @@ export function SeatRow({ avatar, name, onNameChange, onRemove, canRemove }: Sea
 }
 ```
 
-- [ ] **Step 4: Implement `PlayerRoster`**
+- [x] **Step 4: Implement `PlayerRoster`**
 
 Create `src/game/setup/PlayerRoster.tsx`:
 
@@ -1558,7 +1558,7 @@ export function PlayerRoster({
 }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 npx vitest run src/game/setup/PlayerRoster.test.tsx
@@ -1566,7 +1566,7 @@ npx vitest run src/game/setup/PlayerRoster.test.tsx
 
 Expected: PASS — all seven cases.
 
-- [ ] **Step 6: Run the gates and commit**
+- [x] **Step 6: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -1595,7 +1595,7 @@ git commit -m "feat(setup): transport-agnostic 2-6 seat roster"
 
 **Background.** The seed input survives, but behind a `<details>` disclosure. It is a debugging affordance and the reason golden replays are reproducible — not something to put in a player's way. It defaults to a fresh random value so two games in a row differ.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/game/setup/LocalSetupScreen.test.tsx`:
 
@@ -1643,7 +1643,7 @@ describe('LocalSetupScreen', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/setup/LocalSetupScreen.test.tsx
@@ -1651,7 +1651,7 @@ npx vitest run src/game/setup/LocalSetupScreen.test.tsx
 
 Expected: FAIL — cannot resolve `./LocalSetupScreen`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `src/game/setup/LocalSetupScreen.tsx`:
 
@@ -1720,7 +1720,7 @@ export function LocalSetupScreen({ onStart, defaultSeed }: LocalSetupScreenProps
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/game/setup/LocalSetupScreen.test.tsx
@@ -1728,7 +1728,7 @@ npx vitest run src/game/setup/LocalSetupScreen.test.tsx
 
 Expected: PASS — all five cases.
 
-- [ ] **Step 5: Run the gates and commit**
+- [x] **Step 5: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -1757,7 +1757,7 @@ git commit -m "feat(setup): local setup screen on the shared roster"
 
 **Background.** `StepStack` currently passes `onUndo` to every entry, so every entry shows an undo affordance. But snapshots exist **per intent**, not per log entry — a merger pushes several entries under one intent. Offering undo on an entry with no snapshot would throw `no snapshot for step N` from `rewindTo`. The entry therefore needs to say whether it is undoable, and only the session knows.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/game/screen/stepsOf.test.tsx`:
 
@@ -1810,7 +1810,7 @@ describe('stepsOf', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/screen/stepsOf.test.tsx
@@ -1818,7 +1818,7 @@ npx vitest run src/game/screen/stepsOf.test.tsx
 
 Expected: FAIL — cannot resolve `./stepsOf`.
 
-- [ ] **Step 3: Add the `undoable` flag to `StepStack`**
+- [x] **Step 3: Add the `undoable` flag to `StepStack`**
 
 In `src/game/panel/StepStack.tsx`, extend the entry interface and gate the handler:
 
@@ -1854,7 +1854,7 @@ export function StepStack({ entries, onUndo }: StepStackProps) {
 }
 ```
 
-- [ ] **Step 4: Add a `StepStack` test for the flag**
+- [x] **Step 4: Add a `StepStack` test for the flag**
 
 Append to `src/game/panel/StepStack.test.tsx`:
 
@@ -1876,7 +1876,7 @@ it('offers undo only on entries marked undoable', () => {
 
 Confirm `vi` is imported in that file; add it to the existing `vitest` import if not.
 
-- [ ] **Step 5: Implement `stepsOf`**
+- [x] **Step 5: Implement `stepsOf`**
 
 Create `src/game/screen/stepsOf.tsx`:
 
@@ -1924,7 +1924,7 @@ Check `LogDetail`'s exact prop name before running — if it is not `tokens`, us
 grep -n "export interface LogDetailProps" -A 4 src/game/panel/LogDetail.tsx
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 ```bash
 npx vitest run src/game/screen/stepsOf.test.tsx src/game/panel/StepStack.test.tsx
@@ -1932,7 +1932,7 @@ npx vitest run src/game/screen/stepsOf.test.tsx src/game/panel/StepStack.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 7: Run the gates and commit**
+- [x] **Step 7: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -1976,7 +1976,7 @@ survive into someone else's turn.
 
 `FoundGroups` needs `foundSize`: the size the new chain will be, which is the placed tile plus the unclaimed group it joins. `previewPlacement(state, coord)` returns `loneAdj`; the full group is that flood-filled, plus one for the tile itself. `pendingFoundTile` holds the coord during `foundStartup`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/game/screen/useTurnPanel.test.tsx`:
 
@@ -2052,7 +2052,7 @@ describe('useTurnPanel', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx
@@ -2060,7 +2060,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx
 
 Expected: FAIL — cannot resolve `./useTurnPanel`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `src/game/screen/useTurnPanel.tsx`:
 
@@ -2204,7 +2204,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
 
 Note the unused `staged`/`setStaged` at this point — Tasks 12 and 13 consume them. If the linter objects before then, add the buy stage (Task 12) in the same sitting.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx
@@ -2212,7 +2212,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx
 
 Expected: PASS — all five cases.
 
-- [ ] **Step 5: Verify the founding size against a golden game**
+- [x] **Step 5: Verify the founding size against a golden game**
 
 `foundingSize` must agree with the engine. G1 founds Messla at `chainSize: 2` from one placed tile beside one loner. Add this test and run it:
 
@@ -2228,7 +2228,7 @@ it('sizes the founding groups from the chain that will exist', () => {
 
 `$200` is the tier-2 price at size 2. If this fails, print what `FoundGroups` received and reconcile against `getSharePriceAtSize(tier, size)` in `engine/startups.ts` before moving on — a wrong founding size shows a wrong price on every brand.
 
-- [ ] **Step 6: Run the gates and commit**
+- [x] **Step 6: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -2253,7 +2253,7 @@ git commit -m "feat(screen): turn panel slots for the draw, placement and foundi
 
 The buy buttons render in `active`; the confirm and end-turn buttons render in `staging`. That split is the reason the hook returns two nodes.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/game/screen/useTurnPanel.test.tsx`:
 
@@ -2315,7 +2315,7 @@ describe('useTurnPanel — buying', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx -t buying
@@ -2323,7 +2323,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx -t buying
 
 Expected: FAIL — no buy UI (the hook returns `{ active: null }` for `buy`).
 
-- [ ] **Step 3: Implement the buy stage**
+- [x] **Step 3: Implement the buy stage**
 
 In `src/game/screen/useTurnPanel.tsx`, add these imports:
 
@@ -2414,7 +2414,7 @@ Add this branch immediately before the final `return { active: null, staging: id
   }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx
@@ -2422,7 +2422,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx
 
 Expected: PASS — all eleven cases.
 
-- [ ] **Step 5: Run the gates and commit**
+- [x] **Step 5: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -2449,7 +2449,7 @@ The queued shareholder — **not** the active player — is the actor: `mergerCo
 
 `Brand` renders its own `<button>` in `mode="select"`. Do not wrap it in another button; nested buttons are invalid HTML and break `getByRole('button', { name })`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `src/game/screen/useTurnPanel.test.tsx`, adding these imports at the top of the file:
 
@@ -2517,7 +2517,7 @@ describe('useTurnPanel — mergers', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx -t mergers
@@ -2547,7 +2547,7 @@ for (const g of ALL_GOLDEN_GAMES) {
 }"
 ```
 
-- [ ] **Step 3: Implement the survivor choice**
+- [x] **Step 3: Implement the survivor choice**
 
 In `src/game/screen/useTurnPanel.tsx`, add imports:
 
@@ -2596,7 +2596,7 @@ Add this branch before the `buy` branch:
   }
 ```
 
-- [ ] **Step 4: Implement liquidation**
+- [x] **Step 4: Implement liquidation**
 
 Add this branch immediately after the survivor branch:
 
@@ -2681,7 +2681,7 @@ Add this branch immediately after the survivor branch:
   }
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 npx vitest run src/game/screen/useTurnPanel.test.tsx
@@ -2689,7 +2689,7 @@ npx vitest run src/game/screen/useTurnPanel.test.tsx
 
 Expected: PASS — all fourteen cases.
 
-- [ ] **Step 6: Run the gates and commit**
+- [x] **Step 6: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -2719,7 +2719,7 @@ git commit -m "feat(screen): survivor choice and multi-shareholder liquidation"
 
 All five panel slots are passed on every render, so the panel's zone order and heights never change with the stage.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/game/GameScreen.test.tsx`:
 
@@ -2797,7 +2797,7 @@ describe('GameScreen', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/game/GameScreen.test.tsx
@@ -2805,7 +2805,7 @@ npx vitest run src/game/GameScreen.test.tsx
 
 Expected: FAIL — cannot resolve `./GameScreen`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Create `src/game/GameScreen.tsx`:
 
@@ -2917,7 +2917,7 @@ export function GameScreen({ session }: GameScreenProps) {
 Note `HandZone` is rendered even with no actor (at `stage: 'end'`), with empty values rather than
 `null`. A slot that disappears is a slot that resizes the panel.
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/game/GameScreen.test.tsx
@@ -2925,7 +2925,7 @@ npx vitest run src/game/GameScreen.test.tsx
 
 Expected: PASS — all five cases. The third is the panel-stability guard; if the slot list differs between stages, a branch of `useTurnPanel` is returning `null` for a slot instead of the idle placeholder.
 
-- [ ] **Step 5: Run the gates and commit**
+- [x] **Step 5: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -2950,7 +2950,7 @@ git commit -m "feat(screen): GameScreen composing board, panel and the reveal cu
 
 **Background.** `Game.tsx`, `SetupScreen` and the six modals **stay on disk** — `src/pages/RoomPage.tsx` serves online play from them, and deleting them is Phase 3/5. This task only stops pass-and-play from using them.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/pages/PassAndPlayPage.test.tsx`:
 
@@ -2988,7 +2988,7 @@ describe('PassAndPlayPage', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 ```bash
 npx vitest run src/pages/PassAndPlayPage.test.tsx
@@ -2996,7 +2996,7 @@ npx vitest run src/pages/PassAndPlayPage.test.tsx
 
 Expected: FAIL — the old `SetupScreen` renders a comma-separated field, not list items.
 
-- [ ] **Step 3: Rewrite the page**
+- [x] **Step 3: Rewrite the page**
 
 Replace the whole contents of `src/pages/PassAndPlayPage.tsx`:
 
@@ -3045,7 +3045,7 @@ export function PassAndPlayPage() {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run src/pages/PassAndPlayPage.test.tsx
@@ -3053,7 +3053,7 @@ npx vitest run src/pages/PassAndPlayPage.test.tsx
 
 Expected: PASS — all three cases. The third is the deadlock closing: it is the exact sequence that wedged before this phase.
 
-- [ ] **Step 5: Run the gates and commit**
+- [x] **Step 5: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -3080,7 +3080,7 @@ git commit -m "feat(app): pass-and-play runs on the new stack"
 
 It drives Chrome through the DevTools Protocol directly over a WebSocket — no Puppeteer or Playwright dependency. It starts its own Vite dev server (base `/`, unlike the build which uses `/acquire-startups-m1`) and its own Chrome with a scratch profile, so it never touches a browser the developer has open.
 
-- [ ] **Step 1: Write the script**
+- [x] **Step 1: Write the script**
 
 Create `scripts/verify-layout.mjs`:
 
@@ -3324,7 +3324,7 @@ main().catch((err) => {
 });
 ```
 
-- [ ] **Step 2: Add the npm script**
+- [x] **Step 2: Add the npm script**
 
 In `package.json`, add to `"scripts"`:
 
@@ -3332,7 +3332,7 @@ In `package.json`, add to `"scripts"`:
     "verify:layout": "node scripts/verify-layout.mjs",
 ```
 
-- [ ] **Step 3: Run it**
+- [x] **Step 3: Run it**
 
 ```bash
 npm run verify:layout
@@ -3346,7 +3346,7 @@ If Chrome is not at the default path, set it:
 CHROME_PATH="$(which chromium || echo /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome)" npm run verify:layout
 ```
 
-- [ ] **Step 4: Prove both checks can fail**
+- [x] **Step 4: Prove both checks can fail**
 
 A gate that has never failed is not known to work — this is the Phase 1a lesson about `check:bundle`, which was green for a whole phase while guarding nothing. Break each check once, confirm it reports, then revert.
 
@@ -3356,7 +3356,7 @@ A gate that has never failed is not known to work — this is the Phase 1a lesso
 
 If the second break does **not** fail the gate, the script is measuring at stages where the pile is empty in all of them — fix the walk in `MEASURE` so at least one stage stages a share, before trusting this gate at all.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add scripts/verify-layout.mjs package.json
@@ -3378,7 +3378,7 @@ git commit -m "test(layout): headless-Chrome gate for the things jsdom cannot se
 
 These tests click the actual screen rather than calling `dispatch`, so they prove the wiring, not the engine — the engine is already proven by `golden.test.ts`.
 
-- [ ] **Step 1: Write the test**
+- [x] **Step 1: Write the test**
 
 Create `src/game/screen/drivenGolden.test.tsx`:
 
@@ -3478,7 +3478,7 @@ describe('driven golden games', () => {
 });
 ```
 
-- [ ] **Step 2: Run it**
+- [x] **Step 2: Run it**
 
 ```bash
 npx vitest run src/game/screen/drivenGolden.test.tsx
@@ -3492,7 +3492,7 @@ npx vitest run src/game/screen/drivenGolden.test.tsx --reporter verbose
 
 A rejection here is a real finding: it means the screen's actor or stage handling disagrees with the engine.
 
-- [ ] **Step 3: Run the gates and commit**
+- [x] **Step 3: Run the gates and commit**
 
 ```bash
 npx vitest run
@@ -3511,7 +3511,7 @@ git commit -m "test(screen): drive G2 and G7 through the real game screen"
 
 **Background.** In Phase 1b, fourteen tasks of TDD produced 101 passing tests and zero surprises, while the single "open it in a browser and report what you saw" step produced two real defects — one of them in the constraint the plan named as most important. This step is not ceremony. Budget for it.
 
-- [ ] **Step 1: Start the app**
+- [x] **Step 1: Start the app**
 
 ```bash
 npm run dev
@@ -3519,7 +3519,7 @@ npm run dev
 
 Open `http://127.0.0.1:5173/pass-and-play`.
 
-- [ ] **Step 2: Play a four-player game for at least six turns**
+- [x] **Step 2: Play a four-player game for at least six turns**
 
 Add two seats, name them, start. Then work through, writing down anything that looks wrong:
 
@@ -3532,23 +3532,23 @@ Add two seats, name them, start. Then work through, writing down anything that l
 7. Play until a merger. Does the payout read clearly? Does the liquidation queue tell you whose turn it is?
 8. Does any zone scroll that should not? Does the board ever need scrolling?
 
-- [ ] **Step 3: Check reduced motion**
+- [x] **Step 3: Check reduced motion**
 
 In Chrome DevTools: Rendering → *Emulate CSS media feature prefers-reduced-motion* → `reduce`. Play two turns. Step entries must appear **instantly** — not faster, instantly.
 
-- [ ] **Step 4: Check both viewport widths**
+- [x] **Step 4: Check both viewport widths**
 
 Resize to 768px and to 1440px. The board must fit with no scrolling at both. Compare with what `npm run verify:layout` reports; a disagreement means the script is measuring the wrong thing.
 
-- [ ] **Step 5: Write the findings down**
+- [x] **Step 5: Write the findings down**
 
 Create `docs/superpowers/specs/2026-08-04-phase-2a-by-hand-notes.md` with what you saw — including "nothing wrong here" for the checks that passed, so the next phase knows what was actually looked at.
 
-- [ ] **Step 6: Fix anything that is a defect, not a preference**
+- [x] **Step 6: Fix anything that is a defect, not a preference**
 
 Each fix follows the normal cycle: failing test first where a test can express it, and a note in the findings file where one cannot (layout and motion often cannot).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-08-04-phase-2a-by-hand-notes.md
@@ -3565,7 +3565,7 @@ git commit -m "docs: Phase 2a by-hand play notes"
 
 **Background.** Every phase in this project ends with a carry-forward that the next phase reads first. Follow the shape of `2026-08-03-phase-1b-carry-forward.md`.
 
-- [ ] **Step 1: Confirm the whole suite is green**
+- [x] **Step 1: Confirm the whole suite is green**
 
 ```bash
 npx vitest run
@@ -3577,7 +3577,7 @@ npm run verify:layout
 
 All five must pass. Record the test count and file count from the vitest output.
 
-- [ ] **Step 2: Write the carry-forward**
+- [x] **Step 2: Write the carry-forward**
 
 Cover, with evidence rather than assertion:
 
@@ -3588,18 +3588,18 @@ Cover, with evidence rather than assertion:
 - **Carried findings** — anything from Task 18 not fixed.
 - **What 2b inherits** — the `declareEnd` intent already exists in the engine and is unused by the UI; `FinalScoring` and `RevealOverlay` are built and unwired; dead-tile trade-in has `getDeadTilesInHand` wired to the board's `blocked` prop but no trade-in affordance; the terminal-overlay route back to the lobby is still unspecified.
 
-- [ ] **Step 3: Check every box in this plan**
+- [x] **Step 3: Check every box in this plan**
 
 ```bash
 python3 - <<'PY'
 import pathlib
 p = pathlib.Path('docs/superpowers/plans/2026-08-04-phase-2a-playable-pass-and-play.md')
-p.write_text(p.read_text().replace('- [ ]', '- [x]'))
+p.write_text(p.read_text().replace('- [x]', '- [x]'))
 print('all steps marked complete')
 PY
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/superpowers/specs/2026-08-04-phase-2a-carry-forward.md docs/superpowers/plans/2026-08-04-phase-2a-playable-pass-and-play.md
