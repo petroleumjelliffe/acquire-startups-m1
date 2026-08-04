@@ -8,6 +8,10 @@ import { JoinRoomPage } from "./pages/JoinRoomPage";
 import { PassAndPlayPage } from "./pages/PassAndPlayPage";
 import { RoomPage } from "./pages/RoomPage";
 
+// Lazy on purpose: the catalog pulls in the golden games and replays them, and
+// none of that belongs in the main chunk. `npm run check:bundle` is the guard.
+const CatalogPage = React.lazy(() => import("./game/catalog/CatalogPage"));
+
 export default function App() {
   return (
     <>
@@ -26,6 +30,16 @@ export default function App() {
 
         {/* Room page - for both host and joining players */}
         <Route path="/room/:roomId" element={<RoomPage />} />
+
+        {/* Component catalog - the Phase 1 acceptance surface */}
+        <Route
+          path="/catalog"
+          element={
+            <React.Suspense fallback={null}>
+              <CatalogPage />
+            </React.Suspense>
+          }
+        />
       </Routes>
     </>
   );
