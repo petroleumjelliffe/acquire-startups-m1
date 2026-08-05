@@ -1,5 +1,5 @@
 import type { GameState } from '../engine/gameTypes';
-import type { Intent, IllegalIntentCode } from '../engine/intents';
+import type { Intent } from '../engine/intents';
 import { IllegalIntentError } from '../engine/intents';
 import {
   createSnapshotStore,
@@ -9,9 +9,15 @@ import {
 } from '../engine/history';
 import { createInitialGame } from '../engine/gameInit';
 import { getCurrentActor } from '../engine/actor';
+import type { RejectionCode } from './protocol';
 
 export interface SessionError {
-  code: IllegalIntentCode;
+  /**
+   * Every refusal a session can surface. Wider than `IllegalIntentCode`
+   * because undo is not an intent: the server can refuse one with
+   * `undoOutOfSegment`, which the engine has no word for.
+   */
+  code: RejectionCode;
   message: string;
 }
 
@@ -34,6 +40,11 @@ export interface SessionView {
   segmentStart: number;
   /** The last rejected intent, cleared by the next successful one. */
   error: SessionError | null;
+  /**
+   * A bag-drawing intent is in flight and only the server can answer it.
+   * Pass-and-play never sets this: it holds the bag.
+   */
+  pending?: boolean;
 }
 
 export interface GameSession {

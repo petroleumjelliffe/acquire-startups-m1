@@ -49,8 +49,30 @@ function foundingSize(state: GameState, coord: Coord): number {
   return floodFillUnclaimed([coord], state.board).length;
 }
 
-export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => void): TurnPanelSlots {
-  const { state, actorId, error } = view;
+/**
+ * The label for the step a stage is asking for.
+ *
+ * One map rather than one string per branch, because the waiting panel shows
+ * the same label the actor sees — a second copy would drift the moment a
+ * label is reworded.
+ */
+function stageLabel(stage: GameState['stage']): string {
+  switch (stage) {
+    case 'draw': return 'Open the game';
+    case 'foundStartup': return 'Found a brand';
+    case 'chooseSurvivor': return 'Which chain survives?';
+    case 'mergerLiquidation': return 'Liquidate shares';
+    case 'buy': return 'Buy shares';
+    default: return 'Place a tile';
+  }
+}
+
+export function useTurnPanel(
+  view: SessionView,
+  dispatch: (intent: Intent) => void,
+  canAct: boolean = true,
+): TurnPanelSlots {
+  const { state, actorId, error, pending } = view;
   const [staged, setStaged] = useState<Staged>(NOTHING_STAGED);
 
   // An abandoned basket must never survive into another player's turn, or into
@@ -86,12 +108,29 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
     </div>
   ) : null;
 
+  if (!canAct) {
+    const waitingFor = state.players.find((p) => p.id === actorId)?.name;
+    return {
+      staging: idleStaging,
+      active: (
+        <ActiveStep
+          label={stageLabel(state.stage)}
+          body={
+            <span className="text-[13px] text-gray-600">
+              {pending ? 'Sending…' : `Waiting for ${waitingFor ?? 'the next player'}.`}
+            </span>
+          }
+        />
+      ),
+    };
+  }
+
   if (state.stage === 'draw') {
     return {
       staging: idleStaging,
       active: (
         <ActiveStep
-          label="Open the game"
+          label={stageLabel(state.stage)}
           body={<span className="text-[13px] text-gray-600">Draw for turn order — highest tile plays first.</span>}
           button={
             <>
@@ -118,7 +157,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
       staging: idleStaging,
       active: (
         <ActiveStep
-          label="Place a tile"
+          label={stageLabel(state.stage)}
           body={
             <>
               <span className="text-[13px] text-gray-600">
@@ -175,7 +214,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
       staging: idleStaging,
       active: (
         <ActiveStep
-          label="Found a brand"
+          label={stageLabel(state.stage)}
           body={
             <>
               <FoundGroups
@@ -200,7 +239,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
       staging: idleStaging,
       active: (
         <ActiveStep
-          label="Which chain survives?"
+          label={stageLabel(state.stage)}
           body={
             <>
               {/*
@@ -256,7 +295,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
       return {
         active: (
           <ActiveStep
-            label="Liquidate your shares"
+            label={stageLabel(state.stage)}
             body={
               <>
                 <LiqQueue holders={holders} />
@@ -323,7 +362,7 @@ export function useTurnPanel(view: SessionView, dispatch: (intent: Intent) => vo
     return {
       active: (
         <ActiveStep
-          label="Buy shares"
+          label={stageLabel(state.stage)}
           body={
             <>
               <div className="flex flex-wrap gap-2">

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { GameScreen } from './GameScreen';
 import { createGameSession } from '../../session/GameSession';
+import type { GameSession, SessionView } from '../../session/GameSession';
 import { buildFixture } from '../../engine/golden/fixtures';
 import { ALL_GOLDEN_GAMES } from '../../engine/golden';
 import { replayGoldenGame } from '../../engine/golden/replay';
@@ -200,5 +201,76 @@ describe('GameScreen at the end of a game', () => {
   it('shows no overlay while the game is still running', () => {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
     expect(screen.queryByTestId('final-overlay')).toBeNull();
+  });
+});
+
+/**
+ * A session whose view is fixed. Used only to put the screen into states a
+ * local `GameSession` cannot produce — `pending` is set by the networked
+ * session, which does not exist in this test's world.
+ */
+function frozen(view: SessionView): GameSession {
+  return {
+    getView: () => view,
+    subscribe: () => () => {},
+    dispatch: () => {},
+    undoTo: () => {},
+    reveal: () => {},
+  };
+}
+
+describe('GameScreen with a viewer who is not the actor', () => {
+  // `playable()` seats Alex (p1, holding E6 and H8) and Sam (p2, holding A1),
+  // with the turn on Alex. Sam is therefore the viewer who must wait.
+  function watching() {
+    return <GameScreen session={createGameSession({ state: playable() })} viewerId="p2" />;
+  }
+
+  it('raises no curtain — there is no device to pass', () => {
+    render(watching());
+    expect(screen.queryByText(/pass to/i)).toBeNull();
+    expect(screen.queryByTestId('curtain')).toBeNull();
+  });
+
+  it('shows me my own hand while someone else acts', () => {
+    render(watching());
+    // Every board coordinate renders a labelled cell regardless of occupancy
+    // — `queryByTitle` alone can't tell "not shown" from "shown as an inert
+    // empty square" (both carry `title={coord}`). A hand tile is the one
+    // rendered as a clickable `<button>`; an untouched square is a `<span>`.
+    expect(screen.getByTitle('A1').tagName).toBe('BUTTON');
+    expect(screen.getByTitle('E6').tagName).not.toBe('BUTTON');
+    expect(screen.getByTitle('H8').tagName).not.toBe('BUTTON');
+  });
+
+  it('names who we are waiting for and offers nothing', () => {
+    render(watching());
+    expect(screen.getByText(/waiting for alex/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /end turn/i })).toBeNull();
+  });
+
+  it('ignores a click on my own tile when it is not my turn', () => {
+    render(watching());
+    fireEvent.click(screen.getByTitle('A1'));
+    // Still waiting, and A1 is still mine to play later.
+    expect(screen.getByText(/waiting for alex/i)).toBeInTheDocument();
+    expect(screen.getByTitle('A1')).toBeInTheDocument();
+  });
+
+  it('keeps all five panel slots, so waiting does not resize the panel', () => {
+    const { container } = render(watching());
+    const slots = [...container.querySelectorAll('[data-slot]')].map((el) => el.getAttribute('data-slot'));
+    expect(slots).toEqual(['stepstack', 'active', 'staging', 'hand', 'players']);
+  });
+
+  it('goes inert while a bag-drawing intent is in flight', () => {
+    const session = createGameSession({ state: playable() });
+    session.reveal();
+    const view = { ...session.getView(), pending: true };
+    render(<GameScreen session={frozen(view)} viewerId="p1" />);
+
+    // p1 *is* the actor, but the answer has to come from the server.
+    expect(screen.getByText(/sending/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /end turn/i })).toBeNull();
   });
 });

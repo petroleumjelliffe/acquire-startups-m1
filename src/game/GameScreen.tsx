@@ -29,31 +29,47 @@ import { finalScore } from '../../engine/endGame';
  */
 export interface GameScreenProps {
   session: GameSession;
+  /**
+   * The player at this device. Absent in pass-and-play, where one device is
+   * shared and the viewer is therefore whoever is acting; present online,
+   * where the viewer never changes and the curtain has nothing to protect.
+   */
+  viewerId?: string;
   /** Start over from setup. Omitted when nothing is hosting the screen. */
   onNewGame?: () => void;
   /** Leave the game entirely. Omitted when nothing is hosting the screen. */
   onExit?: () => void;
 }
 
-export function GameScreen({ session, onNewGame, onExit }: GameScreenProps) {
+export function GameScreen({ session, viewerId, onNewGame, onExit }: GameScreenProps) {
   const view = useGameSession(session);
-  const { state, actorId, awaitingReveal, undoableSteps } = view;
-  const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent));
+  const { state, actorId, awaitingReveal, undoableSteps, pending } = view;
+
+  // Inert while someone else is acting, and while an answer only the server
+  // can give is in flight — otherwise the buy panel stays live after "End
+  // turn" and the next click is a rejection waiting to happen.
+  const canAct = (viewerId === undefined || viewerId === actorId) && !pending;
+  const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent), canAct);
 
   const actor = state.players.find((p) => p.id === actorId);
 
   /**
-   * Whose private state the screen is showing — their tiles on the board and
-   * their shares in the hand zone.
+   * Whose private state the screen shows — their tiles on the board, their
+   * shares in the hand zone.
    *
-   * This is the actor at every stage but one. At the turn-order draw seat one
-   * is the actor because they are the only seat allowed to open the game, but
-   * they are pressing the button for the table, not taking a turn: the draw is
-   * a hard gate in front of the game. Showing their hand there put six of
-   * their tiles on the board before play began and made handing the first turn
-   * to whoever won the draw look like seat one had been skipped.
+   * Online that is always me: my own device, my own hand, at every stage
+   * including the turn-order draw. Pass-and-play keeps its own rule, which is
+   * the actor at every stage but the draw: seat one presses that button for
+   * the table rather than taking a turn, and showing their hand put six of
+   * their tiles on a shared board before play began.
    */
-  const viewer = state.stage === 'draw' ? undefined : actor;
+  const viewer = viewerId === undefined
+    ? (state.stage === 'draw' ? undefined : actor)
+    : state.players.find((p) => p.id === viewerId);
+
+  /** Nobody is "up" until the draw has decided who is. */
+  const turnKnown = state.stage !== 'draw';
+
   const prices = Object.fromEntries(
     Object.values(state.startups)
       .filter((s) => s.isFounded && isStartupId(s.id))
@@ -71,8 +87,10 @@ export function GameScreen({ session, onNewGame, onExit }: GameScreenProps) {
           hand={viewer?.hand ?? []}
           placed={viewer?.lastPlacedTile ?? null}
           blocked={viewer ? getDeadTilesInHand(state, viewer.id) : []}
-          onCellClick={(coord) =>
-            actorId && session.dispatch({ type: 'placeTile', playerId: actorId, coord })
+          onCellClick={
+            canAct && actorId
+              ? (coord) => session.dispatch({ type: 'placeTile', playerId: actorId, coord })
+              : undefined
           }
         />
       </div>
@@ -101,15 +119,13 @@ export function GameScreen({ session, onNewGame, onExit }: GameScreenProps) {
               emoji: p.emoji,
               name: p.name,
               cash: p.cash,
-              // Nobody is "up" until the draw has decided who is. Seat one
-              // presses the button; that is not the same as having the turn.
-              active: viewer !== undefined && p.id === actorId,
+              active: turnKnown && p.id === actorId,
             }))}
           />
         }
       />
 
-      {awaitingReveal && actor && (
+      {viewerId === undefined && awaitingReveal && actor && (
         <div data-testid="curtain" className="absolute inset-0 z-20">
           <RevealOverlay
             playerName={actor.name}
