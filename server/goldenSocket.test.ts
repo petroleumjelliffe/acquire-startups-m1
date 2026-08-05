@@ -9,7 +9,18 @@ let server: TestServer;
 beforeAll(async () => { server = await startTestServer(); });
 afterAll(async () => { await server.close(); });
 
-describe('golden games survive the wire', () => {
+/**
+ * This suite proves the inbound leg only: socket → binding → engine → the
+ * correct rules outcome (asserted against `room.draft()`, the authority's own
+ * live state) plus the rejection channel. `TestClient.states` — every `state`
+ * message this client actually received over the wire — is collected by the
+ * harness but never asserted here. Break 2 in the task-7 fix round confirmed
+ * this directly: suppressing every outbound `state`/`rejected` delivery still
+ * left eight of seventeen games passing in full, which is only possible if
+ * nothing in this file depends on what arrives back over the wire.
+ * Projection and the broadcast itself are Task 8's job, not this file's.
+ */
+describe('golden games reach their declared states through the socket layer', () => {
   for (const game of ALL_GOLDEN_GAMES) {
     it(`${game.id}: ${game.title}`, async () => {
       const fixture = buildFixture(game.setup);

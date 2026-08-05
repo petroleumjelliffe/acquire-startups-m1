@@ -98,7 +98,11 @@ export async function connectPlayer(
   const settle = () =>
     new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('server did not settle')), 4000);
-      socket.timeout(3000).emit('ping-settle', () => { clearTimeout(timer); resolve(); });
+      socket.timeout(3000).emit('ping-settle', (err?: Error) => {
+        clearTimeout(timer);
+        if (err) reject(new Error('server did not settle'));
+        else resolve();
+      });
     });
 
   return {
