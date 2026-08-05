@@ -1,51 +1,74 @@
-// src/pages/RoomPage.tsx
-// Multiplayer room page - shows waiting room then game
+import { useNavigate, useParams } from 'react-router-dom';
+import { GameScreen } from '../game/GameScreen';
+import { RoomLobby } from '../game/online/RoomLobby';
+import { ConnectionStrip } from '../game/online/ConnectionStrip';
+import { JoinForm } from '../game/online/JoinForm';
+import { useRoom } from '../net/useRoom';
+import { getConnection, type Connection } from '../net/connection';
 
-import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { WaitingRoom } from '../components/WaitingRoom';
-import { Game } from '../Game';
-import { useSocket } from '../context/SocketContext';
-import type { GameState } from '../../engine/gameTypes';
+export interface RoomPageProps {
+  /** Injectable so screen tests can drive a fake. The app never passes it. */
+  connect?: () => Connection;
+}
 
-export function RoomPage() {
+export function RoomPage({ connect = getConnection }: RoomPageProps) {
   const { roomId } = useParams<{ roomId: string }>();
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const { socket } = useSocket();
+  const navigate = useNavigate();
+  const room = useRoom(roomId ?? '', connect);
 
-  // Listen for successful rejoin (automatic reconnection)
-  useEffect(() => {
-    if (!socket) return;
+  if (room.phase === 'playing' && room.session && room.playerId) {
+    return (
+      <>
+        <ConnectionStrip status={room.status} />
+        {/*
+          No `onNewGame`: this room belongs to everyone in it, and starting
+          over is not one player's to do. Leaving is.
+        */}
+        <GameScreen
+          session={room.session}
+          viewerId={room.playerId}
+          onExit={() => navigate('/')}
+        />
+      </>
+    );
+  }
 
-    const handleGameStarted = (state: GameState) => {
-      console.log('🎮 Game started or rejoined');
-      setGameState(state);
-    };
+  if (room.phase === 'needName' || room.phase === 'error') {
+    return (
+      <>
+        <ConnectionStrip status={room.status} />
+        <JoinForm
+          roomId={roomId}
+          title={`Join ${roomId ?? ''}`}
+          submitLabel="Join room"
+          error={room.message}
+          onSubmit={(name) => room.join(name)}
+        />
+      </>
+    );
+  }
 
-    socket.on('gameStarted', handleGameStarted);
-    socket.on('gameState', handleGameStarted); // Also catch general state updates
-
-    return () => {
-      socket.off('gameStarted', handleGameStarted);
-      socket.off('gameState', handleGameStarted);
-    };
-  }, [socket]);
+  if (room.phase === 'lobby' && room.roster) {
+    const me = room.roster.players.find((p) => p.id === room.playerId);
+    return (
+      <>
+        <ConnectionStrip status={room.status} />
+        <RoomLobby
+          roomId={room.roster.roomId}
+          players={room.roster.players}
+          isHost={me?.isHost === true}
+          note={room.message}
+          onStart={room.begin}
+          onExit={() => navigate('/')}
+        />
+      </>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {!gameState ? (
-        <WaitingRoom
-          onGameStart={setGameState}
-          initialRoomId={roomId}
-        />
-      ) : (
-        <Game
-          seed={gameState.seed}
-          playerNames={gameState.players.map(p => p.name)}
-          initialState={gameState}
-          isMultiplayer={true}
-        />
-      )}
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
+      <ConnectionStrip status={room.status} />
+      <p className="text-gray-600">{room.phase === 'joining' ? 'Joining…' : 'Connecting…'}</p>
     </div>
   );
 }
