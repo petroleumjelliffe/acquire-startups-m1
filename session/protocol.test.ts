@@ -40,7 +40,10 @@ describe('WireIntent', () => {
       ),
     ].sort();
 
-    expect(exercised.length).toBeGreaterThan(5);
+    // Floor is the full size of the `Intent` union, measured against the golden
+    // games. If a filter regression drops any type, this floor fails rather than
+    // sliding under a loose bound.
+    expect(exercised.length).toBeGreaterThanOrEqual(9);
     for (const type of exercised) {
       expect(Object.keys(WIRE_INTENT_TYPES), `${type} is exercised but not on the wire`)
         .toContain(type);
