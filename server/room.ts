@@ -1,6 +1,5 @@
 import type { GameState } from '../engine/gameTypes.js';
 import type { Intent } from '../engine/intents.js';
-import { getCurrentActor } from '../engine/actor.js';
 import { createInitialGame } from '../engine/gameInit.js';
 import { createGameSession, type GameSession } from '../session/GameSession.js';
 import type { RejectionCode, WireIntent } from '../session/protocol.js';
@@ -46,10 +45,11 @@ export interface GameRoom {
 
 /**
  * The three intents that draw from the bag, and therefore the only ones whose
- * result a projected client cannot compute for itself. `endTurn` and
- * `startGame` also change the actor, so they commit and the whole table is told
- * anyway; `tradeInDeadTiles` does not, which makes it the sole reason a
- * mid-segment correction exists at all.
+ * result a projected client cannot compute for itself. `endTurn` always
+ * changes the actor, and `startGame` always closes a segment by leaving the
+ * turn-order draw whether or not the actor changes — so both commit and the
+ * whole table is told anyway; `tradeInDeadTiles` does neither, which makes it
+ * the sole reason a mid-segment correction exists at all.
  */
 const DRAWS = new Set<WireIntent['type']>(['endTurn', 'tradeInDeadTiles', 'startGame']);
 
@@ -133,7 +133,7 @@ export function createGameRoom(
       const s = open();
       const view = s.getView();
 
-      if (getCurrentActor(view.state) !== playerId) {
+      if (view.actorId !== playerId) {
         return {
           kind: 'rejected',
           to: playerId,

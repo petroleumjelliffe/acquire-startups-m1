@@ -89,11 +89,13 @@ describe('the room refuses what the engine refuses', () => {
 
   it('leaves the draft untouched after a rejection', () => {
     const room = createGameRoom('r1', roster('Alex', 'Sam'), openBoard());
-    const before = room.draft();
+    const before = structuredClone(room.draft());
 
     room.dispatch('p2', { type: 'placeTile', coord: 'A1' });
 
     expect(room.draft()).toEqual(before);
+    expect(room.draft().board['A1'].placed).toBe(false);
+    expect(room.draft().players.find((p) => p.id === 'p2')!.hand).toContain('A1');
   });
 });
 
@@ -146,24 +148,33 @@ describe('beginning a game', () => {
 });
 
 /**
- * Test 6, reframed during implementation.
+ * Test 6, reframed during implementation, then reframed again in review.
  *
  * As first written this asserted that no player is ever asked to act on stale
  * money. Once you account for an actor seeing their own draft, that follows by
  * construction from "a commit happens when the actor changes" — it would have
  * passed without exercising the room at all.
  *
+ * The first reframing collapsed a segment close onto an actor change alone.
+ * That over-reaches: leaving the turn-order draw closes a segment even when
+ * the actor is unchanged, because seat one presses the button for the table,
+ * and what follows belongs to the winner as a *player* — a distinction
+ * `session/GameSession.ts:117-119` (`leftDraw`) draws on purpose. The corpus
+ * never happens to exercise it with a stable actor across that boundary, so
+ * the first version passed today and would have broken silently once Task 6
+ * drove `begin` + `startGame` end to end.
+ *
  * The coupling itself is what deserves pinning. Every privacy and staleness
  * guarantee in this phase rests on it, and a `dispatch` that committed early
  * (on any payout, say) or late would break all of them silently while every
  * other test stayed green.
  */
-describe('a commit and an actor change are the same event', () => {
+describe('a commit and a segment close are the same event', () => {
   // Summed across every game below, then floored by the suite-level test
   // after the loop. Measured at 15 across the seventeen golden games current
   // as of this task; pinned well below that so a game that stops finding
   // segment boundaries is caught without a new golden game breaking the gate.
-  let totalActorChanges = 0;
+  let totalSegmentCloses = 0;
 
   for (const game of ALL_GOLDEN_GAMES) {
     it(`${game.id}: ${game.title}`, () => {
@@ -175,13 +186,12 @@ describe('a commit and an actor change are the same event', () => {
       );
 
       let commits = 0;
-      let actorChanges = 0;
+      let segmentCloses = 0;
 
       for (const step of game.steps) {
         const where = `${game.id} / ${step.name}`;
         const actorBefore = room.actorId();
-        // `Intent` carries every field of `WireIntent` plus `playerId`, so it
-        // is assignable as-is. Spoofing is Task 8's subject, not this one.
+        const stageBefore = room.draft().stage;
         const delivery = room.dispatch(step.intent.playerId, step.intent);
 
         if (step.expectError) {
@@ -191,11 +201,19 @@ describe('a commit and an actor change are the same event', () => {
         expect(delivery.kind, `${where} — unexpected rejection`).not.toBe('rejected');
 
         const changed = room.actorId() !== actorBefore;
-        if (changed) actorChanges++;
+        // A segment closes two ways, not one. The actor changing is the usual
+        // one. The other is leaving the turn-order draw, which closes a segment
+        // even when seat one wins its own draw and the actor is unchanged: seat
+        // one pressed the button for the table, and what follows belongs to the
+        // winner as a player. `session/GameSession.ts` owns that rule.
+        const leftDraw = stageBefore === 'draw' && room.draft().stage !== 'draw';
+        const closed = changed || leftDraw;
+
+        if (closed) segmentCloses++;
         if (delivery.kind === 'commit') commits++;
 
-        expect(delivery.kind === 'commit', `${where} — commit and actor change disagree`)
-          .toBe(changed);
+        expect(delivery.kind === 'commit', `${where} — commit and segment close disagree`)
+          .toBe(closed);
 
         if (delivery.kind === 'commit') {
           expect(room.committed(), `${where} — commit did not publish the draft`)
@@ -203,19 +221,22 @@ describe('a commit and an actor change are the same event', () => {
         }
       }
 
-      expect(commits, `${game.id} — commits and actor changes diverged`).toBe(actorChanges);
-      totalActorChanges += actorChanges;
+      expect(commits, `${game.id} — commits and segment closes diverged`).toBe(segmentCloses);
+      totalSegmentCloses += segmentCloses;
     });
   }
 
   /**
-   * Measured, not guessed: summing `actorChanges` across all seventeen golden
-   * games gives 15. Pinned at a round floor comfortably below that — 10 — so
-   * a change that stops the loop finding segment boundaries (e.g. a `dispatch`
-   * that never commits) fails here, while an added golden game does not.
+   * Measured, not guessed: summing `segmentCloses` across all seventeen
+   * golden games gives 15 — unchanged from the actor-change-only count,
+   * because G17's `startGame` changes the actor anyway, so `leftDraw` and
+   * `changed` coincide there rather than adding a new boundary. Pinned at a
+   * round floor comfortably below that — 10 — so a change that stops the loop
+   * finding segment boundaries (e.g. a `dispatch` that never commits) fails
+   * here, while an added golden game does not.
    */
   it('finds enough segment boundaries across the corpus to trust the count', () => {
-    expect(totalActorChanges).toBeGreaterThanOrEqual(10);
+    expect(totalSegmentCloses).toBeGreaterThanOrEqual(10);
   });
 });
 
