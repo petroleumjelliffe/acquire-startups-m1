@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { createNetworkSession } from './NetworkSession';
 import type { RoomTransport } from './transport';
 import { buildFixture } from '../../engine/golden/fixtures';
+import { ALL_GOLDEN_GAMES, type GoldenStep } from '../../engine/golden';
+import { replayGoldenGame } from '../../engine/golden/replay';
+import { getCurrentActor } from '../../engine/actor';
 import type { GameState } from '../../engine/gameTypes';
-import type { RejectedMessage, StateMessage } from '../../session/protocol';
+import { DRAWS, type RejectedMessage, type StateMessage } from '../../session/protocol';
 
 /** p1 holds E6 next to a loner, so founding is one click away. p2 waits. */
 function board(): GameState {
@@ -44,6 +47,65 @@ function harness(state = board()) {
       initial: { state, reason: 'commit', segmentStart: state.nextStepId },
     }),
   };
+}
+
+interface PredictableHandoff {
+  states: GameState[];
+  steps: GoldenStep[];
+  startIndex: number;
+  endIndex: number;
+  playerId: string;
+}
+
+/**
+ * Finds the first run, anywhere in the golden corpus, of two or more
+ * consecutive steps by one player that a client would apply locally — no
+ * `expectError` (rejected, so nothing to undo), no `DRAWS` (waits for the
+ * server, so it is never in `undoableSteps` to begin with) — that ends with
+ * `getCurrentActor` naming someone else.
+ *
+ * That is the one situation the `actorId === playerId` gate in `buildView`
+ * exists for: an optimistic dispatch (a merger-triggering `placeTile`, a
+ * liquidation that empties the last shareholder's holding, …) can hand the
+ * turn to another player with no bag draw involved, before the server's
+ * commit has confirmed it. A hand-built two-step fixture could assert the
+ * same shape, but deriving the run from the golden corpus means the test
+ * fails loudly (via the assertion below) if the corpus stops containing one,
+ * rather than silently testing nothing.
+ *
+ * Consecutive is load-bearing: a same-player run can only be interrupted by
+ * a step the engine actually rejects (declared `expectError`) or a `DRAWS`
+ * step, both excluded here — so a contiguous run of eligible same-player
+ * steps is, by construction, a run the real actor stayed on throughout.
+ * Only the step just past the run's end can show a different actor.
+ */
+function findPredictableActorHandoff(): PredictableHandoff | null {
+  for (const game of ALL_GOLDEN_GAMES) {
+    const states = replayGoldenGame(game);
+    let i = 0;
+    while (i < game.steps.length) {
+      const step = game.steps[i];
+      if (step.expectError || DRAWS.has(step.intent.type)) {
+        i++;
+        continue;
+      }
+      const playerId = step.intent.playerId;
+      let j = i;
+      while (
+        j + 1 < game.steps.length &&
+        !game.steps[j + 1].expectError &&
+        !DRAWS.has(game.steps[j + 1].intent.type) &&
+        game.steps[j + 1].intent.playerId === playerId
+      ) {
+        j++;
+      }
+      if (j > i && getCurrentActor(states[j + 1]) !== playerId) {
+        return { states, steps: game.steps, startIndex: i, endIndex: j, playerId };
+      }
+      i = j + 1;
+    }
+  }
+  return null;
 }
 
 describe('a predictable intent moves the screen before the server answers', () => {
@@ -184,19 +246,28 @@ describe('undoableSteps covers my own open segment and nobody elses', () => {
   });
 
   it('offers nothing once an optimistic intent has handed the actor away', () => {
-    // Founding a chain does not draw from the bag, so it is applied locally —
-    // and in this fixture it leaves the actor unchanged. Placing the tile that
-    // completes the turn is the general case: the moment `actorId` is no
-    // longer me, the segment I could undo inside is not mine, even though the
-    // server has not told me so yet.
-    const h = harness();
-    const session = h.session();
-    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
-    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    // The board()/E6 fixture never reaches this on its own — chooseFoundingBrand
+    // and placeTile-into-buy both leave the actor unchanged, so a hand-built
+    // two-step case here could only ever exercise the gate's "else" branch.
+    // Pull a real handoff from the golden corpus instead: a run of two or more
+    // locally-applied steps by one player that ends with the actor moved on.
+    const found = findPredictableActorHandoff();
+    expect(found, 'the corpus no longer contains a predictable actor handoff').not.toBeNull();
+    if (!found) return;
+    const { states, steps, startIndex, endIndex, playerId } = found;
 
-    const view = session.getView();
-    if (view.actorId !== 'p1') expect(view.undoableSteps).toEqual([]);
-    else expect(view.undoableSteps.length).toBeGreaterThan(0);
+    const h = harness(states[startIndex]);
+    const session = h.session(playerId);
+
+    session.dispatch(steps[startIndex].intent);
+    // The segment is still mine after one step of the run: it has moved, and
+    // I am still the actor.
+    expect(session.getView().undoableSteps.length).toBeGreaterThan(0);
+
+    for (let k = startIndex + 1; k <= endIndex; k++) session.dispatch(steps[k].intent);
+    // The run's last step is exactly the one that hands the actor away.
+    expect(session.getView().actorId).not.toBe(playerId);
+    expect(session.getView().undoableSteps).toEqual([]);
   });
 });
 
