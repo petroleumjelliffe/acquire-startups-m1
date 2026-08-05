@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as ioConnect, type Socket } from 'socket.io-client';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import type { Coord, Row } from '../engine/gameHelpers.js';
-import { startTestServer, connectPlayer, type TestServer } from './socketHarness.js';
+import { startTestServer, connectPlayer, settleSocket, type TestServer } from './socketHarness.js';
 import { project } from './projection.js';
 import {
   CLIENT_EVENTS,
@@ -79,24 +79,6 @@ function deadTileSegment(roomId: string) {
   );
 }
 
-/**
- * Waits for the server to finish handling one message, for raw socket
- * fixtures that never go through `TestClient` — created before a room binds
- * (`createRoom`, malformed `joinRoom`) or emitted straight through
- * `client.socket` to send a shape `TestClient.send` would never construct.
- * Mirrors `socketHarness.ts`'s own `settle`.
- */
-function settle(socket: Socket): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('server did not settle')), 4000);
-    socket.timeout(3000).emit('ping-settle', (err?: Error) => {
-      clearTimeout(timer);
-      if (err) reject(new Error('server did not settle'));
-      else resolve();
-    });
-  });
-}
-
 /** A bare socket, connected but bound to nothing. */
 async function bareSocket(): Promise<Socket> {
   const socket = ioConnect(`http://localhost:${server.port}`, { transports: ['websocket'] });
@@ -117,6 +99,13 @@ describe('what a client receives', () => {
 
     try {
       await p1.send({ type: 'endTurn' });
+      // `p1.send` only orders the server's *handling* of p1's message, not
+      // the *arrival* of anything the handling sent to p2's own, separate
+      // connection. A round trip on p2's own channel orders behind any
+      // earlier emit to p2 (socket.io delivers one connection's messages in
+      // order) — without it, a stale join-time message could make the
+      // p1-hand assertion below vacuous.
+      await settleSocket(p2.socket);
 
       const received = p2.latest();
       expect(received, 'p2 received no state at all').toBeDefined();
@@ -151,10 +140,15 @@ describe('an open segment is private', () => {
       // waits for `joined`, not for it. Drain it on p2's own channel before
       // taking the "before" count, or it can land during the `await` below
       // and be misread as a leak of p1's draft.
-      await settle(p2.socket);
+      await settleSocket(p2.socket);
       const p2Before = p2.states.length;
 
       await p1.send({ type: 'placeTile', coord: 'E6' });
+      // `p1.send`'s round trip is on p1's own socket. It says nothing about
+      // whether anything reached p2's separate connection — only a barrier
+      // on p2's own channel, ordered behind any leak already emitted to p2,
+      // can prove one didn't land.
+      await settleSocket(p2.socket);
 
       // The placement founds a chain: same actor, segment still open.
       expect(room.actorId()).toBe('p1');
@@ -176,10 +170,13 @@ describe('an open segment is private', () => {
     const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
 
     try {
-      await settle(p2.socket);
+      await settleSocket(p2.socket);
       const p2Before = p2.states.length;
 
       await p1.send({ type: 'tradeInDeadTiles', coords: ['C6'] });
+      // Same reasoning as the sibling test above: a barrier on p1's own
+      // socket proves nothing about p2's channel.
+      await settleSocket(p2.socket);
 
       // Same actor, segment stays open, but the bag was touched — this is
       // the one intent (per `server/room.ts`'s `DRAWS`) that produces a real
@@ -334,12 +331,12 @@ describe('a malformed or absent payload', () => {
 
     try {
       socket.emit(CLIENT_EVENTS.createRoom, undefined);
-      await settle(socket);
+      await settleSocket(socket);
       expect(rejections).toHaveLength(1);
       expect(rejections[0].code).toBe('unknownIntent');
 
       socket.emit(CLIENT_EVENTS.createRoom, { name: 42 });
-      await settle(socket);
+      await settleSocket(socket);
       expect(rejections).toHaveLength(2);
       expect(rejections[1].code).toBe('unknownIntent');
 
@@ -364,12 +361,12 @@ describe('a malformed or absent payload', () => {
 
     try {
       socket.emit(CLIENT_EVENTS.joinRoom, undefined);
-      await settle(socket);
+      await settleSocket(socket);
       expect(rejections).toHaveLength(1);
       expect(rejections[0].code).toBe('unknownIntent');
 
       socket.emit(CLIENT_EVENTS.joinRoom, { roomId: room.id }); // no `name`
-      await settle(socket);
+      await settleSocket(socket);
       expect(rejections).toHaveLength(2);
       expect(rejections[1].code).toBe('unknownIntent');
 
@@ -391,12 +388,12 @@ describe('a malformed or absent payload', () => {
 
     try {
       p1.socket.emit(CLIENT_EVENTS.undo, {});
-      await settle(p1.socket);
+      await settleSocket(p1.socket);
       expect(p1.rejections).toHaveLength(1);
       expect(p1.rejections[0].code).toBe('undoOutOfSegment');
 
       p1.socket.emit(CLIENT_EVENTS.undo, undefined);
-      await settle(p1.socket);
+      await settleSocket(p1.socket);
       expect(p1.rejections).toHaveLength(2);
       expect(p1.rejections[1].code).toBe('undoOutOfSegment');
 

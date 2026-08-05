@@ -41,6 +41,29 @@ export async function startTestServer(): Promise<TestServer> {
   };
 }
 
+/**
+ * Waits for the server to finish handling one message on `socket`.
+ *
+ * The success path is deliberately silent, so there is nothing to await for
+ * an accepted mid-segment intent. A round trip through an event the server
+ * always answers orders our next assertion after the dispatch it follows —
+ * and, on a socket other than the one that sent the triggering message,
+ * orders it behind any earlier emit to *that* socket too, since socket.io
+ * delivers one connection's messages in order. Exported so callers can
+ * settle a bystander's channel (proving a leak didn't arrive, not merely
+ * that it wasn't sent) without re-implementing this ordering primitive.
+ */
+export function settleSocket(socket: Socket): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('server did not settle')), 4000);
+    socket.timeout(3000).emit('ping-settle', (err?: Error) => {
+      clearTimeout(timer);
+      if (err) reject(new Error('server did not settle'));
+      else resolve();
+    });
+  });
+}
+
 export interface TestClient {
   socket: Socket;
   playerId: string;
@@ -88,22 +111,7 @@ export async function connectPlayer(
     socket.emit(CLIENT_EVENTS.joinRoom, { roomId, name, playerId, token });
   });
 
-  /**
-   * Waits for the server to finish handling one message.
-   *
-   * The success path is deliberately silent, so there is nothing to await for
-   * an accepted mid-segment intent. A round trip through an event the server
-   * always answers orders our next assertion after the dispatch it follows.
-   */
-  const settle = () =>
-    new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('server did not settle')), 4000);
-      socket.timeout(3000).emit('ping-settle', (err?: Error) => {
-        clearTimeout(timer);
-        if (err) reject(new Error('server did not settle'));
-        else resolve();
-      });
-    });
+  const settle = () => settleSocket(socket);
 
   return {
     socket,
