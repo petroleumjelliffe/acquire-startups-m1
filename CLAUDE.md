@@ -5,9 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Current focus
 
 The **React app revamp**, following the roadmap in
-`docs/superpowers/specs/2026-07-31-react-app-revamp-roadmap-design.md`. Phases 0, 1a and 1b are
-done; **Phase 2a** wires the new component layer to real game state so pass-and-play is playable
-end to end.
+`docs/superpowers/specs/2026-07-31-react-app-revamp-roadmap-design.md`. Phases 0 through 2b are
+done — pass-and-play is playable end to end and a game can be finished and scored. **Phase 3a**
+makes the server the authority: intents over the wire, per-player projection, and the XState layer
+deleted. It ships headless; **Phase 3b** brings the client to it.
 
 Design specs and implementation plans live in `docs/superpowers/{specs,plans}/`. Each phase ends
 with a carry-forward doc in `specs/` recording what it hands to the next one — read the newest
