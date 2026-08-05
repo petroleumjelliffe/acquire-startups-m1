@@ -3,6 +3,7 @@ import { buildFixture } from '../engine/golden/fixtures.js';
 import { ALL_GOLDEN_GAMES } from '../engine/golden/index.js';
 import { applyIntent, IllegalIntentError } from '../engine/intents.js';
 import type { GameState } from '../engine/gameTypes.js';
+import { DRAWS } from '../session/protocol.js';
 import { project } from './projection.js';
 
 function twoHands(): GameState {
@@ -56,12 +57,6 @@ describe('project', () => {
     }
   });
 });
-
-/**
- * The three intents that draw from the bag. A projected client holds no bag,
- * so it cannot compute these — by design. Everything else it can.
- */
-const DRAWS = new Set(['endTurn', 'tradeInDeadTiles', 'startGame']);
 
 function outcome(run: () => unknown): string {
   try {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ALL_GOLDEN_GAMES } from '../engine/golden';
 import type { WireIntent } from './protocol';
-import { CLIENT_EVENTS, SERVER_EVENTS } from './protocol';
+import { CLIENT_EVENTS, SERVER_EVENTS, DRAWS, toWire, isWireIntent } from './protocol';
 
 /**
  * Compile-time exhaustiveness. If `Intent` gains a member this Record stops
@@ -69,5 +69,31 @@ describe('event names', () => {
     const client = Object.values(CLIENT_EVENTS);
     const server = Object.values(SERVER_EVENTS);
     expect(new Set([...client, ...server]).size).toBe(client.length + server.length);
+  });
+});
+
+describe('DRAWS is the one definition of which intents draw from the bag', () => {
+  it('names exactly the three whose result a projected client cannot compute', () => {
+    expect([...DRAWS].sort()).toEqual(['endTurn', 'startGame', 'tradeInDeadTiles']);
+  });
+
+  it('holds only real intent types', () => {
+    // `Set<WireIntent['type']>` is checked at compile time; this is the
+    // runtime half — a typo in a string literal is otherwise invisible.
+    const types = new Set(ALL_GOLDEN_GAMES.flatMap((g) => g.steps.map((s) => s.intent.type)));
+    for (const draw of DRAWS) expect(types.has(draw)).toBe(true);
+  });
+});
+
+describe('toWire strips identity without collapsing the union', () => {
+  it('drops playerId and keeps the variant fields', () => {
+    expect(toWire({ type: 'placeTile', playerId: 'p1', coord: 'E6' }))
+      .toEqual({ type: 'placeTile', coord: 'E6' });
+    expect(toWire({ type: 'buyShares', playerId: 'p2', picks: ['Messla'] }))
+      .toEqual({ type: 'buyShares', picks: ['Messla'] });
+  });
+
+  it('produces something the server will accept as a wire intent', () => {
+    expect(isWireIntent(toWire({ type: 'placeTile', playerId: 'p1', coord: 'E6' }))).toBe(true);
   });
 });

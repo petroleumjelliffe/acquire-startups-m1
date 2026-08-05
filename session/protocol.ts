@@ -76,6 +76,36 @@ export function isWireIntent(wire: unknown): wire is WireIntent {
 }
 
 /**
+ * The intent types that draw from the bag, and therefore the only ones whose
+ * result a projected client cannot compute for itself.
+ *
+ * One definition, three consumers: `server/room.ts` decides which accepted
+ * mid-segment intents still owe their author a `correction`;
+ * `server/projection.test.ts` decides which steps the projection-equivalence
+ * proof must skip; and `src/net/NetworkSession.ts` decides which intents it
+ * may apply optimistically. Phase 3a shipped the first two as independent
+ * copies and its carry-forward flagged the third as the moment that breaks:
+ * a new bag-drawing intent added to only one of them would stop producing
+ * its correction, silently narrow the equivalence proof to cover less than
+ * it claims, and mispredict on the client — with no test failing either way.
+ */
+export const DRAWS = new Set<WireIntent['type']>(['endTurn', 'tradeInDeadTiles', 'startGame']);
+
+/**
+ * Strips identity for the wire — the exact inverse of `server/room.ts`'s
+ * `withPlayer`.
+ *
+ * Same cast, same reason: spreading a discriminated union produces a type
+ * TypeScript will not narrow back to that union, even though every `Intent`
+ * minus its `playerId` is by construction a `WireIntent`. Confined to this
+ * one line so no caller ever needs one.
+ */
+export function toWire(intent: Intent): WireIntent {
+  const { playerId: _identity, ...wire } = intent;
+  return wire as WireIntent;
+}
+
+/**
  * Everything the engine can refuse, plus the one refusal the engine knows
  * nothing about. Undo is not an intent — it never reaches `applyIntent` — so
  * `IllegalIntentCode` has no word for "that step belongs to a segment you no
