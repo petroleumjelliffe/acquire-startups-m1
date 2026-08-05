@@ -1,0 +1,76 @@
+/**
+ * Who this browser is, per room.
+ *
+ * The token is what makes a refresh a rejoin instead of a new seat: the server
+ * issues it once at first join and checks it against the seat's own copy, so
+ * presenting someone else's `playerId` without their token gets nothing.
+ */
+export interface RoomIdentity {
+  playerId: string;
+  token: string;
+  name: string;
+}
+
+const roomKey = (roomId: string) => `acquire.room.${roomId}`;
+const NAME_KEY = 'acquire.name';
+
+/**
+ * Every read is guarded twice: `localStorage` itself throws in Safari's
+ * private mode, and its contents are user-editable text that has outlived
+ * whatever wrote it. A room screen that throws on mount cannot even offer to
+ * start over.
+ */
+function read(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function write(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // A browser that will not store this still plays fine; it just cannot
+    // rejoin after a refresh.
+  }
+}
+
+export function loadIdentity(roomId: string): RoomIdentity | null {
+  const raw = read(roomKey(roomId));
+  if (raw === null) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) return null;
+    const { playerId, token, name } = parsed as Record<string, unknown>;
+    if (typeof playerId !== 'string' || typeof token !== 'string' || typeof name !== 'string') {
+      return null;
+    }
+    return { playerId, token, name };
+  } catch {
+    return null;
+  }
+}
+
+export function saveIdentity(roomId: string, identity: RoomIdentity): void {
+  write(roomKey(roomId), JSON.stringify(identity));
+}
+
+export function clearIdentity(roomId: string): void {
+  try {
+    localStorage.removeItem(roomKey(roomId));
+  } catch {
+    // See `write`.
+  }
+}
+
+export function rememberedName(): string | null {
+  const name = read(NAME_KEY);
+  return name === null || name.trim() === '' ? null : name;
+}
+
+export function rememberName(name: string): void {
+  write(NAME_KEY, name);
+}

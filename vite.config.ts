@@ -37,6 +37,11 @@ export default defineConfig(({ command }) => ({
           name: 'app',
           include: ['src/**/*.test.{ts,tsx}'],
           environment: 'jsdom',
+          environmentOptions: {
+            jsdom: {
+              localStorage: true,
+            },
+          },
           globals: true,
           setupFiles: './src/test/setup.ts',
         },
