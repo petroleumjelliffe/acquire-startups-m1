@@ -22,8 +22,9 @@ before starting work.
 | `engine/golden/` | Golden games G1–G16 — the executable rules spec, stored as data. Run by `golden.test.ts`. |
 | `src/game/` | The new component layer (Phase 1b). Pure, props-in, styled through `tokens.ts`. |
 | `src/game/catalog/` | `/catalog` route — every component state, mostly replayed from golden games. The acceptance surface. |
-| `src/components/`, `src/Game.tsx` | **Legacy.** Modal-driven UI, still serving `/room/:roomId`. Do not build on it. Deleted in Phase 3/5, not before — online depends on it. |
-| `server/` | Express + Socket.io + XState. Not authoritative yet; that is Phase 3. |
+| `session/` | Shared between client and server (Phase 3a). `GameSession` — the local draft/session model — and `protocol.ts`'s wire types (`WireIntent`, `StateMessage`, …). No React, no transport. |
+| `src/components/`, `src/Game.tsx` | **Legacy, and now dead.** Modal-driven UI still routed at `/room/:roomId`, but it speaks a wire protocol Phase 3a replaced — `CreateRoomPage`/`JoinRoomPage` emit the old `createRoom` shape and hang waiting for an ack the server no longer sends. Online is broken until Phase 3b rebuilds the client against the new protocol. Do not build on it; still off-limits to touch, deleted in Phase 3b/5. |
+| `server/` | Express + Socket.io. Authoritative over intents as of Phase 3a — runs `applyIntent`, projects state per player before broadcast, rejects out-of-turn/illegal intents — but headless: no client speaks its protocol yet (Phase 3b). The XState layer (`gameRoomMachine`, `playerMachine`) is deleted. |
 | `prototype/` | The buildless design lab the component layer was ported from. Reference, not a build target. |
 
 ## Commands
@@ -53,7 +54,8 @@ npm run check:bundle   # guards vitest and golden data out of the main chunk
 - **Safe chain** = ≥11 tiles; two safe chains cannot merge. A tile whose placement would join two
   safe chains is permanently unplayable — a dead tile.
 - **Segment** = a run of steps by one actor, ending when a *different* player must act. It is the
-  undo boundary, the pass-the-device boundary, and (in Phase 3) the commit boundary.
+  undo boundary, the pass-the-device boundary, and (Phase 3a) the server's commit boundary — a
+  segment close is what turns a private draft into `room.committed()` and broadcasts it.
 - **Panel-height stability**: a zone's reservation is a *floor*, not a fixed height. Reserve enough
   that ordinary content changes move nothing (the point is to stop labels and controls jittering
   between transitions). Growing to fit a genuinely new row is fine — mark the zone

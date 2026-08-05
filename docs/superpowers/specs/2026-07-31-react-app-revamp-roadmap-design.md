@@ -257,7 +257,18 @@ end-to-end pass over G2, G7 and G9 through the real UI.
 
 **This is the first point at which the game can be finished.** Today no path to `end` exists.
 
-### Phase 3 — Server authority
+### Phase 3 — Server authority (split into 3a and 3b)
+
+> **Split during planning, 2026-08-05.** 3a is the server — intents over the
+> wire, projection, validation, the XState layer deleted — proven headlessly.
+> 3b is the client: the networked session, `/room/:roomId` on `GameScreen`, and
+> the deletion of `Game.tsx` and its six modals. See
+> [2026-08-05-phase-3a-server-authority-design.md](./2026-08-05-phase-3a-server-authority-design.md).
+>
+> Two claims in that section proved wrong when executed. The client cannot
+> usefully predict *every* intent — three of nine draw from the bag — and the
+> `gameRoomMachine` rewrite was dropped rather than done, because the engine's
+> `stage` and `getCurrentActor` already are the model this section wanted.
 
 - Intents over the wire. The server runs `applyIntent`.
 - **Per-player projection** before broadcast (`bag`, seed, other hands stripped).
