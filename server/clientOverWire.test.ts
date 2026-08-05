@@ -35,6 +35,10 @@ describe('two networked clients reach the same state the server holds', () => {
   // steps, say — would otherwise leave every per-step assertion vacuous while
   // the suite stayed green.
   let predictions = 0;
+  // Same floor discipline, for the complementary claim: on a bag-drawing
+  // intent the client cannot predict, it must not move at all until the
+  // server answers. See the `deferred` assertion below.
+  let deferred = 0;
 
   for (const game of ALL_GOLDEN_GAMES) {
     it(`${game.id}: ${game.title}`, async () => {
@@ -70,12 +74,31 @@ describe('two networked clients reach the same state the server holds', () => {
           const where = `${game.id} / ${step.name}`;
           const wire = toWire(step.intent);
           const predictable = !DRAWS.has(wire.type) && !step.expectError;
+          // The complement of `predictable`, minus the steps that are
+          // expected to be refused: a legal bag-drawing intent is the one
+          // case the client cannot compute for itself at all, so dispatching
+          // it must leave the client's state untouched — no bogus board may
+          // ever be visible — until the server's own answer arrives.
+          const awaitsServer = DRAWS.has(wire.type) && !step.expectError;
+          const beforeDispatch = awaitsServer ? session.getView().state : null;
 
           session.dispatch(step.intent);
 
           // Captured before the server can answer: this is the client's own
           // prediction, not the server's reply relabelled.
           const predicted = predictable ? session.getView().state : null;
+
+          if (awaitsServer) {
+            // Asserted immediately after `dispatch`, before the settle below
+            // gives the server any chance to reply — this is the state of a
+            // client that has sent the intent and is still waiting, not one
+            // the server has since corrected. `predictions` cannot cover this
+            // case: it only ever captures a state for `predictable` steps,
+            // which by definition excludes every `DRAWS` type.
+            expect(session.getView().state, `${where} — the client moved before the server answered`)
+              .toEqual(beforeDispatch);
+            deferred++;
+          }
 
           for (const seat of room.players) await settleSocket(clients[seat.id].socket);
 
@@ -128,5 +151,13 @@ describe('two networked clients reach the same state the server holds', () => {
     // golden game cannot break this, while a harness that stops predicting
     // fails loudly.
     expect(predictions).toBeGreaterThanOrEqual(25);
+  });
+
+  it('made enough deferred-to-server checks across the corpus to trust the count', () => {
+    // 7 legal bag-drawing steps across the corpus at measurement time (far
+    // fewer than the 29 predictable ones — most turns end without exhausting
+    // the bag or trading in a dead tile). Floored at 5, still comfortably
+    // above zero, so this branch cannot silently stop being reached either.
+    expect(deferred).toBeGreaterThanOrEqual(5);
   });
 });
