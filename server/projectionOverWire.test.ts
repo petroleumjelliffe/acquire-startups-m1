@@ -48,6 +48,12 @@ function openSegment(roomId: string) {
   );
 }
 
+/** A run of `n` coords along `letter`, starting at 1 — `row('B', 11)` is
+ * `B1..B11`, a safe (≥11-tile) chain. */
+function row(letter: Row, n: number): Coord[] {
+  return Array.from({ length: n }, (_, i) => `${letter}${i + 1}` as Coord);
+}
+
 /**
  * p1 holds one genuinely dead tile (`C6`, boxed in between two safe 11-tile
  * chains — the exact setup golden game G8 uses to prove it is dead). Trading
@@ -60,8 +66,6 @@ function openSegment(roomId: string) {
  * kind at all.
  */
 function deadTileSegment(roomId: string) {
-  const row = (letter: Row, n: number): Coord[] =>
-    Array.from({ length: n }, (_, i) => `${letter}${i + 1}` as Coord);
   return server.rooms.fromState(
     roomId,
     ['Alex', 'Sam'],
@@ -75,6 +79,55 @@ function deadTileSegment(roomId: string) {
         { id: 'ZuckFace', coords: row('D', 11) },
       ],
       bag: ['I12'],
+    }),
+  );
+}
+
+/**
+ * Same boxed-in setup as `deadTileSegment`, but the bag holds `C7` instead
+ * of `I12` — a coord sandwiched between `B7` and `D7` exactly as `C6` is
+ * sandwiched between `B6` and `D6`, so the tile the trade draws is *itself*
+ * dead. That makes `endTurn` legal the instant the trade completes (no
+ * legal placement remains), closing the segment — a real commit, broadcast
+ * to the whole table — while Alex still holds the drawn tile. That is the
+ * exact shape of the confirmed log leak: a commit p2 receives, naming a
+ * coordinate presently sitting in p1's actual hand.
+ */
+function deadReplacementSegment(roomId: string) {
+  return server.rooms.fromState(
+    roomId,
+    ['Alex', 'Sam'],
+    buildFixture({
+      players: [
+        { name: 'Alex', cash: 4200, hand: ['C6'] },
+        { name: 'Sam', cash: 5800, hand: ['A1'] },
+      ],
+      chains: [
+        { id: 'Messla', coords: row('B', 11) },
+        { id: 'ZuckFace', coords: row('D', 11) },
+      ],
+      bag: ['C7'],
+    }),
+  );
+}
+
+/**
+ * p1's turn, `buy` stage. `doBuyShares` in `engine/intents.ts` calls
+ * `requireStage(state, 'buy')` before it ever touches `intent.picks` — so a
+ * malformed `picks` fired at `openSegment` (stage `play`) would be caught by
+ * the stage check first and never reach the dereference this fixture exists
+ * to exercise.
+ */
+function buyStage(roomId: string) {
+  return server.rooms.fromState(
+    roomId,
+    ['Alex', 'Sam'],
+    buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000 },
+        { name: 'Sam', cash: 6000 },
+      ],
+      stage: 'buy',
     }),
   );
 }
@@ -405,6 +458,60 @@ describe('a malformed or absent payload', () => {
       p1.close();
     }
   });
+
+  it('intent rejects a malformed payload instead of crashing the server', async () => {
+    // Two rooms, because the two families of malformed field need different
+    // stages to actually reach the dereference: `doBuyShares` requires `buy`,
+    // `doTradeInDeadTiles` requires `play` (`openSegment`'s stage).
+    const buyRoom = buyStage('wire-intent-malformed-buy');
+    const [buyAlex] = buyRoom.players;
+    const buyer = await connectPlayer(server.port, buyRoom.id, buyAlex.name, buyAlex.id, buyAlex.token);
+
+    const tradeRoom = openSegment('wire-intent-malformed-trade');
+    const [tradeAlex] = tradeRoom.players;
+    const trader = await connectPlayer(server.port, tradeRoom.id, tradeAlex.name, tradeAlex.id, tradeAlex.token);
+
+    try {
+      // Each of these has a *valid* `type` and a malformed field — the case
+      // the old comment at the `intent` send site argued away by only
+      // considering an absent payload. Every one of them dereferences before
+      // validation in `engine/intents.ts` (`.length`, a `for...of`, a spread
+      // into `Set`) and previously took the whole process down.
+      const buyMalformed: unknown[] = [
+        { type: 'buyShares' },              // picks undefined -> .length
+        { type: 'buyShares', picks: null }, // picks null -> .length
+        { type: 'buyShares', picks: 5 },    // picks not iterable
+      ];
+      for (const [i, payload] of buyMalformed.entries()) {
+        buyer.socket.emit(CLIENT_EVENTS.intent, payload);
+        await settleSocket(buyer.socket);
+        expect(buyer.rejections, `buyShares payload ${i} (${JSON.stringify(payload)})`)
+          .toHaveLength(i + 1);
+        expect(buyer.rejections[i].code).toBe('unknownIntent');
+      }
+
+      trader.socket.emit(CLIENT_EVENTS.intent, { type: 'tradeInDeadTiles', coords: 5 });
+      await settleSocket(trader.socket);
+      expect(trader.rejections).toHaveLength(1);
+      expect(trader.rejections[0].code).toBe('unknownIntent');
+
+      // The server stayed up: a well-formed intent on each connection, right
+      // after the malformed ones, still works — and so does an unrelated
+      // liveness check.
+      await buyer.send({ type: 'endTurn' });
+      expect(buyRoom.committed().stage).not.toBe('buy');
+
+      await trader.send({ type: 'placeTile', coord: 'E6' });
+      expect(tradeRoom.draft().board['E6'].placed).toBe(true);
+
+      const health = await fetch(`http://localhost:${server.port}/health`);
+      expect(health.ok).toBe(true);
+      expect(await health.json()).toEqual({ ok: true });
+    } finally {
+      buyer.close();
+      trader.close();
+    }
+  });
 });
 
 describe('a rejection is addressed to a non-actor', () => {
@@ -487,6 +594,53 @@ describe('a rejected intent leaves the draft unchanged', () => {
 
       expect(p2.rejections.map((r) => r.code)).toEqual(['notYourTurn']);
       expect(JSON.stringify(room.draft())).toBe(before);
+    } finally {
+      p1.close();
+      p2.close();
+    }
+  });
+});
+
+describe('the log never leaks a hand through project()', () => {
+  it('names no tile coordinate that sits in another player\'s actual hand', async () => {
+    const room = deadReplacementSegment('wire-log-leak');
+    const [alex, sam] = room.players;
+    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
+    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+
+    try {
+      await p1.send({ type: 'tradeInDeadTiles', coords: ['C6'] });
+      expect(room.draft().players.find((p) => p.id === 'p1')!.hand).toEqual(['C7']);
+
+      // `C7` is itself dead (see `deadReplacementSegment`), so no legal
+      // placement remains — `endTurn` closes the segment right away. A real
+      // commit, broadcast to the whole table, while p1 still holds `C7`.
+      await p1.send({ type: 'endTurn' });
+      expect(room.actorId()).toBe('p2');
+      await settleSocket(p2.socket);
+
+      const seenBySam = p2.latest()!.state;
+      expect(seenBySam.players.find((p) => p.id === 'p1')!.hand).toEqual([]);
+
+      // The general invariant, not just this one case: no tile coordinate
+      // named anywhere in a projection Sam actually received may sit in a
+      // hand that isn't Sam's — checked against the room's real,
+      // unprojected state, which is the ground truth `seenBySam` must not
+      // leak. Written this way, it also catches any future intent that logs
+      // a drawn tile, not just `tradeInDeadTiles`.
+      const actualHand = new Map(room.committed().players.map((p) => [p.id, p.hand]));
+      for (const entry of seenBySam.log) {
+        for (const token of entry.detail) {
+          if (token.kind !== 'tile') continue;
+          for (const [ownerId, hand] of actualHand) {
+            if (ownerId === 'p2') continue; // Sam's own hand is not a leak
+            expect(
+              hand,
+              `log entry "${entry.phase}" names ${token.coord}, which is in ${ownerId}'s hand`,
+            ).not.toContain(token.coord);
+          }
+        }
+      }
     } finally {
       p1.close();
       p2.close();

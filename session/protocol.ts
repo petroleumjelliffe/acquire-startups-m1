@@ -22,6 +22,60 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 export type WireIntent = DistributiveOmit<Intent, 'playerId'>;
 
 /**
+ * Narrows an arbitrary wire payload to `WireIntent` before it ever reaches
+ * `room.dispatch`.
+ *
+ * A missing or wholly malformed payload is not the hazard: `{...undefined}`
+ * is `{}`, and the engine's own `applyIntent` default branch rejects an
+ * object with no recognised `type`. The hazard is a payload with a *valid*
+ * `type` and a malformed field — `{ type: 'buyShares' }` with no `picks`,
+ * or `{ type: 'tradeInDeadTiles', coords: 5 }` — because every variant's
+ * handler in `engine/intents.ts` dereferences that field (`.length`, a
+ * `for...of`, a spread into `Set`) before any validation runs. That throws
+ * synchronously inside a socket.io listener, which socket.io does not catch,
+ * which takes the whole process down for every room on it, not just the
+ * sender's. This function is what stands between an arbitrary payload and
+ * that dereference: array fields must actually be arrays, numeric fields
+ * actually numbers, string fields actually strings, before `withPlayer`
+ * ever hands the result to the engine as a trusted `Intent`.
+ *
+ * Field-level only — it does not check that `coord` names a real board
+ * square or `startupId` a real startup. Those stay the engine's job
+ * (`tileNotInHand`, `brandUnavailable`, …), which already rejects them
+ * cleanly; nothing downstream dereferences an unvalidated *value*, only an
+ * unvalidated *shape*.
+ */
+export function isWireIntent(wire: unknown): wire is WireIntent {
+  if (typeof wire !== 'object' || wire === null) return false;
+  const w = wire as Record<string, unknown>;
+
+  switch (w.type) {
+    case 'startGame':
+    case 'declareEnd':
+    case 'endTurn':
+      return true;
+    case 'placeTile':
+      return typeof w.coord === 'string';
+    case 'chooseFoundingBrand':
+    case 'chooseSurvivor':
+      return typeof w.startupId === 'string';
+    case 'liquidate':
+      return (
+        typeof w.startupId === 'string' &&
+        typeof w.sell === 'number' &&
+        typeof w.trade === 'number' &&
+        typeof w.keep === 'number'
+      );
+    case 'buyShares':
+      return Array.isArray(w.picks) && w.picks.every((p) => typeof p === 'string');
+    case 'tradeInDeadTiles':
+      return Array.isArray(w.coords) && w.coords.every((c) => typeof c === 'string');
+    default:
+      return false;
+  }
+}
+
+/**
  * Everything the engine can refuse, plus the one refusal the engine knows
  * nothing about. Undo is not an intent — it never reaches `applyIntent` — so
  * `IllegalIntentCode` has no word for "that step belongs to a segment you no

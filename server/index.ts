@@ -20,6 +20,7 @@ import {
   type StateReason,
   type UndoMessage,
   type WireIntent,
+  isWireIntent,
 } from '../session/protocol.js';
 
 /** Which room and seat a socket is bound to. The client never says. */
@@ -232,13 +233,25 @@ export function createServer(): ServerHandle {
       // `bound.playerId` — never anything the client sent. The wire type has no
       // `playerId` field for it to have sent one in.
       //
-      // No shape check here, unlike `createRoom`/`joinRoom`/`undo` below — but
-      // only by accident, not by design: a missing or malformed `wire` spreads
-      // as `{...undefined}`, which is `{}`, and the engine's `applyIntent`
-      // rejects an object with no recognised `type` through its own default
-      // branch rather than dereferencing a field that isn't there. Do not read
-      // this as "intent doesn't need a guard" — it needs one exactly as much
-      // as the others; it just happens to already have one, inside the engine.
+      // A missing or wholly malformed `wire` is not the hazard here — that
+      // spreads as `{...undefined}`, which is `{}`, and the engine's
+      // `applyIntent` rejects an object with no recognised `type` through its
+      // own default branch. The hazard is a payload with a *valid* `type` and
+      // a malformed field: `{ type: 'buyShares' }` with no `picks`, or
+      // `{ type: 'tradeInDeadTiles', coords: 5 }`. Every such handler in
+      // `engine/intents.ts` dereferences that field before validating it
+      // (`.length`, a `for...of`, a spread into `Set`), which throws
+      // synchronously and takes the whole process down for every room, not
+      // just this one — exactly the crash `isWireIntent` exists to turn into
+      // a clean rejection, same as the shape checks on `createRoom`/`joinRoom`/
+      // `undo`.
+      if (!isWireIntent(wire)) {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'unknownIntent',
+          message: 'malformed intent payload',
+        });
+        return;
+      }
       deliver(room, room.dispatch(bound.playerId, wire));
     });
 

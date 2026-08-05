@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-05
 **Status:** Phase 3a complete; this is the punch list it hands forward
-**Branch:** `revamp/phase-3a-server-authority` (20 commits, not pushed, not on `main`)
+**Branch:** `revamp/phase-3a-server-authority` (22 commits, not pushed, not on `main`)
 **Worktree:** `.worktrees/phase-3a`
 **Branch point:** `main` @ `2ecbf39`
 **Plan:** [2026-08-05-phase-3a-server-authority.md](../plans/2026-08-05-phase-3a-server-authority.md)
@@ -13,7 +13,7 @@
 **The server now runs the rules and nobody has watched it do so.** Intents cross a real
 socket, the engine — not a hand-maintained XState duplicate of it — decides what is
 legal, and each player is projected a state with no other player's hand, no bag and no
-seed in it. All of that is proven by 481 automated tests, seventeen of them driving the
+seed in it. All of that is proven by 483 automated tests, seventeen of them driving the
 golden corpus over real websockets. **None of it has been driven by a human, and no
 client exists that can drive it.** Say this plainly, because it is the phase's largest
 gap: 3a ships headless, with no by-hand verification pass of any kind, and the one route
@@ -23,15 +23,15 @@ in `src/` that used to talk to a game server — `/room/:roomId`, backed by
 never sends; the request just hangs. Online is dead until Phase 3b rebuilds the client
 against `session/protocol.ts`. This was known and accepted going in — the design's own
 title is "server authority," not "playable online" — but a reader skimming only the
-`## What shipped` table below could mistake "481 green tests" for "you can play this
+`## What shipped` table below could mistake "483 green tests" for "you can play this
 over the internet." You cannot. Nobody has even opened a browser to it.
 
 ## What shipped
 
 | | Before (2b, measured at Task 1) | After (3a, measured now) |
 |---|---|---|
-| Tests | 388 in 44 files | **481 in 49 files** |
-| `git diff --stat main...HEAD` | — | **40 files changed, +4659/-2225** |
+| Tests | 388 in 44 files | **483 in 49 files** |
+| `git diff --stat main...HEAD` | — | **42 files changed, +5271/-2228** |
 | `engine/**` touched | — | **0 files** (read-only, honoured throughout) |
 | `src/components/`, `src/Game.tsx`, `prototype/` touched | — | **0 files** (untouched, per constraint) |
 | Gates | vitest, typecheck, vite build, check:bundle, verify:layout | same **five**, all green |
@@ -40,6 +40,12 @@ The "before" figure is Task 1's own first measurement (`npx vitest run` immediat
 after `vite.config.ts`'s test-project split, before any new test file existed) — a
 config-only change with no effect on the count, so it stands for the branch point.
 The "after" figure is this task's own run, moments before this document was written.
+
+The `git diff --stat` figure is necessarily self-referential: it is measured against
+`main...HEAD`, and `HEAD` is the commit that carries this document, so the figure
+includes this file's own diff. A count taken before that commit — as an earlier draft of
+this row briefly was — undercounts by exactly this file, which is a strange place for a
+"how much changed" figure to be wrong.
 
 **What actually changed under `server/`:** the XState layer is gone —
 `gameRoomMachine.ts`, `playerMachine.ts`, `machines/types.ts`, `gameManagerXState.ts`,
@@ -114,8 +120,8 @@ It proves the rules are enforced. Task 8, separately, proves the channel is priv
   no golden game happens to draw and keep the same seat's turn — it would have broken
   silently the moment Task 6 wired `begin` + `startGame` end to end. Caught by review,
   not by the corpus.
-- **481 tests in 49 files**, measured just now; **40 files changed** against `main`
-  (`+4659/-2225`); `engine/**` and `src/components/`, `src/Game.tsx`, `prototype/` show
+- **483 tests in 49 files**, measured just now; **42 files changed** against `main`
+  (`+5271/-2228`); `engine/**` and `src/components/`, `src/Game.tsx`, `prototype/` show
   **zero** diff — every global constraint held for the whole phase.
 
 ## Five hollow gates, and the process rule that came out of it
@@ -224,10 +230,15 @@ only other people's.
   because `applyIntent` always `structuredClone`s before mutating, but nothing
   structurally stops a future caller — a client-side optimistic-update path, say —
   mutating a projected object in place and corrupting the room's real state. And
-  `DRAWS` in `server/room.ts` (the three-element set deciding which intents produce a
-  `correction` delivery) is hand-maintained with no test tying it to the engine's own
-  intent list — a new bag-drawing intent added to `engine/intents.ts` would silently
-  stop producing the correction it needs.
+  `DRAWS` — the three-element set of bag-drawing intent types — exists as **two
+  independent copies that must agree, not one**: `server/room.ts:54` (deciding which
+  intents produce a `correction` delivery instead of `none`) and
+  `server/projection.test.ts:64` (deciding which steps the projection-equivalence proof
+  skips, since a projected client holds no bag and cannot predict a draw's outcome).
+  Neither is derived from the other or from `engine/intents.ts`. A new bag-drawing intent
+  added to only one of them would both stop producing the correction it needs *and*
+  silently narrow the equivalence proof to cover less than it claims to — with no test
+  failure to say so either way.
 
 ## Deviations from the plan, and why each was right
 
@@ -284,11 +295,28 @@ Unchanged by this phase, since it touched none of `src/`:
 **A gate proves what it was actually run against, not what its name implies.** Two of
 this phase's own tests (hollow gates #4 and #5) looked, by name and by a single passing
 run, like they proved an ordering or privacy guarantee. Neither did, until someone
-deleted the thing being guarded and watched the gate fail to notice. This project is now
-five-for-five: every phase so far has shipped at least one check that ran green while
-guarding nothing, and every one of them was found by literally breaking the code the
-check claims to cover — never by reading the check's code and reasoning about it in the
-abstract.
+deleted the thing being guarded and watched the gate fail to notice. This project has
+shipped five such hollow gates so far, and they concentrate in three phases, not five:
+1a shipped two (`check:bundle`, the stall/progress-invariant harness), 2a shipped one
+(`verify:layout`), and 3a shipped two (the socket-settle primitive, the draft-privacy
+ordering barrier). Phases 0, 1b and 2b have none. Every one of the five was found by
+literally breaking the code the check claims to cover — never by reading the check's
+code and reasoning about it in the abstract.
+
+**A comment arguing a check is unnecessary is itself a place to look for the missing
+check.** The final pre-merge review of this phase found two surviving defects, and both
+sat in the exact spot the source argued, in prose, that no further check was needed. The
+`intent` handler in `server/index.ts` carried a comment reasoning that a malformed
+payload was safe because `{...undefined}` spreads to `{}`, which the engine's default
+branch rejects — true only for an *absent* payload, not one with a valid `type` and a
+malformed field (`{ type: 'buyShares' }` with no `picks`), which dereferenced before
+validation and crashed the whole process, every room on it, not just the sender's.
+Separately, `project()`'s own docstring named the hand "the one secret this game
+actually has" and redacted it everywhere — except in `log`, where `tradeInDeadTiles`
+names the coordinate it draws to replace a traded-in tile, leaking it to the whole table
+on the next commit while the drawing player still held it. Prose reassurance sitting
+next to a boundary is a smell worth treating as a checklist item, not as a proof that the
+boundary was checked.
 
 **Coverage boundaries are worth stating even when both halves are proven.** Task 7 and
 Task 8 together fully cover the wire; either one alone proves much less than "seventeen
