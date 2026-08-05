@@ -114,6 +114,18 @@ export function createServer(): ServerHandle {
   }
 
   io.on('connection', (socket) => {
+    /**
+     * Answers immediately, and does nothing else.
+     *
+     * socket.io delivers a connection's messages in order, so an acknowledged
+     * round trip that arrives after an intent proves the intent was handled.
+     * Tests need this because the accepted mid-segment path is deliberately
+     * silent — there is no reply to await, and without an ordering point an
+     * assertion runs before the server has processed anything and passes
+     * vacuously.
+     */
+    socket.on('ping-settle', (ack: () => void) => { if (typeof ack === 'function') ack(); });
+
     socket.on(CLIENT_EVENTS.createRoom, (msg: CreateRoomMessage) => {
       // `msg` is whatever the client sent, typed only by wishful thinking —
       // a malformed or missing payload dereferenced below would throw
