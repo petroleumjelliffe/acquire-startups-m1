@@ -16,12 +16,12 @@ export interface RoomRegistry {
   all(): GameRoom[];
 }
 
-function seatPlayer(names: number, name: string): RoomPlayer {
+function seatPlayer(seat: number, name: string): RoomPlayer {
   return {
-    id: `p${names + 1}`,
+    id: `p${seat + 1}`,
     name,
     token: randomUUID(),
-    isHost: names === 0,
+    isHost: seat === 0,
     connected: true,
   };
 }
@@ -39,7 +39,13 @@ export function createRoomRegistry(): RoomRegistry {
 
   return {
     create(hostName) {
-      const id = roomCode();
+      // Six random characters collide rarely, but "rarely" over a Map holding
+      // live games means silently orphaning one — every socket bound to the
+      // overwritten room stops resolving through `get()`, with no error raised
+      // anywhere. Retry rather than trust the odds.
+      let id = roomCode();
+      while (rooms.has(id)) id = roomCode();
+
       const host = seatPlayer(0, hostName);
       const room = createGameRoom(id, [host]);
       rooms.set(id, room);

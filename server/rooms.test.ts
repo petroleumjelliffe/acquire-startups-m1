@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import { createRoomRegistry } from './rooms.js';
 
@@ -61,6 +61,27 @@ describe('the registry', () => {
     const rooms = createRoomRegistry();
     expect(rooms.get('nope')).toBeUndefined();
     expect(rooms.join('nope', 'Sam')).toBeNull();
+  });
+
+  it('retries the room code on a collision instead of overwriting the live room', () => {
+    const rooms = createRoomRegistry();
+
+    // Force `roomCode()` to draw the same six characters for the first room
+    // and for the first attempt on the second room, then a different six
+    // characters on the retry. If `create` does not check for a collision,
+    // it stops after the first draw, `rooms.set` clobbers the first room's
+    // Map entry, and both assertions below fail.
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const first = rooms.create('Alex');
+
+    let calls = 0;
+    random.mockImplementation(() => (calls++ < 6 ? 0 : 0.5));
+    const second = rooms.create('Sam');
+
+    random.mockRestore();
+
+    expect(second.room.id).not.toBe(first.room.id);
+    expect(rooms.get(first.room.id)).toBe(first.room);
   });
 
   it('seats a prepared state without going through the lobby', () => {
