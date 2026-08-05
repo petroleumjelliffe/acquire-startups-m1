@@ -6,11 +6,21 @@ export interface JoinFormProps {
   roomId?: string;
   title: string;
   submitLabel: string;
+  /**
+   * A submission is outstanding: disables the button (alongside the existing
+   * `ready` check) and blocks another submit, so a double-click or an
+   * edit-and-resubmit before the reply lands cannot send a second request.
+   * Optional so callers with no in-flight state of their own — `RoomPage`'s
+   * use — are unaffected.
+   */
+  busy?: boolean;
+  /** Shown on the button in place of `submitLabel` while `busy`. */
+  busyLabel?: string;
   error?: string | null;
   onSubmit(name: string, roomId: string): void;
 }
 
-export function JoinForm({ roomId, title, submitLabel, error, onSubmit }: JoinFormProps) {
+export function JoinForm({ roomId, title, submitLabel, busy = false, busyLabel, error, onSubmit }: JoinFormProps) {
   const [name, setName] = useState(getRandomEmojiName);
   const [code, setCode] = useState(roomId ?? '');
 
@@ -22,7 +32,7 @@ export function JoinForm({ roomId, title, submitLabel, error, onSubmit }: JoinFo
         className="mx-auto max-w-md rounded-xl bg-white p-8 shadow-xl"
         onSubmit={(e) => {
           e.preventDefault();
-          if (ready) onSubmit(name.trim(), code.trim().toUpperCase());
+          if (ready && !busy) onSubmit(name.trim(), code.trim().toUpperCase());
         }}
       >
         <h1 className="mb-6 text-center text-2xl font-bold">{title}</h1>
@@ -55,10 +65,10 @@ export function JoinForm({ roomId, title, submitLabel, error, onSubmit }: JoinFo
 
         <button
           type="submit"
-          disabled={!ready}
+          disabled={!ready || busy}
           className="m-0 w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          {submitLabel}
+          {busy ? (busyLabel ?? submitLabel) : submitLabel}
         </button>
       </form>
     </div>

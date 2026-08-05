@@ -12,6 +12,10 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
   const navigate = useNavigate();
   const connection = connect();
   const [error, setError] = useState<string | null>(null);
+  // Disables `JoinForm`'s button and blocks a second submit while a request
+  // is outstanding. Cleared on rejection too — a mistyped code should be
+  // correctable, not stuck.
+  const [waiting, setWaiting] = useState(false);
   const sentName = useRef('');
 
   useEffect(() => {
@@ -19,7 +23,10 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
       saveIdentity(msg.roomId, { playerId: msg.playerId, token: msg.token, name: sentName.current });
       navigate(`/room/${msg.roomId}`);
     });
-    const offRejected = connection.transport.onRejected((msg) => setError(msg.message));
+    const offRejected = connection.transport.onRejected((msg) => {
+      setError(msg.message);
+      setWaiting(false);
+    });
     return () => { offJoined(); offRejected(); };
   }, [connection, navigate]);
 
@@ -27,11 +34,14 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
     <JoinForm
       title="Join a room"
       submitLabel="Join room"
+      busy={waiting}
+      busyLabel="Joining…"
       error={error}
       onSubmit={(name, roomId) => {
         sentName.current = name;
         rememberName(name);
         setError(null);
+        setWaiting(true);
         connection.joinRoom({ roomId, name });
       }}
     />
