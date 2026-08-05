@@ -1108,11 +1108,19 @@ git add server/room.ts server/room.test.ts && \
 - Modify: `server/persistence.ts` (rewrite around committed state)
 - Test: `server/rooms.test.ts`
 
-**Deliberately not here:** `server/roomManager.ts` is not deleted and `server/types.ts` is not
-trimmed until Task 6. The old `server/index.ts` still imports `RoomManager` and `GameAction`, so
-doing either now would leave a tree that does not typecheck — and this task's commit runs the full
-gate chain. The new `persistence.ts` keeps `initPersistence`, which is the only symbol the old file
-imports from it, so rewriting persistence here is safe.
+**Deliberately not here — corrected during execution.** `server/roomManager.ts` is not deleted,
+`server/types.ts` is not trimmed, and **`server/persistence.ts` is not rewritten**. All three move
+to Task 6.
+
+The first two were deferred in pre-flight because the old `server/index.ts` imports `RoomManager`
+and `GameAction` directly. The third was missed there and found by the Task 5 implementer: the
+pre-flight check looked only at `index.ts`'s *direct* imports, but `server/gameManagerXState.ts` —
+which `index.ts` instantiates — also imports `saveGame` and `loadAllGames`, and destructures the old
+`loadAllGames()` `Map` as `[gameId, state]` tuples. The new `SavedGame[]` return type breaks it.
+
+Consequently this task's `RoomRegistry` has **no `persist` method** and imports nothing from
+`persistence.ts`. Its only caller would be `deliver` in `server/index.ts`, which Task 6 writes, so
+adding it here would be untested dead code. Task 6 adds `persist` alongside the rewrite.
 
 **Interfaces:**
 - Consumes: `server/room` (`createGameRoom`, `GameRoom`, `RoomPlayer`), `server/persistence` (`saveGame`, `loadAllGames`, `initPersistence`).
@@ -1414,6 +1422,35 @@ git rm server/machines/gameRoomMachine.ts server/machines/playerMachine.ts \
 `playerAuth.ts` goes because `applyIntent` already validates every actor, including the liquidation case its own copy got wrong. `engineSpike.test.ts` goes because its header says to: *"Delete this file when the real server-authoritative loop lands."* `roomManager.ts` is superseded by Task 5's registry; it survived until now only because the old `server/index.ts`, rewritten in the next step, still imported it.
 
 The tree does not typecheck between this step and Step 3. That is expected and confined to this task.
+
+- [ ] **Step 1a: Rewrite persistence, and add `persist` to the registry**
+
+Moved here from Task 5 during execution — see that task's note. Two pieces:
+
+First, replace `server/persistence.ts` with the version in Task 5's original text: it saves one
+committed `GameState` per room under `SAVE_VERSION = 3`, exports `initPersistence`, `saveGame` and
+`loadAllGames`, and never writes drafts. Deleting `gameManagerXState.ts` in the step above is what
+makes this safe — it was the transitive consumer of the old `Map`-returning `loadAllGames`.
+
+Second, add the method back to `server/rooms.ts`. On the `RoomRegistry` interface:
+
+```ts
+  persist(room: GameRoom): Promise<void>;
+```
+
+and in `createRoomRegistry`'s returned object, with `import { saveGame } from './persistence.js';`
+at the top:
+
+```ts
+    async persist(room) {
+      // `committed()` throws before a game begins, so the lifecycle check is
+      // load-bearing rather than an optimisation. Drafts are never written:
+      // uncommitted work was never real, which is the segment model stated as
+      // a storage fact.
+      if (room.lifecycle() === 'lobby') return;
+      await saveGame(room.id, room.committed());
+    },
+```
 
 - [ ] **Step 1b: Trim `server/types.ts`**
 
