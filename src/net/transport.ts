@@ -1,0 +1,53 @@
+import type { Socket } from 'socket.io-client';
+import {
+  CLIENT_EVENTS,
+  SERVER_EVENTS,
+  type RejectedMessage,
+  type StateMessage,
+  type UndoMessage,
+  type WireIntent,
+} from '../../session/protocol';
+
+/**
+ * Everything a session may do to the network, and nothing else.
+ *
+ * Deliberately narrower than a socket: a session cannot create a room, join
+ * one, read the roster, or reconnect. Those belong to `connection.ts`, which
+ * is what keeps "the game" and "the lobby" from growing into each other.
+ */
+export interface RoomTransport {
+  sendIntent(wire: WireIntent): void;
+  sendUndo(stepId: number): void;
+  /** Returns an unsubscribe. */
+  onState(handler: (msg: StateMessage) => void): () => void;
+  /** Returns an unsubscribe. */
+  onRejected(handler: (msg: RejectedMessage) => void): () => void;
+  /** False while the socket is down, so intents are refused rather than dropped. */
+  isOpen(): boolean;
+}
+
+/**
+ * The real one. Untested in isolation on purpose — a stub socket asserting
+ * "emit was called" proves only that this file calls the function it plainly
+ * calls. `server/clientOverWire.test.ts` drives this adapter over a real
+ * socket.io connection against the real server, which is where a wrong event
+ * name or payload shape actually shows up.
+ */
+export function createSocketTransport(socket: Socket): RoomTransport {
+  return {
+    sendIntent: (wire) => { socket.emit(CLIENT_EVENTS.intent, wire); },
+    sendUndo: (stepId) => {
+      const msg: UndoMessage = { stepId };
+      socket.emit(CLIENT_EVENTS.undo, msg);
+    },
+    onState(handler) {
+      socket.on(SERVER_EVENTS.state, handler);
+      return () => { socket.off(SERVER_EVENTS.state, handler); };
+    },
+    onRejected(handler) {
+      socket.on(SERVER_EVENTS.rejected, handler);
+      return () => { socket.off(SERVER_EVENTS.rejected, handler); };
+    },
+    isOpen: () => socket.connected,
+  };
+}
