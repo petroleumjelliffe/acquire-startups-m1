@@ -1,9 +1,16 @@
 // server/persistence.ts
-// Save and load committed game states.
+// Save committed game states.
+//
+// Restore-at-boot does not live here, and deliberately: a save holds only the
+// `GameState`, not the roster or its rejoin tokens, so a game restored from
+// disk would be one nobody could rejoin. Rebuilding that properly — roster
+// and all — is Phase 4's recovery work. Writing committed state now is still
+// worth it: it is the input Phase 4 will need. Shipping a read side that
+// implies a restore capability that does not exist would be worse than
+// shipping none.
 
-import { writeFile, readFile, readdir, mkdir } from 'fs/promises';
+import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
-import { existsSync } from 'fs';
 import type { GameState } from '../engine/gameTypes.js';
 
 const GAMES_DIR = join(process.cwd(), 'server', 'games');
@@ -22,13 +29,6 @@ interface SavedGame {
   state: GameState;
 }
 
-export async function initPersistence(): Promise<void> {
-  if (!existsSync(GAMES_DIR)) {
-    await mkdir(GAMES_DIR, { recursive: true });
-    console.log('✓ Created games directory:', GAMES_DIR);
-  }
-}
-
 /**
  * Only ever called with a room's committed state. Drafts are not written —
  * which is the segment model's "uncommitted work was never real" rule stated
@@ -37,29 +37,11 @@ export async function initPersistence(): Promise<void> {
 export async function saveGame(roomId: string, state: GameState): Promise<void> {
   const saved: SavedGame = { roomId, version: SAVE_VERSION, state };
   try {
+    // `recursive: true` makes this idempotent, so there is no setup step
+    // (an `initPersistence` called once at boot, say) left to forget.
+    await mkdir(GAMES_DIR, { recursive: true });
     await writeFile(join(GAMES_DIR, `${roomId}.json`), JSON.stringify(saved), 'utf-8');
   } catch (e) {
     console.error(`✗ Could not save room ${roomId}:`, e);
   }
-}
-
-export async function loadAllGames(): Promise<SavedGame[]> {
-  if (!existsSync(GAMES_DIR)) return [];
-  const files = (await readdir(GAMES_DIR)).filter((f) => f.endsWith('.json'));
-  const games: SavedGame[] = [];
-
-  for (const file of files) {
-    try {
-      const saved = JSON.parse(await readFile(join(GAMES_DIR, file), 'utf-8')) as SavedGame;
-      if (saved.version !== SAVE_VERSION) {
-        console.log(`ℹ Skipping ${file}: save version ${saved.version}, expected ${SAVE_VERSION}`);
-        continue;
-      }
-      games.push(saved);
-    } catch (e) {
-      console.error(`✗ Could not load ${file}:`, e);
-    }
-  }
-
-  return games;
 }

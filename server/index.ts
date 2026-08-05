@@ -54,7 +54,15 @@ export function createServer(): ServerHandle {
 
   /** The one send site. Everything a client ever sees is projected here. */
   function sendState(room: GameRoom, playerId: string, reason: StateReason): void {
-    const source = reason === 'commit' ? room.committed() : room.draft();
+    // A draft belongs to exactly one player: the one the game is waiting on.
+    // `reset` follows a rejection, and a rejection can be addressed to someone
+    // who is *not* the actor — an out-of-turn intent, or an undo from the
+    // wrong player. Sending them the draft hands over the actor's uncommitted
+    // board, cash and log, which is the leak this phase exists to prevent.
+    // They get the committed state: it is what they already had, which is what
+    // "reset" should mean for them.
+    const ownsDraft = reason !== 'commit' && playerId === room.actorId();
+    const source = ownsDraft ? room.draft() : room.committed();
     const message: StateMessage = {
       state: project(source, playerId),
       reason,
@@ -107,6 +115,19 @@ export function createServer(): ServerHandle {
 
   io.on('connection', (socket) => {
     socket.on(CLIENT_EVENTS.createRoom, (msg: CreateRoomMessage) => {
+      // `msg` is whatever the client sent, typed only by wishful thinking —
+      // a malformed or missing payload dereferenced below would throw
+      // synchronously inside this listener and take the whole process down
+      // for every room, not just this connection. This socket has not even
+      // bound to a room yet, so any connecting client can reach this line.
+      if (typeof msg?.name !== 'string') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'unknownIntent',
+          message: 'createRoom requires a name',
+        });
+        return;
+      }
+
       const { room, player } = rooms.create(msg.name);
       bindings.set(socket.id, { roomId: room.id, playerId: player.id });
       void socket.join(room.id);
@@ -117,6 +138,17 @@ export function createServer(): ServerHandle {
     });
 
     socket.on(CLIENT_EVENTS.joinRoom, (msg: JoinRoomMessage) => {
+      // Same shape hazard as `createRoom`, above: this socket has not bound
+      // to anything yet either, so a malformed payload here is just as
+      // reachable by any connecting client.
+      if (typeof msg?.roomId !== 'string' || typeof msg?.name !== 'string') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'unknownIntent',
+          message: 'joinRoom requires a roomId and a name',
+        });
+        return;
+      }
+
       const seat = rooms.join(msg.roomId, msg.name, msg.playerId, msg.token);
       if (!seat) {
         socket.emit(SERVER_EVENTS.rejected, {
@@ -187,6 +219,14 @@ export function createServer(): ServerHandle {
       }
       // `bound.playerId` — never anything the client sent. The wire type has no
       // `playerId` field for it to have sent one in.
+      //
+      // No shape check here, unlike `createRoom`/`joinRoom`/`undo` below — but
+      // only by accident, not by design: a missing or malformed `wire` spreads
+      // as `{...undefined}`, which is `{}`, and the engine's `applyIntent`
+      // rejects an object with no recognised `type` through its own default
+      // branch rather than dereferencing a field that isn't there. Do not read
+      // this as "intent doesn't need a guard" — it needs one exactly as much
+      // as the others; it just happens to already have one, inside the engine.
       deliver(room, room.dispatch(bound.playerId, wire));
     });
 
@@ -198,6 +238,13 @@ export function createServer(): ServerHandle {
         socket.emit(SERVER_EVENTS.rejected, {
           code: 'wrongStage',
           message: 'the game has not begun',
+        });
+        return;
+      }
+      if (typeof msg?.stepId !== 'number') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'undoOutOfSegment',
+          message: 'undo requires a numeric stepId',
         });
         return;
       }
