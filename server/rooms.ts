@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { GameState } from '../engine/gameTypes.js';
 import { createGameRoom, type GameRoom, type RoomPlayer } from './room.js';
+import { saveGame } from './persistence.js';
 
 export interface Seat {
   room: GameRoom;
@@ -14,6 +15,7 @@ export interface RoomRegistry {
   /** Seats a prepared state directly. Tests use this; no socket event reaches it. */
   fromState(roomId: string, names: string[], state: GameState): GameRoom;
   all(): GameRoom[];
+  persist(room: GameRoom): Promise<void>;
 }
 
 function seatPlayer(seat: number, name: string): RoomPlayer {
@@ -82,5 +84,14 @@ export function createRoomRegistry(): RoomRegistry {
     },
 
     all: () => [...rooms.values()],
+
+    async persist(room) {
+      // `committed()` throws before a game begins, so the lifecycle check is
+      // load-bearing rather than an optimisation. Drafts are never written:
+      // uncommitted work was never real, which is the segment model stated as
+      // a storage fact.
+      if (room.lifecycle() === 'lobby') return;
+      await saveGame(room.id, room.committed());
+    },
   };
 }

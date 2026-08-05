@@ -30,8 +30,7 @@
     "socket.io-client": "^4.8.1",
     "tsx": "^4.20.6",
     "typescript": "^5.2.2",
-    "uuid": "^13.0.0",
-    "xstate": "^5.24.0"
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
