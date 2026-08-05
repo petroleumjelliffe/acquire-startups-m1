@@ -48,8 +48,9 @@ describe('creating a room', () => {
     f.sendJoined({ roomId: 'ABC123', playerId: 'p1', token: 'tok' });
 
     expect(screen.getByText('room page')).toBeInTheDocument();
-    // The seat is stored before the navigation, or the room screen it lands on
-    // would join again as a stranger.
+    // Creating a room stores the seat the server issued, under that room's
+    // key, so the room screen it lands on rejoins rather than taking a new
+    // seat.
     expect(JSON.parse(localStorage.getItem('acquire.room.ABC123')!)).toEqual({
       playerId: 'p1', token: 'tok', name: 'Alex',
     });
