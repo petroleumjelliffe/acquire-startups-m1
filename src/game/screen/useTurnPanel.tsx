@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { hasLegalTile, type Intent } from '../../../engine/intents';
 import type { GameState, StartupId } from '../../../engine/gameTypes';
-import type { SessionView } from '../session/GameSession';
+import type { SessionView } from '../../../session/GameSession';
 import type { Coord } from '../../../engine/gameHelpers';
 import { getDeadTilesInHand } from '../../../engine/placement';
 import { getEndCondition } from '../../../engine/endGame';

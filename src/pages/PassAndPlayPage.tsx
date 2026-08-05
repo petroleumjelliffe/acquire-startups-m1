@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LocalSetupScreen } from '../game/setup/LocalSetupScreen';
 import { GameScreen } from '../game/GameScreen';
-import { createGameSession } from '../game/session/GameSession';
+import { createGameSession } from '../../session/GameSession';
 
 export function PassAndPlayPage() {
   const navigate = useNavigate();

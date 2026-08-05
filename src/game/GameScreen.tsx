@@ -1,4 +1,4 @@
-import type { GameSession } from './session/GameSession';
+import type { GameSession } from '../../session/GameSession';
 import { useGameSession } from './session/useGameSession';
 import { Board } from './Board';
 import { Panel } from './panel/Panel';

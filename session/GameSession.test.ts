@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { createGameSession } from './GameSession';
-import { buildFixture } from '../../../engine/golden/fixtures';
-import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
-import { replayGoldenGame } from '../../../engine/golden/replay';
+import { buildFixture } from '../engine/golden/fixtures';
+import { ALL_GOLDEN_GAMES } from '../engine/golden';
+import { replayGoldenGame } from '../engine/golden/replay';
 
 function playableGame() {
   return buildFixture({
@@ -268,5 +268,61 @@ describe('ending the game', () => {
 
     expect(session.getView().state.stage).toBe('end');
     expect(session.getView().undoableSteps).toEqual([]);
+  });
+});
+
+describe('segmentStart', () => {
+  function stuckOpening() {
+    // p1 holds nothing, so `endTurn` is legal from `play` and the turn passes
+    // without needing a placement. An empty bag means no draw, which keeps the
+    // step count predictable.
+    return buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: [] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: [],
+    });
+  }
+
+  it('opens at the first step id the session will file', () => {
+    const session = createGameSession({ state: stuckOpening() });
+    expect(session.getView().segmentStart).toBe(1);
+  });
+
+  it('advances when the actor changes, and empties the undo range with it', () => {
+    const session = createGameSession({ state: stuckOpening() });
+    const opened = session.getView().segmentStart;
+
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+    const view = session.getView();
+
+    expect(view.actorId).toBe('p2');
+    expect(view.segmentStart).toBeGreaterThan(opened);
+    expect(view.undoableSteps).toEqual([]);
+  });
+
+  it('holds still while the same actor keeps working', () => {
+    const session = createGameSession({
+      state: buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['E6'] },
+          { name: 'Sam', cash: 6000, hand: ['A1'] },
+        ],
+        loners: ['E5'],
+        bag: [],
+      }),
+    });
+    const opened = session.getView().segmentStart;
+
+    // Placing E6 beside the E5 loner founds a chain: same actor, stage moves
+    // to `foundStartup`, segment stays open.
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    const view = session.getView();
+
+    expect(view.actorId).toBe('p1');
+    expect(view.segmentStart).toBe(opened);
+    expect(view.undoableSteps.length).toBeGreaterThan(0);
   });
 });

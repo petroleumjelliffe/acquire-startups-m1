@@ -1,14 +1,14 @@
-import type { GameState } from '../../../engine/gameTypes';
-import type { Intent, IllegalIntentCode } from '../../../engine/intents';
-import { IllegalIntentError } from '../../../engine/intents';
+import type { GameState } from '../engine/gameTypes';
+import type { Intent, IllegalIntentCode } from '../engine/intents';
+import { IllegalIntentError } from '../engine/intents';
 import {
   createSnapshotStore,
   applyIntentWithHistory,
   rewindTo,
   type SnapshotStore,
-} from '../../../engine/history';
-import { createInitialGame } from '../../../engine/gameInit';
-import { getCurrentActor } from '../../../engine/actor';
+} from '../engine/history';
+import { createInitialGame } from '../engine/gameInit';
+import { getCurrentActor } from '../engine/actor';
 
 export interface SessionError {
   code: IllegalIntentCode;
@@ -23,6 +23,15 @@ export interface SessionView {
   awaitingReveal: boolean;
   /** Step ids that can be undone right now, oldest first. Task 6 scopes this. */
   undoableSteps: number[];
+  /**
+   * The step id the open segment began at. Every snapshot below it belongs to
+   * a committed segment and is nobody's to undo.
+   *
+   * Exposed because Phase 3's server has to see a commit boundary it would
+   * otherwise re-derive — and a second derivation of the segment rule is the
+   * duplication this module exists to prevent.
+   */
+  segmentStart: number;
   /** The last rejected intent, cleared by the next successful one. */
   error: SessionError | null;
 }
@@ -87,6 +96,7 @@ export function createGameSession(init: SessionInit): GameSession {
       actorId,
       awaitingReveal,
       undoableSteps: [...store.keys()].filter((k) => k >= segmentStart).sort((a, b) => a - b),
+      segmentStart,
       error,
     };
   }

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { GameSession, SessionView } from './GameSession';
+import type { GameSession, SessionView } from '../../../session/GameSession';
 
 /**
  * Binds a `GameSession` to React.

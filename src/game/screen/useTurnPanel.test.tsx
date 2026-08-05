@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useTurnPanel } from './useTurnPanel';
-import { createGameSession, type GameSession } from '../session/GameSession';
+import { createGameSession, type GameSession } from '../../../session/GameSession';
 import type { Intent } from '../../../engine/intents';
 import { buildFixture } from '../../../engine/golden/fixtures';
 import { ALL_GOLDEN_GAMES } from '../../../engine/golden';

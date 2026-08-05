@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { createGameSession, type GameSession } from './GameSession';
+import { createGameSession, type GameSession } from '../../../session/GameSession';
 import { useGameSession } from './useGameSession';
 import { buildFixture } from '../../../engine/golden/fixtures';
 

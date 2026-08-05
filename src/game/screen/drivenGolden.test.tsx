@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, within, fireEvent, act } from '@testing-library/react';
 import { GameScreen } from '../GameScreen';
-import { createGameSession } from '../session/GameSession';
+import { createGameSession } from '../../../session/GameSession';
 import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
 import { replayGoldenGame } from '../../../engine/golden/replay';
 import { buildFixture } from '../../../engine/golden/fixtures';
