@@ -154,6 +154,21 @@ export function createServer(): ServerHandle {
         return;
       }
 
+      // `room.dispatch`, `room.undo` and `room.begin` all THROW rather than
+      // reject outside their expected lifecycle, and socket.io does not catch
+      // a synchronous throw from a listener — an unguarded call here takes
+      // the whole process down for every room, not just this one. These three
+      // checks (here, and in `intent` and `undo` below) exist to turn that
+      // crash into a clean rejection; they are not redundant with anything
+      // upstream.
+      if (room.lifecycle() !== 'lobby') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'wrongStage',
+          message: 'the game has already begun',
+        });
+        return;
+      }
+
       const delivery = room.begin(randomSeed());
       io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
       deliver(room, delivery);
@@ -163,6 +178,13 @@ export function createServer(): ServerHandle {
       const bound = bindings.get(socket.id);
       const room = bound && rooms.get(bound.roomId);
       if (!bound || !room) return;
+      if (room.lifecycle() === 'lobby') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'wrongStage',
+          message: 'the game has not begun',
+        });
+        return;
+      }
       // `bound.playerId` — never anything the client sent. The wire type has no
       // `playerId` field for it to have sent one in.
       deliver(room, room.dispatch(bound.playerId, wire));
@@ -172,6 +194,13 @@ export function createServer(): ServerHandle {
       const bound = bindings.get(socket.id);
       const room = bound && rooms.get(bound.roomId);
       if (!bound || !room) return;
+      if (room.lifecycle() === 'lobby') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'wrongStage',
+          message: 'the game has not begun',
+        });
+        return;
+      }
       deliver(room, room.undo(bound.playerId, msg.stepId));
     });
 
