@@ -477,30 +477,42 @@ Create `session/protocol.test.ts`:
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import type { Intent } from '../engine/intents';
+import { ALL_GOLDEN_GAMES } from '../engine/golden';
 import type { WireIntent } from './protocol';
 import { CLIENT_EVENTS, SERVER_EVENTS } from './protocol';
 
-describe('WireIntent', () => {
-  it('covers every engine intent type', () => {
-    // The value of this test is mostly at compile time: if `Intent` gains a
-    // member, this Record stops being exhaustive and `npm run typecheck`
-    // fails. The runtime assertion catches the reverse — a stale entry here
-    // for an intent the engine no longer has.
-    const covered: Record<WireIntent['type'], true> = {
-      placeTile: true,
-      chooseFoundingBrand: true,
-      chooseSurvivor: true,
-      liquidate: true,
-      buyShares: true,
-      tradeInDeadTiles: true,
-      declareEnd: true,
-      endTurn: true,
-      startGame: true,
-    };
+/**
+ * Compile-time exhaustiveness. If `Intent` gains a member this Record stops
+ * being complete and `npm run typecheck` fails — which is where the real
+ * guarantee lives, since `Intent` is a type and has no runtime form to
+ * enumerate.
+ */
+const WIRE_INTENT_TYPES: Record<WireIntent['type'], true> = {
+  placeTile: true,
+  chooseFoundingBrand: true,
+  chooseSurvivor: true,
+  liquidate: true,
+  buyShares: true,
+  tradeInDeadTiles: true,
+  declareEnd: true,
+  endTurn: true,
+  startGame: true,
+};
 
-    const engineTypes: Intent['type'][] = Object.keys(covered) as Intent['type'][];
-    expect(engineTypes.length).toBe(9);
+describe('WireIntent', () => {
+  it('covers every intent type the golden corpus exercises', () => {
+    // A real cross-check rather than a restatement: the corpus is independent
+    // evidence of which intents exist, so an entry deleted from the Record
+    // above fails here even though the Record still typechecks.
+    const exercised = [
+      ...new Set(ALL_GOLDEN_GAMES.flatMap((g) => g.steps).map((s) => s.intent.type)),
+    ].sort();
+
+    expect(exercised.length).toBeGreaterThan(5);
+    for (const type of exercised) {
+      expect(Object.keys(WIRE_INTENT_TYPES), `${type} is exercised but not on the wire`)
+        .toContain(type);
+    }
   });
 
   it('still narrows on `type`, so Omit did not collapse the union', () => {
@@ -1084,9 +1096,13 @@ git add server/room.ts server/room.test.ts && \
 **Files:**
 - Create: `server/rooms.ts`
 - Modify: `server/persistence.ts` (rewrite around committed state)
-- Modify: `server/types.ts` (trim)
 - Test: `server/rooms.test.ts`
-- Delete: `server/roomManager.ts`
+
+**Deliberately not here:** `server/roomManager.ts` is not deleted and `server/types.ts` is not
+trimmed until Task 6. The old `server/index.ts` still imports `RoomManager` and `GameAction`, so
+doing either now would leave a tree that does not typecheck — and this task's commit runs the full
+gate chain. The new `persistence.ts` keeps `initPersistence`, which is the only symbol the old file
+imports from it, so rewriting persistence here is safe.
 
 **Interfaces:**
 - Consumes: `server/room` (`createGameRoom`, `GameRoom`, `RoomPlayer`), `server/persistence` (`saveGame`, `loadAllGames`, `initPersistence`).
@@ -1344,38 +1360,19 @@ export async function loadAllGames(): Promise<SavedGame[]> {
 }
 ```
 
-- [ ] **Step 5: Trim `server/types.ts`**
+- [ ] **Step 5: Run to verify it passes**
 
-Replace it entirely. `MultiplayerGameState`, `GameAction` and `SavedGameState` are gone — the first restated fields already optional on `GameState`, the second carried a `payload: any` that `WireIntent` replaces, and the third now lives in `persistence.ts`:
+Run: `npm run typecheck && npx vitest run`
+Expected: PASS, whole tree and whole suite — 6 new tests in `server/rooms.test.ts`. Nothing here breaks the old `server/index.ts`, which is why the two deletions were deferred to Task 6.
 
-```ts
-// server/types.ts
-// Types shared across the server's modules. The wire's types live in
-// `session/protocol.ts`, because 3b's client speaks the other half of them.
-
-export type { RoomPlayer, Lifecycle, Delivery, GameRoom } from './room.js';
-export type { Seat, RoomRegistry } from './rooms.js';
-```
-
-- [ ] **Step 6: Delete the old room manager**
-
-```bash
-git rm server/roomManager.ts
-```
-
-- [ ] **Step 7: Run to verify it passes**
-
-Run: `npm run typecheck && npx vitest run server/rooms.test.ts`
-Expected: PASS — 6 tests. `npm run typecheck` will still fail overall while `server/index.ts` imports the deleted `roomManager`; that is expected and Task 6 fixes it. Run the test file alone here.
-
-- [ ] **Step 8: Break it and observe the failure**
+- [ ] **Step 6: Break it and observe the failure**
 
 In `join`, change `if (!existing || existing.token !== token) return null;` to `if (!existing) return null;`. Run `npx vitest run server/rooms.test.ts`. Expected: "refuses a rejoin presenting the wrong token" fails. This is the guard that keeps projection meaningful — without it, presenting another player's id binds their seat to your socket. Revert and re-run to confirm PASS.
 
-- [ ] **Step 9: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add -A && npx vitest run server/rooms.test.ts server/room.test.ts server/projection.test.ts && \
+git add -A && npm run typecheck && npx vitest run && \
   git commit -m "feat(server): room registry and committed-state persistence"
 ```
 
@@ -1387,8 +1384,8 @@ The last place anything about sockets lives, and the only place `project` is cal
 
 **Files:**
 - Rewrite: `server/index.ts`
-- Delete: `server/machines/gameRoomMachine.ts`, `server/machines/playerMachine.ts`, `server/machines/types.ts`, `server/gameManagerXState.ts`, `server/playerAuth.ts`, `server/test-client.js`, `server/test.html`, `server/engineSpike.test.ts`
-- Modify: `package.json` (remove `xstate`)
+- Delete: `server/machines/gameRoomMachine.ts`, `server/machines/playerMachine.ts`, `server/machines/types.ts`, `server/gameManagerXState.ts`, `server/playerAuth.ts`, `server/roomManager.ts`, `server/test-client.js`, `server/test.html`, `server/engineSpike.test.ts`
+- Modify: `server/types.ts` (trim), `package.json` (remove `xstate`)
 
 **Interfaces:**
 - Consumes: `server/rooms` (`createRoomRegistry`), `server/room` (`Delivery`, `GameRoom`), `server/projection` (`project`), `session/protocol` (all message types and both event maps).
@@ -1399,12 +1396,27 @@ The last place anything about sockets lives, and the only place `project` is cal
 ```bash
 git rm server/machines/gameRoomMachine.ts server/machines/playerMachine.ts \
        server/machines/types.ts server/gameManagerXState.ts \
-       server/playerAuth.ts server/test-client.js server/test.html \
-       server/engineSpike.test.ts && \
+       server/playerAuth.ts server/roomManager.ts server/test-client.js \
+       server/test.html server/engineSpike.test.ts && \
   rmdir server/machines 2>/dev/null; npm uninstall xstate
 ```
 
-`playerAuth.ts` goes because `applyIntent` already validates every actor, including the liquidation case its own copy got wrong. `engineSpike.test.ts` goes because its header says to: *"Delete this file when the real server-authoritative loop lands."*
+`playerAuth.ts` goes because `applyIntent` already validates every actor, including the liquidation case its own copy got wrong. `engineSpike.test.ts` goes because its header says to: *"Delete this file when the real server-authoritative loop lands."* `roomManager.ts` is superseded by Task 5's registry; it survived until now only because the old `server/index.ts`, rewritten in the next step, still imported it.
+
+The tree does not typecheck between this step and Step 3. That is expected and confined to this task.
+
+- [ ] **Step 1b: Trim `server/types.ts`**
+
+Replace it entirely. `MultiplayerGameState`, `GameAction` and `SavedGameState` all go — the first restated three fields already optional on `GameState`, the second carried the `payload: any` that `WireIntent` replaces, and the third now lives in `persistence.ts`:
+
+```ts
+// server/types.ts
+// Types shared across the server's modules. The wire's types live in
+// `session/protocol.ts`, because 3b's client speaks the other half of them.
+
+export type { RoomPlayer, Lifecycle, Delivery, GameRoom } from './room.js';
+export type { Seat, RoomRegistry } from './rooms.js';
+```
 
 - [ ] **Step 2: Write `server/index.ts`**
 
@@ -2049,7 +2061,7 @@ describe('identity is the socket, not the payload', () => {
 describe('undo over the wire', () => {
   it('lets the actor rewind its own open segment', async () => {
     const room = openSegment('wire-undo');
-    const [alex, sam] = room.players;
+    const [alex] = room.players;
     const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
 
     try {
@@ -2063,7 +2075,6 @@ describe('undo over the wire', () => {
       expect(p1.latest()!.reason).toBe('correction');
     } finally {
       p1.close();
-      void sam;
     }
   });
 
