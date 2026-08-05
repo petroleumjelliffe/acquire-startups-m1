@@ -120,13 +120,36 @@ merger cannot be undone after a liquidator has moved. And when the active player
 buy segment, `segmentStart` has reset a second time, so their undo cannot reach back across the
 liquidations either.
 
-**Stated invariant: bonus recipients are always a subset of the shareholder queue.**
-`gameLogic.ts:711` builds the queue from holders of the absorbed chain; `bonuses.ts:26` pays only
-`holdings.filter(h => h.shares > 0)` of that same chain. Therefore any merger that moves another
-player's money necessarily seats that player in the queue, necessarily changes the actor, and
-necessarily commits. **Another player's cash can never sit unbroadcast inside a private draft.**
-This is load-bearing — without it, an uncontested merger would leave other players' screens showing
-stale money for the length of the active player's buy phase. It gets a test.
+### A payout can precede its commit
+
+An earlier draft of this design claimed that a merger moving another player's money always changes
+the actor, and therefore always commits — so no one else's cash could sit unbroadcast in a private
+draft. **That claim is false.** It was checked against all seventeen golden games before this
+document was finalised, and every merger game violates it. Two independent reasons:
+
+- `gameLogic.ts:711` builds the queue **"starting from current player"**. When the acting player
+  also holds absorbed shares they are at the head of it, so the actor does not change and the
+  segment stays open.
+- The queue is built for `absorbedIds[0]` only. In a multi-chain merger (G7) a player is paid a
+  bonus for the *second* absorbed chain while the current queue holds only the first chain's
+  shareholders — so the recipient is not even in the queue yet.
+
+Measured over the corpus: **5 steps move a non-actor's cash, and a payout precedes its commit by up
+to 2 intents.**
+
+**What is actually true**, and what the design relies on instead: every recipient holds absorbed
+shares in some chain, so they are seated in that chain's queue before the merger completes. **The
+commit that reveals the money is the same commit that asks them to act on it.** Nobody is ever
+asked to decide on stale figures.
+
+The cost is honest and is accepted rather than fixed: for up to two intents, a watching player's
+board does not move and their cash is out of date, while someone else liquidates. The alternative —
+making "another player's cash moved" a second commit trigger — would buy a live board at the price
+of a second commit rule, and would forbid the acting player from undoing a merging placement, which
+pass-and-play allows today. One rule is worth more than two intents of latency.
+
+Two tests hold this in place: the guarantee (test 6) and the measured bound (test 8), the latter
+pinned so that an engine change which widens the window is noticed rather than absorbed.
 
 The two mergers that do *not* close a segment — nobody holds absorbed shares, or only the active
 player does — pay nobody but the active player. Those stay in the draft and stay undoable, which is
@@ -259,12 +282,15 @@ Against a real socket.io server on port 0, with one bound client socket per play
 | 2 | **What B's socket received** contains no `seed`, no `bag`, and no `hand` but B's. |
 | 3 | **An intent from the wrong socket is rejected**, and impersonation is unrepresentable — the wire type has no `playerId`. |
 | 4 | **While A is mid-segment, B receives nothing** — no message with `reason: 'correction'` ever reaches a non-actor. |
-| 5 | **`applyIntent` on a projected state equals `applyIntent` on the full state** for the six non-drawing intents. |
-| 6 | **Bonus recipients are a subset of the shareholder queue**, over the merger golden games. |
+| 5 | **`applyIntent` on a projected state equals `applyIntent` on the full state** for the six non-drawing intents, and rejects with the same code where the golden game expects a rejection. |
+| 6 | **No player is asked to act on stale money** — replaying the goldens through the room, whenever the actor becomes P, the last state broadcast to P carries P's current cash. |
 | 7 | **Undo is refused** below `segmentStart` and from a non-actor. |
+| 8 | **A payout precedes its commit by at most 2 intents**, pinned as a regression guard on the window described above. |
 
-**Test 5 goes first.** If it fails, the optimistic model is wrong and the design changes before
-anything is built on it.
+**Test 5 was run before this design was finalised** — a throwaway probe over all seventeen golden
+games, using the `project` implementation above. Result: **42 predictable steps, 0 mismatches.** The
+optimistic model holds. Task 1 rebuilds it as a real test rather than trusting this paragraph; the
+number 42 is a useful floor for catching a harness that silently checks nothing.
 
 **Every one of these must be observed failing before it is trusted.** Async socket tests fail
 vacuously in a way synchronous ones do not — an assertion inside a listener that never fires is a
@@ -301,7 +327,7 @@ played, and no game in progress matters. Whatever is live gets overwritten.
 Phase 3a is done when:
 
 - The server runs `applyIntent` and no handler accepts a client-computed state.
-- Every one of the seven assertions above passes, and each has been observed failing.
+- Every one of the eight assertions above passes, and each has been observed failing.
 - `xstate` is absent from `package.json`, and the four files that used it are gone.
 - `npx vitest run`, `npm run typecheck`, `npx vite build`, `npm run check:bundle` and
   `npm run verify:layout` are green. Pass-and-play is unchanged and still passes its own gates.
@@ -319,9 +345,14 @@ the split.
 in a way that only a real client reveals — a missing correction, a state the client cannot
 reconstruct. Test 5 covers the reducer half of that claim; the transport half waits for 3b.
 
-**Test 5 could fail.** If `applyIntent` on a redacted state diverges — some path reading `bag.length`
-that the grep missed — the optimistic model collapses and 3a falls back to server round-trips.
-Running it first makes that a design revision rather than a rewrite.
+**Test 5 has already been run and passes** (42 predictable steps, 0 mismatches, all seventeen golden
+games). This risk is discharged, and the fallback it guarded against — reverting to server
+round-trips — is not needed.
+
+**A stated invariant in this design was measured and found false**, and the section above records
+the correction. That is worth noting as a process fact: the claim was plausible, derived from real
+line numbers, and wrong, and only running it over the corpus exposed it. Any remaining reasoning in
+this document that has *not* been executed should be read with that in mind.
 
 **The `session/` move churns imports across `src/game/`.** Mechanical, and the typecheck catches
 every miss, but it touches files this phase otherwise has no business in.
