@@ -35,6 +35,12 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   const [joining, setJoining] = useState(false);
 
   const sessionRef = useRef<NetworkSession | null>(null);
+  // Read once, at mount, for whatever `roomId` the hook first saw. A `roomId`
+  // change on an already-mounted instance would keep the old room's identity
+  // rather than loading the new room's — unreachable today because every
+  // navigation into `/room/:roomId` comes from another route, never a
+  // same-instance param change. A future room-switch flow (leave and rejoin
+  // without a full navigation) would need to revisit this.
   const identityRef = useRef(loadIdentity(roomId));
 
   // Status, roster, identity, and the lobby's own rejections.
