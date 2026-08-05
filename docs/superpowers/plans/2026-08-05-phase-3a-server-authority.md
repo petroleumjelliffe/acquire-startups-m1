@@ -268,7 +268,7 @@ export function project(state: GameState, forPlayerId: string): GameState {
 - [ ] **Step 6: Run to verify it passes**
 
 Run: `npx vitest run server/projection.test.ts`
-Expected: PASS — 21 tests (4 redaction, 1 corpus floor, 17 golden games).
+Expected: PASS — 22 tests (4 redaction, 1 corpus floor, 17 golden games).
 
 - [ ] **Step 7: Break each gate and observe it fail**
 
@@ -504,8 +504,18 @@ describe('WireIntent', () => {
     // A real cross-check rather than a restatement: the corpus is independent
     // evidence of which intents exist, so an entry deleted from the Record
     // above fails here even though the Record still typechecks.
+    //
+    // Only steps the corpus expects to *succeed* count as evidence.
+    // `engine/golden/turns.ts:96` deliberately sends `{ type: 'bogus' }`, cast
+    // through `unknown` because `Intent` is a closed union, to prove
+    // `applyIntent`'s default branch rejects what it does not recognise. That
+    // is a negative case and must not be read as a requirement on the wire.
     const exercised = [
-      ...new Set(ALL_GOLDEN_GAMES.flatMap((g) => g.steps).map((s) => s.intent.type)),
+      ...new Set(
+        ALL_GOLDEN_GAMES.flatMap((g) => g.steps)
+          .filter((s) => !s.expectError)
+          .map((s) => s.intent.type),
+      ),
     ].sort();
 
     expect(exercised.length).toBeGreaterThan(5);
