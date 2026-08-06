@@ -238,9 +238,12 @@ describe('GameScreen with a viewer who is not the actor', () => {
     // — `queryByTitle` alone can't tell "not shown" from "shown as an inert
     // empty square" (both carry `title={coord}`). A hand tile is the one
     // rendered as a clickable `<button>`; an untouched square is a `<span>`.
-    expect(screen.getByTitle('A1').tagName).toBe('BUTTON');
-    expect(screen.getByTitle('E6').tagName).not.toBe('BUTTON');
-    expect(screen.getByTitle('H8').tagName).not.toBe('BUTTON');
+    // `data-tile-state`, not the tag: a hand tile with nothing to do is
+    // deliberately no longer a `<button>`, so the tag can no longer tell
+    // "mine" from "not mine". The state can, and is what the badge means.
+    expect(screen.getByTitle('A1')).toHaveAttribute('data-tile-state', 'hand');
+    expect(screen.getByTitle('E6')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(screen.getByTitle('H8')).not.toHaveAttribute('data-tile-state', 'hand');
   });
 
   it('says whose turn it is where you cannot miss it, and offers nothing', () => {

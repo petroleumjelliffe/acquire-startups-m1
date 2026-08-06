@@ -203,7 +203,7 @@ describe('the first state message starts the game', () => {
     f.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
 
     // A1 starts out in Sam's hand — a clickable tile.
-    expect(screen.getByTitle('A1').tagName).toBe('BUTTON');
+    expect(screen.getByTitle('A1')).toHaveAttribute('data-tile-state', 'hand');
 
     // A second state — the kind a real commit sends after a move — with A1
     // now placed on the board and a new tile, B2, drawn into the hand. This
@@ -221,9 +221,9 @@ describe('the first state message starts the game', () => {
     f.sendState({ state: afterMove, reason: 'commit', segmentStart: afterMove.nextStepId });
 
     // A1 is now a settled board tile, not a hand button.
-    expect(screen.getByTitle('A1').tagName).toBe('SPAN');
+    expect(screen.getByTitle('A1')).not.toHaveAttribute('data-tile-state', 'hand');
     // B2 is the new hand tile.
-    expect(screen.getByTitle('B2').tagName).toBe('BUTTON');
+    expect(screen.getByTitle('B2')).toHaveAttribute('data-tile-state', 'hand');
   });
 });
 

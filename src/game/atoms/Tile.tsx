@@ -42,7 +42,7 @@ const STATE_CLASSES: Record<TileState, string> = {
   empty: 'bg-gray-100 border-gray-300 text-gray-500 font-medium',
   filled: DARK,
   placed: `${DARK} outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]`, // == filled + selected
-  hand: 'bg-blue-100 border-2 border-blue-500 text-blue-700 font-bold cursor-pointer hover:bg-blue-200',
+  hand: 'bg-blue-100 border-2 border-blue-500 text-blue-700 font-bold',
   blocked: 'bg-blue-100 border-2 border-blue-500 text-blue-700/30 font-bold cursor-not-allowed',
   chain: `${DARK} z-[1]`,
   founded: 'border-2 font-extrabold z-[2]',
@@ -63,8 +63,24 @@ export function Tile({ coord, state, brand, onClick, fill, selected }: TileProps
         : '';
 
   const box = fill ? 'h-full w-full' : 'h-[34px] w-[34px]';
+  /**
+   * A tile is a control only when it has something to do.
+   *
+   * It used to render as an enabled `<button>` for any hand tile, handler or
+   * not — so online, watching someone else's turn, your own six tiles offered
+   * a hover, a focus ring and a place in the tab order, and clicking them did
+   * nothing at all. That was the first thing reported from a by-hand session:
+   * "I'm allowed to click but nothing happens." The affordance has to tell the
+   * truth; the *look* of a hand tile does not change, because it is still
+   * yours either way.
+   */
+  // `blocked` keeps its own cursor either way: "yours, and never playable" is
+  // a fact about the tile, not about whether this screen offers a handler.
+  const interactive = onClick != null;
+  const affordance = interactive && state !== 'blocked' ? 'cursor-pointer hover:bg-blue-200' : '';
+
   const className =
-    `${BASE} ${box} ${STATE_CLASSES[state]} ${brandPaint} ${selected ? SELECTED : ''}`.trim();
+    `${BASE} ${box} ${STATE_CLASSES[state]} ${brandPaint} ${affordance} ${selected ? SELECTED : ''}`.trim();
 
   // `founded` is the only state whose label is not the coordinate — but the
   // coordinate stays reachable through the title in every state.
@@ -84,17 +100,23 @@ export function Tile({ coord, state, brand, onClick, fill, selected }: TileProps
     </>
   );
 
-  const interactive = state === 'hand' || state === 'blocked' || onClick != null;
   if (interactive) {
     return (
-      <button type="button" className={className} title={coord} disabled={state === 'blocked'} onClick={onClick}>
+      <button
+        type="button"
+        className={className}
+        title={coord}
+        data-tile-state={state}
+        disabled={state === 'blocked'}
+        onClick={onClick}
+      >
         {body}
       </button>
     );
   }
 
   return (
-    <span className={className} title={coord}>
+    <span className={className} title={coord} data-tile-state={state}>
       {body}
     </span>
   );

@@ -47,12 +47,34 @@ describe('Board', () => {
     expect(rings.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('offers no control for a hand tile with nothing to do', () => {
+    // Watching someone else's turn online, your own tiles are still yours and
+    // still look it — but they are not controls, because there is nothing to
+    // press them for. Reported by hand as "I'm allowed to click but nothing
+    // happens".
+    const { container } = render(<Board board={createEmptyBoard()} hand={['C6'] as Coord[]} />);
+    expect(container.querySelector('button[title="C6"]')).toBeNull();
+    expect(screen.getByTitle('C6').className).not.toMatch(/cursor-pointer/);
+    expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'hand');
+  });
+
+  it('is a control once there is something to do with it', () => {
+    const { container } = render(
+      <Board board={createEmptyBoard()} hand={['C6'] as Coord[]} onCellClick={() => {}} />,
+    );
+    expect(container.querySelector('button[title="C6"]')).not.toBeNull();
+    expect(screen.getByTitle('C6').className).toMatch(/cursor-pointer/);
+  });
+
   it('marks blocked hand tiles and makes them unclickable', () => {
     const { container } = render(
       <Board board={createEmptyBoard()} hand={['C6'] as Coord[]} blocked={['C6'] as Coord[]} />,
     );
     expect(screen.getByTitle('C6').className).toMatch(/cursor-not-allowed/);
-    expect(container.querySelector('[title="C6"][disabled]')).toBeTruthy();
+    expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'blocked');
+    // No handler was given, so it is not a control at all — not merely a
+    // disabled one. With a handler it renders as a disabled button instead.
+    expect(container.querySelector('[title="C6"] button, button[title="C6"]')).toBeNull();
   });
 
   it('shows the ticker on an HQ tile and keeps the coordinate reachable on hover', () => {
