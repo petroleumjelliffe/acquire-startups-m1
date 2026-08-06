@@ -31,8 +31,28 @@ export function stepsOf(
   state: GameState,
   undoableSteps: number[],
   from = 0,
+  /**
+   * The seat at this device, so their own steps can say "You".
+   *
+   * Optional because the catalog renders the stack with no viewer at all, and
+   * a name is the honest fallback there. Passed down from `GameScreen`, which
+   * resolves the viewer once for the board and the panel — this is that same
+   * value, not a third derivation of it.
+   */
+  viewerId?: string,
 ): StepStackEntry[] {
   const undoable = new Set(undoableSteps);
+  /**
+   * Attribution comes from the entry's own `playerId`, never from whose turn
+   * it is. A merger files its payout entries under the players being *paid*,
+   * who are not the actor — and those are the rows where knowing who got what
+   * is the whole point.
+   */
+  const actorOf = (playerId: string | undefined): string | undefined => {
+    if (playerId === undefined) return undefined;
+    if (playerId === viewerId) return 'You';
+    return state.players.find((p) => p.id === playerId)?.name;
+  };
 
   // This turn and the one before it — not the whole game, and not the open
   // segment alone.
@@ -52,6 +72,7 @@ export function stepsOf(
     .map((entry) => ({
     stepId: entry.stepId,
     phase: entry.phase,
+    actor: actorOf(entry.playerId),
     undoable: undoable.has(entry.stepId),
     detail:
       entry.payload?.kind === 'payout' ? (

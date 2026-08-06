@@ -19,6 +19,11 @@ export interface StepStackEntry {
   phase: string;
   detail: ReactNode;
   /**
+   * Who did it — a name, or `You`. Absent where there is nobody to name, which
+   * is the catalog and any entry the engine files without a player.
+   */
+  actor?: string;
+  /**
    * Whether this step can be rewound to. Snapshots are filed per *intent*, and
    * one intent can push several log entries — a merger writes the placement,
    * the merge and the payout under one action. Offering undo on an entry with
@@ -147,6 +152,7 @@ export function StepStack({ entries, onUndo }: StepStackProps) {
           <StepEntry
             key={e.stepId}
             phase={e.phase}
+            actor={e.actor}
             detail={e.detail}
             stepId={e.stepId}
             onUndo={e.undoable ? onUndo : undefined}

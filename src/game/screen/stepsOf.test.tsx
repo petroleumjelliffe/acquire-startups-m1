@@ -144,6 +144,101 @@ describe('stepsOf', () => {
   });
 });
 
+describe('whose step it was', () => {
+  /**
+   * The stack shows two turns. Without a name on them the previous player's
+   * moves read as your own — which is most of what the panel is for when it is
+   * not your turn.
+   */
+  it('names the player on every entry', () => {
+    const session = createGameSession({
+      state: buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['E6'] },
+          { name: 'Sam', cash: 6000, hand: ['A1'] },
+        ],
+        bag: ['I11', 'I12', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+      }),
+    });
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+
+    const view = session.getView();
+    const placement = stepsOf(view.state, view.undoableSteps).find(
+      (e) => e.phase === 'Placed a tile',
+    );
+    expect(placement?.actor).toBe('Alex');
+  });
+
+  /**
+   * Your own steps say "You". Reading your own name back at you is how a log
+   * written for spectators reads when it is shown to a participant.
+   */
+  it('says "You" for the viewer, and the name for anyone else', () => {
+    const session = createGameSession({
+      state: buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['E6'] },
+          { name: 'Sam', cash: 6000, hand: ['A1'] },
+        ],
+        bag: ['I11', 'I12', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+      }),
+    });
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    const view = session.getView();
+
+    const asAlex = stepsOf(view.state, view.undoableSteps, 0, 'p1');
+    const asSam = stepsOf(view.state, view.undoableSteps, 0, 'p2');
+    const phaseIs = (e: { phase: string }) => e.phase === 'Placed a tile';
+
+    expect(asAlex.find(phaseIs)?.actor).toBe('You');
+    expect(asSam.find(phaseIs)?.actor).toBe('Alex');
+  });
+
+  /**
+   * The property that decides the implementation, checked over the whole
+   * corpus: an entry is attributed to **its own** `playerId`, never to whoever
+   * happens to be taking the turn. A finished merger is the case that
+   * separates the two — its liquidation entries belong to each shareholder in
+   * the queue, and by the time the state settles the turn has moved on.
+   */
+  it('attributes every entry to its own player, across the corpus', () => {
+    let sawNonActor = false;
+
+    for (const game of ALL_GOLDEN_GAMES) {
+      const states = replayGoldenGame(game);
+      const state = states[states.length - 1];
+      const turnActor = state.players[state.turnIndex]?.id;
+
+      for (const entry of stepsOf(state, [])) {
+        const logged = state.log.find((e) => e.stepId === entry.stepId)!;
+        const expected = state.players.find((p) => p.id === logged.playerId)?.name;
+        expect(entry.actor, `${game.id} step ${entry.stepId} (${entry.phase})`).toBe(expected);
+        if (logged.playerId !== undefined && logged.playerId !== turnActor) sawNonActor = true;
+      }
+    }
+
+    // Without this the loop above would pass just as happily on a corpus where
+    // every entry did belong to the current actor, which would make attributing
+    // by actor indistinguishable from attributing by entry.
+    expect(sawNonActor, 'no entry in the corpus belongs to anyone but the actor').toBe(true);
+  });
+
+  /**
+   * A merger payout is filed with no player at all — it is a table-level event
+   * whose rows name the players being paid inside `PayoutLines`. So it carries
+   * no attribution, rather than borrowing the actor's.
+   */
+  it('leaves an entry with no player unattributed', () => {
+    const states = replayGoldenGame(g('G2'));
+    const state = states.find((s) => s.log.some((e) => e.phase === 'Merger payout'));
+    if (!state) throw new Error('G2 no longer produces a merger payout');
+
+    const payout = state.log.find((e) => e.phase === 'Merger payout')!;
+    expect(payout.playerId, 'a payout is now filed under a player — rethink this').toBeUndefined();
+    expect(stepsOf(state, []).find((e) => e.stepId === payout.stepId)?.actor).toBeUndefined();
+  });
+});
+
 describe('the turn before yours', () => {
   /**
    * Driven through a real session rather than a hand-picked log index,

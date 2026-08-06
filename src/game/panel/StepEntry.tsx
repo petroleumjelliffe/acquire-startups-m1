@@ -12,12 +12,14 @@ import type { ReactNode } from 'react';
  */
 export interface StepEntryProps {
   phase: string;
+  /** Who did it — a name, or `You`. Omitted where there is nobody to name. */
+  actor?: string;
   detail: ReactNode;
   stepId?: number;
   onUndo?: (stepId: number) => void;
 }
 
-export function StepEntry({ phase, detail, stepId, onUndo }: StepEntryProps) {
+export function StepEntry({ phase, actor, detail, stepId, onUndo }: StepEntryProps) {
   const undoable = onUndo != null && stepId != null;
 
   return (
@@ -30,10 +32,18 @@ export function StepEntry({ phase, detail, stepId, onUndo }: StepEntryProps) {
     // it can drop the list by exactly their height.
     <div data-step-id={stepId} className="flex flex-col gap-[3px]">
       <div className="flex items-center gap-2">
+        {/*
+          The name leads and the phase follows, both in the label's own
+          treatment — an attribution rather than a rewritten sentence, because
+          the phases are the engine's strings and not uniformly verb phrases:
+          "Placed a tile" takes a subject, "Merger payout" does not. One rule
+          covers both, and the engine's copy stays the engine's.
+        */}
         <span
           data-step-phase
           className="text-xs font-semibold uppercase tracking-[0.03em] text-gray-500"
         >
+          {actor ? <span data-step-actor className="text-gray-700">{actor} </span> : null}
           {phase}
         </span>
         {undoable && (
