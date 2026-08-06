@@ -22,6 +22,15 @@ export default function CatalogPage() {
           replayed from a golden game — their numbers come from the engine. States marked{' '}
           <SourceBadge /> are hand-authored, because no golden game covers them.
         </p>
+        {/* The sibling surface: this page shows what a component looks like,
+            that one lets you play from any golden state and find out whether it
+            works. */}
+        <p className="mt-2 text-sm">
+          <a href="/scenarios" className="font-semibold text-blue-700 hover:underline">
+            Scenarios →
+          </a>{' '}
+          <span className="text-gray-500">jump into any golden-game state and play on from it.</span>
+        </p>
       </header>
 
       <main className="mx-auto flex max-w-6xl flex-col gap-10">

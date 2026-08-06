@@ -51,17 +51,31 @@ function scenariosFor(gameId: string): Scenario[] {
 
 /** A one-line summary of what is on the board, so a step can be picked by sight. */
 function summarise(state: GameState): string {
-  const founded = Object.values(state.startups).filter((s) => s.isFounded);
-  const placed = Object.values(state.board).filter((c) => c.placed).length;
+  const cells = Object.values(state.board);
+  const placed = cells.filter((c) => c.placed).length;
   const actor = state.players[state.turnIndex]?.name ?? '—';
-  const chains = founded.length === 0
+
+  // Counted from the board, not from `Startup.tiles`: the intent path claims a
+  // chain by writing `startupId` onto each cell, and that array is not what it
+  // maintains. Reading it here reported every chain as ×0.
+  const size = new Map<string, number>();
+  for (const cell of cells) {
+    if (cell.placed && cell.startupId) size.set(cell.startupId, (size.get(cell.startupId) ?? 0) + 1);
+  }
+  const chains = size.size === 0
     ? 'no chains'
-    : founded.map((s) => `${s.id} ×${s.tiles.length}`).join(', ');
+    : [...size].map(([id, n]) => `${id} ×${n}`).join(', ');
+
   return `${state.stage} · ${actor} · ${placed} tiles · ${chains}`;
 }
 
+/** G2 before G10: the ids are numbered, so they sort as numbers. */
+const GAMES = [...ALL_GOLDEN_GAMES].sort(
+  (a, b) => Number(a.id.slice(1)) - Number(b.id.slice(1)),
+);
+
 export default function ScenarioPage() {
-  const [gameId, setGameId] = useState(ALL_GOLDEN_GAMES[0]?.id ?? '');
+  const [gameId, setGameId] = useState(GAMES[0]?.id ?? '');
   const [picked, setPicked] = useState<Scenario | null>(null);
   /**
    * Which seat the screen belongs to, or none.
@@ -114,7 +128,7 @@ export default function ScenarioPage() {
       </p>
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
-        {ALL_GOLDEN_GAMES.map((g) => (
+        {GAMES.map((g) => (
           <button
             key={g.id}
             type="button"
@@ -131,7 +145,7 @@ export default function ScenarioPage() {
       </div>
 
       <p className="mt-3 text-sm font-semibold text-gray-800">
-        {ALL_GOLDEN_GAMES.find((g) => g.id === gameId)?.title}
+        {GAMES.find((g) => g.id === gameId)?.title}
       </p>
 
       <fieldset className="mt-4 flex flex-wrap items-center gap-3 text-sm">
