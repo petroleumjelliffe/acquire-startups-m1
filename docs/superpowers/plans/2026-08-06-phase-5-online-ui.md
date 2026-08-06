@@ -1,14 +1,18 @@
-# By-Hand Polish Implementation Plan
+# Phase 5 — Online UI Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Close the thirteen findings from the first real two-player sessions on the merged Phase 3 client.
+**Goal:** Finish the online UI — the roadmap's Phase 5 — which in practice means closing the thirteen findings from the first real two-player sessions on the merged Phase 3 client.
+
+**Why this is Phase 5 rather than a polish pass:** the roadmap's Phase 5 named three things. Two of them Phase 3b already delivered — hidden hands (projection enforces them, `viewerId` renders them) and the `ReconnectionBanner` rework (it became `ConnectionStrip`, scoped to the room screen). The third, *the step stack as the spectator view of committed segments*, is Task 7 below and is now done. What remains of Phase 5 is exactly what playing the thing in two browsers turned up, which is the more honest specification of "online UI" than the roadmap's three bullets were.
 
 **Architecture:** No new layers. Every item is a change to an existing component, the shared `GameSession` interface, or (once) the engine's opening deal. The through-line is that Phase 3 replaced a shared device with two independent screens, and several things that were adequate when one person held the phone are not adequate when two people are watching different copies of the same board.
 
 **Tech Stack:** TypeScript ESM, React 18, vitest 4 (`node` project for `engine|session|server`, `app`/jsdom for `src`), Tailwind classes inline, socket.io 4.
 
-**Branch point:** `main` @ `9135482`. Phases 3a and 3b are merged; there is no worktree.
+**Branch point:** `main` @ `3e4c1f2`. Phases 3a and 3b are merged; there is no worktree.
+**Roadmap:** [2026-07-31-react-app-revamp-roadmap-design.md](../specs/2026-07-31-react-app-revamp-roadmap-design.md) — this plan is that document's Phase 5.
+**Predecessor:** [2026-08-05-phase-3b-carry-forward.md](../specs/2026-08-05-phase-3b-carry-forward.md), which is stale: it predates all thirteen findings and still describes UI decisions this plan reverses.
 
 ## Global Constraints
 
@@ -35,16 +39,9 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 | Turn toast showed a step that never changed | `9135482` | A watcher's state only advances on commit, so the stage label sat frozen while claiming to be live. Removed; the toast says who is up. |
 | "No tile you hold can be played" | `9135482` | Removed. The board and the End turn button say it. The dead-tile explanation stays, because the board cannot show *why* a tile is unplayable. |
 | Skip looked like a primary action | `9135482` | Hollow now. |
+| The step stack hid what the last player did | `3e4c1f2` | Ruled: the **entirety of the previous turn** — tile placed, founding, merger outcome, shares purchased — read-only above your own live steps. The boundary comes from the session, which closes segments, not from reading the log back into them: a merger files payout entries under players who are not the actor. `SessionView` gained `previousSegmentStart`. |
 
 ---
-
-## Open decision, blocking Task 7
-
-**How much history returns to the step stack?** Phase 3b scoped it to the open segment, which was too deep a cut: a watcher cannot see what the last player just did. Three options, and this plan cannot be executed past Task 7 without a ruling:
-
-1. **The whole previous turn, read-only** — every step of the last committed segment, greyed and not undoable, above your own live steps. Precise, and bounded by one segment. *Recommended.*
-2. **A one-line outcome** — "Alex founded Messla at E6", the turn collapsed to its result. Smallest, but loses a multi-step turn's detail (a merger is not one line).
-3. **Everything, with only the open segment undoable** — the pre-3b behaviour, which is what the owner asked to change in the first place.
 
 ---
 
@@ -125,20 +122,7 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 - [ ] **Step 4:** Test the reduced-motion branch (jsdom can assert a class or attribute, not a frame) and state plainly in the test that the animation itself is settled by eye.
 - [ ] **Step 5:** By-hand check that a commit carrying several changes does not animate the entire board. Suite, typecheck, commit.
 
-## Task 7: The last completed turn comes back — BLOCKED
-
-**Do not start this task until the open decision above is ruled on.**
-
-**Finding:** scoping the step stack to the open segment means a watcher cannot see what the last player did.
-
-**Files:** `src/game/screen/stepsOf.tsx`, `src/game/GameScreen.tsx`; test `src/game/screen/stepsOf.test.tsx`.
-
-- [ ] **Step 1:** Implement whichever option was chosen. Under option 1, `stepsOf` needs the *previous* segment's start as well as the open one, and entries below `segmentStart` render read-only — `undoable: false` already exists for that.
-- [ ] **Step 2:** The existing "drops every step below the open segment" test encodes the current rule and will need rewriting to the new one. Rewrite it; do not delete it.
-- [ ] **Step 3: Break it** by dropping the previous segment again; confirm the new test goes red. Restore.
-- [ ] **Step 4:** Suite, typecheck, commit.
-
-## Task 8: Deal hands after the turn-order draw — the one engine change
+## Task 7: Deal hands after the turn-order draw — the one engine change
 
 **Finding:** `createInitialGame` fills every hand before setting `stage: "draw"` (`engine/gameInit.ts`), so a player holds six tiles before it is known who plays first. Hands should be dealt once the order is settled.
 

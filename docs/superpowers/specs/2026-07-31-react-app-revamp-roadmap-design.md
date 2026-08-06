@@ -309,8 +309,17 @@ the entire point of the model. Includes Render cold-start handling. No turn time
 
 ### Phase 5 — Online UI
 
-Hidden hands under the new component layer (now genuinely enforced by Phase 3's projection), the
-step-stack as the spectator view of committed segments, and a `ReconnectionBanner` rework.
+> **Rewritten 2026-08-06, after the first two-browser sessions.** Two of the three items below were
+> already delivered by Phase 3b, and the third is done. What Phase 5 actually is now lives in
+> [2026-08-06-phase-5-online-ui.md](../plans/2026-08-06-phase-5-online-ui.md): the thirteen findings
+> from playing the thing with two people, of which six are closed. Playing it turned out to be a
+> better specification of "online UI" than these three bullets were.
+
+Hidden hands under the new component layer (now genuinely enforced by Phase 3's projection) —
+**done in 3b**, via `GameScreen`'s `viewerId`. The step-stack as the spectator view of committed
+segments — **done**, `3e4c1f2`: the previous turn renders read-only above your own steps. A
+`ReconnectionBanner` rework — **done in 3b**: it became `ConnectionStrip`, scoped to the room screen
+instead of fixed across every route including the ones with no server.
 
 ## Risks
 
