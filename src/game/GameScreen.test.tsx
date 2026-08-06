@@ -74,6 +74,50 @@ describe('GameScreen', () => {
   });
 });
 
+describe('changing your mind about a tile', () => {
+  /**
+   * Scoped to the grid: once a tile is placed the step stack renders its
+   * coordinate as a log token, with a `title` of its own, so an unscoped
+   * `getByTitle` matches the board cell and the log entry both.
+   */
+  function onBoard(coord: string) {
+    const grid = screen.getByTestId('game-surface').querySelector('[data-board="grid"]')!;
+    return within(grid as HTMLElement).getByTitle(coord);
+  }
+
+  function placedE6() {
+    render(<GameScreen session={createGameSession({ state: playable() })} />);
+    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    fireEvent.click(screen.getByTitle('E6'));
+    // E6 sits next to the loner E5, so placing it asks which brand to found —
+    // the stage has moved on, which is what used to make a second click an
+    // error rather than a correction.
+    expect(screen.getByText(/found a brand/i)).toBeInTheDocument();
+  }
+
+  it('switches to the new tile without an undo first', () => {
+    placedE6();
+
+    fireEvent.click(onBoard('H8'));
+
+    // H8 is played, E6 is back in hand, and nothing was refused.
+    expect(onBoard('H8')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'hand');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('refuses once the placement has been built on', () => {
+    placedE6();
+    // Founding the brand settles the placement: undo is the way back now.
+    fireEvent.click(screen.getByRole('button', { name: /^messla$/i }));
+
+    fireEvent.click(onBoard('H8'));
+
+    expect(onBoard('E6')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'hand');
+  });
+});
+
 describe('GameScreen at the turn-order draw', () => {
   /** A fresh game: hands are dealt, but the draw has not happened. */
   function atDraw() {

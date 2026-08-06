@@ -103,7 +103,26 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
           hqTiles={foundingTiles(state)}
           onCellClick={
             canAct && actorId
-              ? (coord) => session.dispatch({ type: 'placeTile', playerId: actorId, coord })
+              ? (coord) => {
+                  // Changing your mind is not an error.
+                  //
+                  // Placing a tile moves the stage on, so a second click used
+                  // to be refused outright — you had to find the undo in the
+                  // step stack first, for what reads as one action: "no, that
+                  // one." If the open segment holds nothing but the placement,
+                  // this takes it back and plays the new tile in its place.
+                  //
+                  // The gate is the segment's step count, not the stage: one
+                  // step means only the placement has happened, and anything
+                  // that followed it — founding a brand, choosing a survivor,
+                  // buying — settles the placement and makes undo the honest
+                  // way back. Online both halves are the server's to grant, in
+                  // that order.
+                  if (state.stage !== 'play' && undoableSteps.length === 1) {
+                    session.undoTo(undoableSteps[0]);
+                  }
+                  session.dispatch({ type: 'placeTile', playerId: actorId, coord });
+                }
               : undefined
           }
         />
