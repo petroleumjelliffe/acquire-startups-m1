@@ -52,7 +52,18 @@ export function Panel(props: PanelProps) {
                 // `overflow-y-auto` above takes over, which is the behaviour
                 // that was always intended.
                 ? 'flex min-h-[96px] flex-1 flex-col'
-                : 'flex-none'
+                : slot === 'active'
+                  // Clips the arriving step while it is still below the line.
+                  //
+                  // The zone sizes to its content, so there is nothing to clip
+                  // at rest — this exists for the one moment a step is rising
+                  // through it. Without it the arriving step's text paints over
+                  // the staging zone below: CSS lays down every block
+                  // background before any inline content, so being a later,
+                  // opaque sibling does not save staging from text drawn on top
+                  // of it.
+                  ? 'flex-none overflow-hidden'
+                  : 'flex-none'
             }
           >
             {props[slot]}

@@ -38,9 +38,12 @@ button {
    step rises from below (behind staging) to fill the slot. The new step shoves
    the old one up."
 
-   Nothing clips it. The staging zone is the next sibling and opaque, so it
-   paints over anything this zone overflows downwards — which is what makes 40px
-   of travel read as coming out from behind it.
+   The slot clips it (`overflow-hidden` in `Panel`), and that is load-bearing
+   rather than tidy. Being a later, opaque sibling is NOT enough: CSS paints
+   every block background before any inline content, so the staging zone's
+   background goes down first and the rising step's *text* draws straight over
+   the top of it. That is visible in the frames this was reported from — the
+   brand chips of the arriving step sitting across the staging rule.
 
    The duration and curve are `STEP_RISE_MS` and `STEP_RISE_EASE` from
    `src/game/panel/stepMotion.ts`, where the step stack's half of the same
@@ -49,12 +52,15 @@ button {
    two things moving at different speeds. */
 @keyframes step-rise {
   from {
-    transform: translateY(40px);
-    opacity: 0;
+    /* 100% of the step's own height, so it starts with its top edge exactly on
+       the staging zone's top edge — wholly below the line, wholly hidden — and
+       rises its full height into place. A fixed offset was the bug: at 40px a
+       tall step was already 90% in position before it became visible, so it
+       read as a fade rather than an arrival. */
+    transform: translateY(100%);
   }
   to {
     transform: none;
-    opacity: 1;
   }
 }
 

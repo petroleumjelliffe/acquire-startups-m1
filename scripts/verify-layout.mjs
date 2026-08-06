@@ -238,6 +238,18 @@ const MEASURE = `(async () => {
   const zone = document.querySelector('[data-slot="active"] > *');
   stepRise.activeAnimation = zone ? getComputedStyle(zone).animationName : null;
   stepRise.activeMoving = zone ? getComputedStyle(zone).transform !== 'none' : false;
+  // How far the arriving step still has to climb, as a fraction of its own
+  // height. It starts with its top on the staging zone's top edge — a whole
+  // height below where it lands — so a fifth of the way in it should still be
+  // most of the way down. A fixed offset (40px) was the reported bug: a tall
+  // step was already 90% in place before it was visible at all.
+  if (zone) {
+    const r = zone.getBoundingClientRect();
+    const stagingTop = document.querySelector('[data-slot="staging"]').getBoundingClientRect().top;
+    stepRise.activeClimbLeft = r.height > 0
+      ? Math.round(((r.top - (stagingTop - r.height)) / r.height) * 100) / 100
+      : null;
+  }
   await wait(400);
   stepRise.settled = tyOf();
   await wait(300);
@@ -560,6 +572,13 @@ async function main() {
         `animation "${rise.activeAnimation}" and ${rise.activeMoving ? 'was' : 'was not'} ` +
         `moving 80ms in. It appears in place instead of coming up from behind staging, ` +
         `which is what happens when the zone is not keyed and React reuses the node.`,
+      );
+    } else if ((rise.activeClimbLeft ?? 0) < 0.5) {
+      failures.push(
+        `${width}px: the incoming step was already ` +
+        `${Math.round((1 - (rise.activeClimbLeft ?? 0)) * 100)}% in place 80ms in — it should ` +
+        `start a whole step-height below, with its top on the staging edge, and still have ` +
+        `most of the climb left this early. A short fixed offset reads as a fade.`,
       );
     }
     // And a step leaving, which is the same machinery run backwards: undo the
