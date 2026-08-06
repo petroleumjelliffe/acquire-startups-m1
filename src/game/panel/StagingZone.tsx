@@ -64,7 +64,13 @@ export function StagingZone({ label, shares, cashDelta = 0, action }: StagingZon
         this; it took measuring the real page.
       */}
       <div data-zone="pile" className="flex h-[72px] min-h-[72px] flex-wrap items-end gap-3">
-        {shares ?? <span className="self-center text-[13px] text-[#c9bd93]">empty</span>}
+        {/*
+          No placeholder. An empty pile is self-evident, and the word "empty"
+          was a label for nothing — the reservation is on this container, so the
+          zone is the same height either way and the space reads as waiting for
+          something rather than as missing content.
+        */}
+        {shares}
       </div>
 
       {/* Same story: the phase-advance button measures 38px, so a 32px

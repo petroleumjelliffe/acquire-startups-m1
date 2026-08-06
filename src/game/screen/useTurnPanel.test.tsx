@@ -208,6 +208,36 @@ describe('useTurnPanel — buying', () => {
     return session;
   }
 
+  /**
+   * Early game: a tile placed on its own founds nothing, so the buy step opens
+   * with no brand in existence and used to render a heading over an empty row.
+   */
+  it('says what to do when nothing has been founded', () => {
+    const session = sessionFor(buildFixture({
+      players: [{ name: 'Alex', cash: 6000, hand: ['H8'] }, { name: 'Sam', cash: 6000, hand: ['A1'] }],
+      bag: ['I11', 'I12'],
+    }));
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'H8' });
+    expect(session.getView().state.stage, 'the placement did not reach the buy step').toBe('buy');
+
+    render(<Harness session={session} dispatch={() => {}} />);
+    expect(screen.getByText(/found a startup to buy shares/i)).toBeInTheDocument();
+  });
+
+  /**
+   * The empty state is about nothing being *founded*, which stopped meaning
+   * "nothing to buy" the moment sold-out brands started staying in the row.
+   */
+  it('shows sold-out cards rather than the empty state', () => {
+    const session = atBuy();
+    const state = structuredClone(session.getView().state);
+    state.startups.Messla.availableShares = 0;
+
+    render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
+    expect(screen.queryByText(/found a startup to buy shares/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /messla — sold out/i })).toBeInTheDocument();
+  });
+
   it('stages picks locally without dispatching', () => {
     const dispatch = vi.fn();
     render(<Harness session={atBuy()} dispatch={dispatch} />);
@@ -237,6 +267,30 @@ describe('useTurnPanel — buying', () => {
       playerId: 'p1',
       picks: ['Messla', 'Messla'],
     });
+  });
+
+  /**
+   * The pile is not a receipt. A share put there by mistake comes back out —
+   * `StockStack` has carried the `×` affordance since the atom was built and
+   * the catalog has shown it as `stack · sm · removable`; the panel simply
+   * never passed a handler, so the state was unreachable.
+   */
+  it('takes a staged share back out of the pile', () => {
+    const { container } = render(<Harness session={atBuy()} dispatch={() => {}} />);
+    const buy = screen.getByRole('button', { name: /buy one messla/i });
+    fireEvent.click(buy);
+    fireEvent.click(buy);
+
+    const staging = container.querySelector('[data-slot="staging"]')!;
+    expect(staging.textContent).toMatch(/×2/);
+
+    const remove = within(staging as HTMLElement).getByRole('button', { name: /remove one/i });
+    fireEvent.click(remove);
+
+    expect(staging.textContent).toMatch(/×1/);
+    // And the money comes back with it.
+    expect(staging.textContent).toMatch(/200/);
+    expect(staging.textContent).not.toMatch(/400/);
   });
 
   it('stops at three shares a turn', () => {
@@ -354,6 +408,26 @@ describe('useTurnPanel — mergers', () => {
       within(staging()).queryAllByTitle(survivorId).length,
       'the survivor shares gained are missing from the pile',
     ).toBeGreaterThan(0);
+  });
+
+  /**
+   * The same rule as the buy pile: what you staged, you can take back. A sale
+   * is otherwise invisible in the pile — it shows up only as a number in
+   * `Net` — so the one staged decision in this step had nothing to click.
+   */
+  it('takes a staged sale back out of the pile', () => {
+    const session = createGameSession({
+      state: stateWhere((s) => s.stage === 'mergerLiquidation'),
+    });
+    const { container } = render(<Harness session={session} dispatch={() => {}} />);
+    const staging = () => container.querySelector('[data-slot="staging"]')! as HTMLElement;
+
+    fireEvent.click(screen.getByRole('button', { name: /sell one share/i }));
+    const removes = within(staging()).getAllByRole('button', { name: /remove one/i });
+    expect(removes).toHaveLength(1);
+
+    fireEvent.click(removes[0]);
+    expect(within(staging()).queryByRole('button', { name: /remove one/i })).toBeNull();
   });
 
   it('accumulates a sale locally, then dispatches one liquidate intent', () => {

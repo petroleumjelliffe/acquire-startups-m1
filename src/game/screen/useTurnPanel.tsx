@@ -398,7 +398,26 @@ export function useTurnPanel(
             cashDelta={staged.sell * unitPrice}
             shares={
               <>
+                {/*
+                  The remainder, not a staged thing — so no `×`. Taking a share
+                  off "what I am keeping" is not a move; putting a sold or
+                  traded one back is, and those two stacks carry the affordance.
+                */}
                 <StockStack id={absorbedId} count={keep} size="sm" />
+                {/*
+                  Shares sold for cash, shown leaving. Without this the sale
+                  appeared only as a number in `Net`, which left the one staged
+                  decision in this step with nothing to click to undo it.
+                */}
+                {staged.sell > 0 && (
+                  <StockStack
+                    id={absorbedId}
+                    count={staged.sell}
+                    size="sm"
+                    leaving
+                    onRemove={canAct ? () => setStaged({ ...staged, sell: staged.sell - 1 }) : undefined}
+                  />
+                )}
                 {/*
                   What you are getting, not only what you are giving up. A
                   trade hands in `TRADE_RATIO` absorbed shares for one survivor
@@ -406,12 +425,21 @@ export function useTurnPanel(
                   staging zone answered "what am I losing" and left "what am I
                   gaining" to arithmetic. Derived from `TRADE_RATIO` rather
                   than written down, because it is a rule.
+
+                  Removing one hands back the whole trade it came from, which is
+                  why it moves by `TRADE_RATIO`: half a trade is not a state the
+                  rules have.
                 */}
                 {staged.trade > 0 && (
                   <StockStack
                     id={survivorId}
                     count={staged.trade / TRADE_RATIO}
                     size="sm"
+                    onRemove={
+                      canAct
+                        ? () => setStaged({ ...staged, trade: staged.trade - TRADE_RATIO })
+                        : undefined
+                    }
                   />
                 )}
               </>
@@ -467,6 +495,19 @@ export function useTurnPanel(
           label={stageLabel(state.stage)}
           body={
             <>
+              {/*
+                Nothing founded yet, so the step is asking for something that
+                cannot be given. It says what would change that rather than
+                leaving a heading over an empty row.
+
+                Keyed on nothing being *founded*, not on nothing being buyable:
+                a founded brand whose pool is empty renders a sold-out card, so
+                those two conditions came apart the moment sold-out cards
+                stayed in the row.
+              */}
+              {founded.length === 0 && (
+                <span className="text-[13px] text-gray-600">Found a startup to buy shares.</span>
+              )}
               <div className="flex flex-wrap gap-2">
                 {founded.map((s) => {
                   // Bound to a const so the `isStartupId` narrowing survives
@@ -519,7 +560,29 @@ export function useTurnPanel(
           label="Buying"
           cashDelta={-spent}
           shares={basket.map(([id, n]) =>
-            isStartupId(id) ? <StockStack key={id} id={id} count={n} size="sm" /> : null,
+            isStartupId(id) ? (
+              <StockStack
+                key={id}
+                id={id}
+                count={n}
+                size="sm"
+                // The pile is not a receipt: a share put there by mistake comes
+                // back out, one at a time, and the handler is what lights the
+                // atom's `×`. Nothing said the stack was clickable before this,
+                // because nothing was.
+                onRemove={
+                  canAct
+                    ? () => {
+                        const at = staged.picks.lastIndexOf(id);
+                        if (at < 0) return;
+                        const picks = [...staged.picks];
+                        picks.splice(at, 1);
+                        setStaged({ ...staged, picks });
+                      }
+                    : undefined
+                }
+              />
+            ) : null,
           )}
           action={!canAct ? undefined : (
             /*
