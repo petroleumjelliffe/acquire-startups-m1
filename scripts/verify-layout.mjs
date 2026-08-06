@@ -373,7 +373,20 @@ const WAITING_PANEL = `(() => {
     };
   };
 
+  // Sell and trade are alternatives and must read as a pair. Same top edge
+  // means one row; different tops mean the second wrapped underneath.
+  const liqRow = () => {
+    const fig = [...document.querySelectorAll('[data-catalog-state]')]
+      .find((f) => f.getAttribute('data-catalog-state') === 'panel · mid-merger (the worst squeeze)');
+    const wrap = fig && fig.querySelector('[data-liq-actions]');
+    if (!wrap) return null;
+    const tops = [...wrap.querySelectorAll('button')].map((b) => Math.round(b.getBoundingClientRect().top));
+    const widths = [...wrap.querySelectorAll('button')].map((b) => Math.round(b.getBoundingClientRect().width));
+    return { count: tops.length, sameRow: tops.length > 1 && new Set(tops).size === 1, tops, widths };
+  };
+
   return {
+    liq: liqRow(),
     myTurn: zonesIn('panel · my turn (waiting-panel baseline)'),
     waiting: zonesIn('panel · not my turn (waiting)'),
     merger: zonesIn('panel · mid-merger (the worst squeeze)'),
@@ -612,6 +625,14 @@ async function main() {
           `${width}px: the step stack collapses to ${wp.mergerStack.height}px during a merger ` +
           `(floor ${STACK_FLOOR}px) — the undo is unreachable exactly when it is most wanted`,
         );
+      }
+      if (wp.liq && !wp.liq.sameRow) {
+        failures.push(
+          `${width}px: the liquidation actions wrapped instead of sharing a row ` +
+          `(tops ${JSON.stringify(wp.liq.tops)}, widths ${JSON.stringify(wp.liq.widths)})`,
+        );
+      } else if (wp.liq) {
+        console.log(`${width}px  liq actions side by side, widths ${JSON.stringify(wp.liq.widths)}`);
       }
       if (wp.mergerStack.overflow > 0 && !/auto|scroll/.test(wp.mergerStack.scrollable)) {
         failures.push(
