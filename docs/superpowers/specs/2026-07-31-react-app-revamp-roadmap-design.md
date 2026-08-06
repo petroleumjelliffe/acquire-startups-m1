@@ -307,6 +307,15 @@ what the async-play goal wanted. Reconnect fetches current state, the current se
 it is your move. Uncommitted local staging is discarded on reconnect; it was never real, which is
 the entire point of the model. Includes Render cold-start handling. No turn timeouts.
 
+**Coverage is part of the phase, not a follow-up** (owner, 2026-08-06). Today each piece is tested
+and no sequence is: `identity.ts` round-trips a rejoin, `rooms.rejoin` honours and refuses tokens,
+`connectionLost()` clears a stuck request, and `RoomPage` resends the stored identity when the
+socket returns — but nothing drives a real remount the way F5 does, nothing kills and revives a
+live socket (`clientOverWire` opens real ones and never drops one), and nothing survives a server
+restart, because `saveGame` writes on every commit and **no code reads it back**. Phase 4 owes
+three end-to-end tests: refresh mid-turn, a dropped-and-restored socket mid-turn, and a server
+restart with a game in progress. Then the same three by hand on prod.
+
 ### Phase 5 — Online UI
 
 > **Rewritten 2026-08-06, after the first two-browser sessions.** Two of the three items below were
