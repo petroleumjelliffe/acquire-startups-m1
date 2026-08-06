@@ -79,8 +79,8 @@ as New Room and the button becomes `Join game`. `Leave` below.
 
 ### Tokens the file defines
 
-From `get_variable_defs` on the frame — the values to build against, not
-eyeballed from the export:
+From `get_variable_defs` on the frame. Recorded for the type scale and
+proportions; see the note below on colour:
 
 | | |
 |---|---|
@@ -91,10 +91,11 @@ eyeballed from the export:
 | Secondary button | fill `#FFFFFF`, text `#0E1828`, stroke `#d0d5dc` |
 | Placeholder | stroke `#CCCCCC`, text `#666666` |
 
-**These disagree with the app.** Our primary buttons are Tailwind `bg-blue-600`
-(`#2563eb`); the mockup's is `#0065F4`. Decide once, when the lobby is built,
-whether the app moves to the file's blue or the file is treated as
-approximate — and do not silently ship two blues.
+**The colours are not the file's to decide** (owner, 2026-08-06): the palette
+stays Tailwind's, which is what the rest of the app is built on. So the
+mockup's `#0065F4` does not replace `bg-blue-600`, and the greys above are
+approximate rather than exact. Read the file for **layout, copy, structure and
+states**; take colour from the app.
 
 ## What the mockup settles, and what it opens
 
@@ -102,17 +103,19 @@ Settles the last open question from the rulings — **what the lobby shows about
 saved game**: a name, the players, and how long ago it was played. So the save
 carries a **name** and a **last-played timestamp**, not just a state blob.
 
-Three things it raises that nothing has answered yet:
+The three it raised are now ruled (owner, 2026-08-06):
 
-- **`New Game` sits above `Continue`, both live.** One active local game per
-  device was the ruling; pressing `New Game` with a game saved therefore has to
-  do something — replace it, or refuse until the saved one is ended. The mockup
-  does not say which.
-- **Where a game gets its name.** The card shows one; no screen collects it.
-  Generated from the players and date, or typed at setup?
-- **Ending a game from the lobby.** The ruling puts `End game` on the final
-  scoring screen only, and the Continue card has no such affordance — which means
-  an abandoned mid-game has no exit but finishing it.
+| Question | Ruling |
+|---|---|
+| `New Game` with a game already saved | **Discards it.** One active local game per device; multiple saves are a later feature if they are ever wanted. |
+| Where the name comes from | **There is no name.** The Continue card's title is the literal string `Game in progress`. Nothing is stored and no screen collects one. |
+| Abandoning a game | No dedicated control. Navigate back to `/pass-and-play`, see the game in progress, press `New Game` — which discards it. No breadcrumb, no settings screen. |
+
+**One thing to settle when it is built, not now:** `New Game` discarding a game
+in progress is irreversible and one press away, directly above the card showing
+the thing it destroys. A confirmation step is the obvious guard, and the mockup
+does not have one. Recommendation: confirm when a game exists, go straight
+through when none does.
 
 ## How to read the Figma file
 
@@ -141,8 +144,9 @@ arriving as `text/event-stream` (strip the `data: ` prefix).
 - What is written: the whole `GameState` and `segmentStart`, or the seed plus
   the intent log replayed on load? The second is smaller and self-verifying, the
   first is simpler and survives a rules change badly. This is the real design
-  decision and has not been made. Either way the save now also carries a **name**
-  and a **last-played timestamp**, because the Continue card shows both.
+  decision and has not been made. Either way the save carries a **last-played
+  timestamp** — and no name: the Continue card's title is fixed copy, and the
+  players it lists come from the state itself.
 - Storage key and versioning — one key per device, and what happens when a save
   predates a rules change and no longer replays or loads cleanly.
 - ~~Whether the lobby's "continue" needs to show anything about the saved game~~
