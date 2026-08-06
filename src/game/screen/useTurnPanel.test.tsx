@@ -256,9 +256,16 @@ describe('useTurnPanel — a player who cannot move', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'endTurn', playerId: 'p1' });
   });
 
-  it('says why the turn can be ended', () => {
+  it('says which tile is the dead one rather than narrating the situation', () => {
     render(<Harness session={createGameSession({ state: stuck() })} dispatch={() => {}} />);
-    expect(screen.getByText(/no tile you hold can be played/i)).toBeInTheDocument();
+
+    // The panel no longer explains that you cannot move — the board shows
+    // that, and the End turn button offers the way out. What it still owes
+    // you is *why* a tile you are holding can never be played, which is not
+    // visible from the board alone.
+    expect(screen.queryByText(/no tile you hold can be played/i)).toBeNull();
+    expect(screen.getByText(/can never be played/i)).toBeInTheDocument();
+    expect(screen.getByText(/C1/)).toBeInTheDocument();
   });
 
   it('offers no such button while a placement is still legal', () => {

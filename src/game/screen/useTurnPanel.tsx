@@ -165,11 +165,12 @@ export function useTurnPanel(
           label={stageLabel(state.stage)}
           body={
             <>
-              <span className="text-[13px] text-gray-600">
-                {canPlace
-                  ? 'Choose one of your tiles on the board.'
-                  : 'No tile you hold can be played. You may end your turn.'}
-              </span>
+              {/*
+                No prose about your own tiles. They are on the board, lit and
+                clickable, which says it better than a sentence does — and the
+                "no tile you hold can be played" line was telling you something
+                the empty board and the End turn button already told you.
+              */}
               {dead.length > 0 && (
                 <span className="text-[13px] text-gray-600">
                   {`${dead.join(', ')} can never be played — ${dead.length === 1 ? 'it joins' : 'they join'} two safe chains.`}
@@ -442,7 +443,13 @@ export function useTurnPanel(
                 dispatch({ type: 'endTurn', playerId: actorId });
                 setStaged(NOTHING_STAGED);
               }}
-              className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+              className={
+                staged.picks.length === 0
+                  // Skipping is not the thing you came here to do, so it does
+                  // not wear the primary treatment.
+                  ? 'm-0 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50'
+                  : 'm-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700'
+              }
             >
               {staged.picks.length === 0 ? 'Skip' : 'Confirm purchase'}
             </button>

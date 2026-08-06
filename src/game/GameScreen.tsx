@@ -8,7 +8,7 @@ import { HandZone } from './panel/HandZone';
 import { PlayersStrip } from './panel/PlayersStrip';
 import { RevealOverlay } from './RevealOverlay';
 import { FinalScoring } from './FinalScoring';
-import { useTurnPanel, stageLabel } from './screen/useTurnPanel';
+import { useTurnPanel } from './screen/useTurnPanel';
 import { TurnToast } from './online/TurnToast';
 import { stepsOf } from './screen/stepsOf';
 import { ownerBadges, foundingTiles } from './screen/boardMarks';
@@ -177,7 +177,7 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
         size; showing both would be saying it twice.
       */}
       {viewerId !== undefined && actor && actorId !== viewerId && (
-        <TurnToast name={actor.name} emoji={actor.emoji} doing={stageLabel(state.stage)} />
+        <TurnToast name={actor.name} emoji={actor.emoji} />
       )}
 
       {viewerId === undefined && awaitingReveal && actor && (

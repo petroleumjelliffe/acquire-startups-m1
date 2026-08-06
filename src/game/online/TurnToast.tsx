@@ -17,11 +17,18 @@ export interface TurnToastProps {
   /** The player being waited on. */
   name: string;
   emoji?: string;
-  /** What they are doing — the panel's own label for the stage. */
-  doing: string;
 }
 
-export function TurnToast({ name, emoji, doing }: TurnToastProps) {
+/**
+ * Deliberately no "…is placing a tile".
+ *
+ * A watcher's state only advances when a segment commits, so a stage label
+ * shown here is frozen at whatever the last commit said — it would sit on
+ * "Buy shares" through the whole of someone's next placement, claiming to be
+ * live while being stale. Who is up *is* live: it changes on exactly the
+ * commits this client receives.
+ */
+export function TurnToast({ name, emoji }: TurnToastProps) {
   return (
     <div
       data-testid="turn-toast"
@@ -31,8 +38,6 @@ export function TurnToast({ name, emoji, doing }: TurnToastProps) {
     >
       <span aria-hidden className="text-base leading-none">{emoji || '•'}</span>
       <span>{`${name} is up`}</span>
-      <span aria-hidden className="text-slate-500">·</span>
-      <span className="font-normal text-slate-300">{doing}</span>
     </div>
   );
 }
