@@ -123,7 +123,13 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 - [ ] **Step 4:** Test the reduced-motion branch (jsdom can assert a class or attribute, not a frame) and state plainly in the test that the animation itself is settled by eye.
 - [ ] **Step 5:** By-hand check that a commit carrying several changes does not animate the entire board. Suite, typecheck, commit.
 
-## Task 7: Deal hands after the turn-order draw — the one engine change
+## Task 7: Deal hands after the turn-order draw — **superseded 2026-08-06**
+
+> **Do not execute this task.** It is absorbed by
+> [2026-08-06-turn-order-draw-round.md](2026-08-06-turn-order-draw-round.md), which makes the draw a
+> round of one-tile turns and therefore has to move the deal anyway — a player holding six tiles
+> plus a draw tile has no way to tell which one is the highlighted one. Its Task 1 carries this
+> task's test verbatim. The text below is kept because the draw-round plan's Task 1 refers to it.
 
 **Finding:** `createInitialGame` fills every hand before setting `stage: "draw"` (`engine/gameInit.ts`), so a player holds six tiles before it is known who plays first. Hands should be dealt once the order is settled.
 
