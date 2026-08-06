@@ -228,10 +228,12 @@ describe('the first state message starts the game', () => {
 });
 
 /**
- * Sam (p2) is the actor, at `buy` — where `useTurnPanel` always renders an
- * "End turn" button, unconditionally, so there is no board placement to walk
- * through first (placing a tile next to a lone tile founds a chain and
- * changes stage, which is not what these tests are about).
+ * Sam (p2) is the actor, at `buy` — where `useTurnPanel` always renders its
+ * one commit button, so there is no board placement to walk through first
+ * (placing a tile next to a lone tile founds a chain and changes stage, which
+ * is not what these tests are about). With nothing staged that button reads
+ * "Skip", and pressing it ends the turn: a bag-drawing intent, which is the
+ * pending path these tests need.
  */
 function midGameState() {
   return buildFixture({
@@ -256,9 +258,10 @@ describe('a dropped connection', () => {
     const state = midGameState();
     f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
 
-    // It is Sam's own turn. End turn is a bag-drawing intent: it goes on the
-    // wire and the session marks itself pending until the server answers.
-    fireEvent.click(screen.getByRole('button', { name: /^end turn$/i }));
+    // It is Sam's own turn. Skipping the buy ends it, and ending a turn is a
+    // bag-drawing intent: it goes on the wire and the session marks itself
+    // pending until the server answers.
+    fireEvent.click(screen.getByRole('button', { name: /^skip$/i }));
     expect(screen.getByText(/sending/i)).toBeInTheDocument();
 
     f.setStatus('closed');

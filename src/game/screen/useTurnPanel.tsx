@@ -425,26 +425,27 @@ export function useTurnPanel(
             isStartupId(id) ? <StockStack key={id} id={id} count={n} size="sm" /> : null,
           )}
           action={!canAct ? undefined : (
-            <div className="flex w-full gap-2">
-              <button
-                type="button"
-                disabled={staged.picks.length === 0}
-                onClick={() => {
+            /*
+              One button, because the buy step has exactly two outcomes and
+              they are the same move: you take what you staged and your turn is
+              over. A separate "End turn" beside it asked the player to say
+              twice what they had already said once, and reading "Confirm
+              purchase" with an empty basket is the same dead end from the
+              other side — hence "Skip", which is what an empty basket means.
+            */
+            <button
+              type="button"
+              onClick={() => {
+                if (staged.picks.length > 0) {
                   dispatch({ type: 'buyShares', playerId: actorId, picks: staged.picks });
-                  setStaged(NOTHING_STAGED);
-                }}
-                className="m-0 flex-1 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Confirm purchase
-              </button>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: 'endTurn', playerId: actorId })}
-                className="m-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm font-semibold hover:bg-gray-50"
-              >
-                End turn
-              </button>
-            </div>
+                }
+                dispatch({ type: 'endTurn', playerId: actorId });
+                setStaged(NOTHING_STAGED);
+              }}
+              className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+            >
+              {staged.picks.length === 0 ? 'Skip' : 'Confirm purchase'}
+            </button>
           )}
         />
       ),

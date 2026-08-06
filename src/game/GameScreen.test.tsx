@@ -56,7 +56,8 @@ describe('GameScreen', () => {
 
     fireEvent.click(screen.getByTitle('E6'));
     fireEvent.click(screen.getByRole('button', { name: /^messla$/i }));
-    fireEvent.click(screen.getByRole('button', { name: /end turn/i }));
+    // One button ends the buy step: "Skip" with nothing staged.
+    fireEvent.click(screen.getByRole('button', { name: /^skip$/i }));
 
     expect(screen.getByText(/pass to sam/i)).toBeInTheDocument();
   });
