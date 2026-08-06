@@ -1,4 +1,3 @@
-import { cloneElement, isValidElement } from 'react';
 import type { GameSession } from '../../session/GameSession';
 import type { Intent } from '../../engine/intents';
 import type { Coord } from '../../engine/gameHelpers';
@@ -135,21 +134,17 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
   });
 
   /**
-   * A new step is a new node.
+   * Which step is on show, for `StepReveal` to animate between.
    *
-   * `.active-step-enter` is a CSS animation, and a CSS animation plays when its
-   * element mounts. React reuses the active zone's DOM node from one step to
-   * the next — same component, same position — so the animation ran once, on
-   * the first step of the game, and never again. The step that arrives when you
-   * place a tile simply appeared, which is exactly what was reported.
+   * A prop rather than a React key: the zone has to *observe* the change so it
+   * can hold the old step on screen while it collapses, and a key would unmount
+   * that step before there was anything to animate away.
    *
    * Stage *and* actor: a merger's liquidation queue moves from one player to
    * the next without the stage changing, and that is a new step to whoever is
    * being asked.
    */
-  const activeStep = isValidElement(active)
-    ? cloneElement(active, { key: `${state.stage}:${actorId}` })
-    : active;
+  const activeStepKey = `${state.stage}:${actorId}`;
 
   const prices = Object.fromEntries(
     Object.values(state.startups)
@@ -181,7 +176,8 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
             onUndo={(stepId) => session.undoTo(stepId)}
           />
         }
-        active={activeStep}
+        active={active}
+        activeStep={activeStepKey}
         staging={staging}
         hand={
           <HandZone

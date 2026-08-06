@@ -33,60 +33,21 @@ button {
   animation: step-up 280ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
 
-/* The incoming step rising from behind the staging zone — the second half of
-   the prototype's T2 (`prototype/transitions.js`, `stepAdvance`): "the incoming
-   step rises from below (behind staging) to fill the slot. The new step shoves
-   the old one up."
+/* `TurnToast` is the only thing left using `.step-enter`, and it keeps this
+   keyframe because a toast really does fade and lift while visible throughout.
 
-   The slot clips it (`overflow-hidden` in `Panel`), and that is load-bearing
-   rather than tidy. Being a later, opaque sibling is NOT enough: CSS paints
-   every block background before any inline content, so the staging zone's
-   background goes down first and the rising step's *text* draws straight over
-   the top of it. That is visible in the frames this was reported from — the
-   brand chips of the arriving step sitting across the staging rule.
+   The panel's step motion is not here at all any more. It is the active zone's
+   own *height*, animated in `panel/StepReveal.tsx` from measured values in
+   `panel/stepMotion.ts` — a height that cannot be expressed as a keyframe
+   because `height: auto` is not animatable, and because the number is the
+   arriving step's own content height, which varies from 53px to 187px.
 
-   The duration and curve are `STEP_RISE_MS` and `STEP_RISE_EASE` from
-   `src/game/panel/stepMotion.ts`, where the step stack's half of the same
-   motion reads them: the two run together and must agree. `verify:layout`
-   measures both, so drift between them fails the gate rather than shipping as
-   two things moving at different speeds. */
-@keyframes step-rise {
-  from {
-    /* 100% of the step's own height, so it starts with its top edge exactly on
-       the staging zone's top edge — wholly below the line, wholly hidden — and
-       rises its full height into place. A fixed offset was the bug: at 40px a
-       tall step was already 90% in position before it became visible, so it
-       read as a fade rather than an arrival. */
-    transform: translateY(100%);
-  }
-  to {
-    transform: none;
-  }
-}
-
-.active-step-enter {
-  animation: step-rise 340ms cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* `TurnToast` reuses `.step-enter` rather than defining a second keyframe:
-   one arrival motion for the whole game surface, and one reduced-motion rule
-   below that covers everything using it.
-
-   The step stack no longer uses it. A completed step cannot animate its own
-   arrival in a bottom-aligned list — every entry above it has already jumped
-   by the time it exists — so `StepStack` moves the whole list with a measured
-   transform instead. It shares this duration and curve through
-   `panel/stepMotion.ts`, and skips itself under the same reduced-motion rule
-   in JavaScript, because there is no class to switch off. */
+   Two earlier attempts lived here as `.active-step-enter` and a transform on
+   the step list. Both animated *contents* while the zone's height changed in a
+   single frame, and the jump underneath was what the eye caught. */
 
 @media (prefers-reduced-motion: reduce) {
-  .step-enter,
-  .active-step-enter {
+  .step-enter {
     animation: none;
   }
 }
-
-/* An element only plays its enter animation when it mounts, and React reuses
-   the active zone's DOM node from one step to the next — which is why this
-   animation existed and never ran after the first step. `GameScreen` keys the
-   zone by stage and actor so a new step is a new node. */

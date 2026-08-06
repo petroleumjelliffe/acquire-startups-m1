@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { StepReveal } from './StepReveal';
 
 /**
  * The side panel: five slots in one fixed order — `stepstack → active →
@@ -18,6 +19,13 @@ export interface PanelProps {
   staging?: ReactNode;
   hand?: ReactNode;
   players?: ReactNode;
+  /**
+   * Identity of the active step, for `StepReveal`. Given, the active zone
+   * animates its height when the step changes and the whole column above moves
+   * with it; omitted — the catalog, which renders one state and never
+   * changes — the zone is simply its height.
+   */
+  activeStep?: string;
 }
 
 const ORDER = ['stepstack', 'active', 'staging', 'hand', 'players'] as const;
@@ -52,21 +60,19 @@ export function Panel(props: PanelProps) {
                 // `overflow-y-auto` above takes over, which is the behaviour
                 // that was always intended.
                 ? 'flex min-h-[96px] flex-1 flex-col'
-                : slot === 'active'
-                  // Clips the arriving step while it is still below the line.
-                  //
-                  // The zone sizes to its content, so there is nothing to clip
-                  // at rest — this exists for the one moment a step is rising
-                  // through it. Without it the arriving step's text paints over
-                  // the staging zone below: CSS lays down every block
-                  // background before any inline content, so being a later,
-                  // opaque sibling does not save staging from text drawn on top
-                  // of it.
-                  ? 'flex-none overflow-hidden'
-                  : 'flex-none'
+                : 'flex-none'
             }
           >
-            {props[slot]}
+            {/*
+              The active zone is the one thing in this panel that animates: it
+              grows from nothing to its own height when the step changes, and
+              everything above is pushed by it. See `StepReveal`.
+            */}
+            {slot === 'active' && props.activeStep !== undefined ? (
+              <StepReveal step={props.activeStep}>{props.active}</StepReveal>
+            ) : (
+              props[slot]
+            )}
           </div>
         ),
       )}

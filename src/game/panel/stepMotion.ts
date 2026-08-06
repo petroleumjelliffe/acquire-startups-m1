@@ -1,45 +1,48 @@
 /**
- * The step stack's arrival motion, as a decision separate from the DOM that
- * performs it.
+ * The panel's step motion, as decisions separate from the DOM that performs
+ * them.
  *
- * It lives apart because jsdom reports every height as zero, so a test that
- * drove the real effect would measure a delta of 0, take the do-nothing branch,
- * and pass whatever the rule said. The rule is testable; the pixels are not.
- * The pixels are checked on a real page by `npm run verify:layout`.
+ * They live apart because jsdom reports every height as zero, so a test that
+ * drove the real effect would measure nothing, take the do-nothing branch, and
+ * pass whatever the rule said. The rules are testable; the pixels are checked
+ * on a real page by `npm run verify:layout`.
  *
- * ## Why an inversion rather than a CSS transition
+ * ## One property, on one element
  *
- * The stack is bottom-aligned, so adding an entry moves every older entry up by
- * exactly the new entry's height — before the browser paints. There is no
- * "before" state left to transition from. So the list is put *back*: translated
- * down by the height that was just added, with no transition, and then released
- * to zero. The older entries slide up from where they were, and the new one
- * rises out from behind the staging zone below, which is opaque and paints over
- * the stack's overflow. One transform, one motion, because it is one list.
+ * A step arriving is **the active zone growing from nothing to its own
+ * height**, clipped. Everything else follows from layout: the step stack is the
+ * panel's flex spacer, so its bottom edge *is* the active zone's top edge, and
+ * a zone growing underneath the history pushes the history up in lockstep. No
+ * transform on the stack, no transform on the arriving step, nothing to keep in
+ * sync — because there is only one thing moving.
+ *
+ * Two earlier attempts animated the *contents* instead: the step list by one
+ * distance and the arriving step's content by another, while the zone's height
+ * changed in a single frame. Both shipped green — suite, typecheck, and browser
+ * probes — and both were wrong in the same way, because the probes measured
+ * what the implementation did rather than what the motion is for. The jump the
+ * eye caught was the one thing neither of them animated.
  */
 
 /**
- * How long the list takes to settle.
+ * How long a step takes to arrive.
  *
- * 280ms is the arrival duration the rest of the surface already uses
- * (`step-up` in `src/styles/index.css`); the stack shares it rather than
- * inventing a second sense of "arriving".
+ * Slower than the two earlier attempts (280ms, then 340ms), because a step now
+ * travels its own full height rather than a fixed offset — a merger's step is
+ * 187px tall, and covering that in a third of a second reads as a flinch.
  */
-export const STEP_RISE_MS = 340;
+export const STEP_RISE_MS = 480;
 
 /**
- * Deliberately *not* `step-up`'s curve.
+ * An even curve, deliberately not the surface's `step-up`
+ * (`cubic-bezier(0.2, 0.7, 0.3, 1)`, which spends 70% of its distance in the
+ * first 20% of its time).
  *
- * That one is `cubic-bezier(0.2, 0.7, 0.3, 1)` — 70% of the distance in the
- * first 20% of the time — which suits a fade-and-lift where the element is
- * visible throughout. Here the distance *is* the reveal: the new step travels
- * up through the clip edge, so front-loading the travel front-loads the whole
- * effect. Measured on a real page, the row went from hidden to 91% visible in
- * 120ms of a 280ms animation, and the remaining 160ms crept the last five
- * pixels — which reads exactly as reported: the new step appears at once while
- * the older ones slide.
- *
- * An even curve spends the time on the part that can be seen.
+ * That suits a fade-and-lift where the element is visible throughout. Here the
+ * distance *is* the reveal — the step is behind the staging edge until it has
+ * travelled — so front-loading the travel front-loads the whole effect. Measured
+ * on a real page, the front-loaded version went from hidden to 91% visible in
+ * 120ms and then crept the last five pixels.
  */
 export const STEP_RISE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
@@ -47,60 +50,11 @@ export const STEP_RISE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
  * How long a step takes to leave.
  *
  * Shorter than the arrival on purpose. The two run in sequence — the old step
- * drops out of view, *then* the new one rises, so a tile switch costs both —
- * and a reversal reads faster than an arrival does: nothing new is being
- * introduced, so there is nothing for the eye to take in on the way out.
+ * collapses, *then* the new one grows, so a replacement costs both — and a
+ * reversal reads faster than an arrival: nothing new is being introduced, so
+ * there is nothing for the eye to take in on the way out.
  */
-export const STEP_EXIT_MS = 180;
-
-/**
- * The steps that are leaving.
- *
- * Identity is `stepId`, never position: the array is rebuilt from the log on
- * every render, so comparing arrays or indices would report a removal on any
- * commit at all.
- *
- * Everything that leaves, leaves together (owner's ruling). Undo removes a
- * *suffix* — `rewindTo` throws away every step after the one you picked — so
- * the rows that go are always the bottom ones, which is what lets the whole
- * list drop by their height and land with the survivors already in place. A
- * removal from the middle would need a different motion; the engine cannot
- * produce one.
- */
-export function leavingIds(shown: readonly number[], next: readonly number[]): number[] {
-  const staying = new Set(next);
-  return shown.filter((id) => !staying.has(id));
-}
-
-export interface RiseFrom {
-  /** The distance the list starts below its resting place, in pixels. */
-  offset: number;
-  duration: number;
-  ease: string;
-}
-
-/**
- * Where the list should start, given how much taller it just became.
- *
- * `null` means do not animate at all, and there are three ways to earn it:
- *
- *  - **reduced motion**, which this project treats as a hard rule rather than a
- *    softening — the step is simply present;
- *  - **nothing was added** (`delta <= 0`), which covers the first render, a
- *    re-render that changed no heights, and every removal — removals are the
- *    exit motion's business, not this one's;
- *  - **the stack shrank into view**, same case as above.
- *
- * A batch arrives as one motion, not one per entry: several steps can land
- * together — a merger writes the placement, the merge and the payout in one
- * commit, and online a whole turn arrives in a single message. `delta` is
- * whatever the list grew by, so a batch simply rises further.
- */
-export function riseFrom(delta: number, reducedMotion: boolean): RiseFrom | null {
-  if (reducedMotion) return null;
-  if (!Number.isFinite(delta) || delta <= 0) return null;
-  return { offset: delta, duration: STEP_RISE_MS, ease: STEP_RISE_EASE };
-}
+export const STEP_EXIT_MS = 240;
 
 /**
  * Whether this device has asked for less motion.

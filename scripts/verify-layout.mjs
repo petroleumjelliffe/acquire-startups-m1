@@ -209,73 +209,44 @@ const MEASURE = `(async () => {
   const handCell = document.querySelector('[data-board="grid"] button:not([disabled])');
   if (!handCell) throw new Error('no placeable tile at the first turn');
 
-  // The step stack's arrival motion, which only a real page can see: jsdom
-  // reports every height as zero, so the effect measures no growth, correctly
-  // does nothing, and any jsdom test of it passes on an unanimated list.
+  // The panel's step motion, which only a real page can see: jsdom reports
+  // every height as zero, so the effect measures a target of zero, animates
+  // nothing, and any jsdom test of it passes on a motionless panel.
   //
-  // The list is translated down by the height just added and released to zero,
-  // so one frame after the placement it should be *below* its resting place,
-  // and settled by the time the animation is over.
-  const tyOf = () => {
+  // Measured as the *relationship* the motion is for, not as the magnitude of
+  // whatever the implementation happens to move. Two earlier attempts animated
+  // the wrong things and passed probes written the other way round.
+  //
+  //  - the active zone grows from nothing to its own height, so mid-flight it
+  //    is strictly between the two;
+  //  - the history's bottom edge sits on that zone's top edge at *every*
+  //    sample, because the zone pushing it is the only thing moving it. That is
+  //    "pinned", stated as a measurement.
+  const revealSample = () => {
+    const zone = document.querySelector('[data-slot="active"]');
     const list = document.querySelector('[data-slot="stepstack"] [data-step-list]');
-    if (!list) return null;
-    const t = getComputedStyle(list).transform;
-    if (!t || t === 'none') return 0;
-    const parts = t.match(/matrix\\(([^)]+)\\)/);
-    return parts ? Math.round(Number(parts[1].split(',')[5])) : 0;
+    if (!zone || !list) return null;
+    const z = zone.getBoundingClientRect();
+    const l = list.getBoundingClientRect();
+    return {
+      zoneHeight: Math.round(z.height),
+      // Positive means the history has come unstuck from the top of the step.
+      gap: Math.round(Math.abs(l.bottom - z.top)),
+      listTransform: getComputedStyle(list).transform === 'none' ? 'none' : 'moved',
+    };
   };
 
   handCell.click();
-  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-  const stepRise = { start: tyOf() };
-  // The other half of the same motion: the *incoming* step rising from behind
-  // the staging zone (prototype/transitions.js, stepAdvance). It is a CSS
-  // animation, so it only plays when its element mounts — and React reuses that
-  // node between steps unless it is keyed, which is exactly how this animation
-  // existed for months and never ran. Sampled mid-flight; a step that is not
-  // animating reports none.
-  await wait(80);
-  const zone = document.querySelector('[data-slot="active"] > *');
-  stepRise.activeAnimation = zone ? getComputedStyle(zone).animationName : null;
-  stepRise.activeMoving = zone ? getComputedStyle(zone).transform !== 'none' : false;
-  // How far the arriving step still has to climb, as a fraction of its own
-  // height. It starts with its top on the staging zone's top edge — a whole
-  // height below where it lands — so a fifth of the way in it should still be
-  // most of the way down. A fixed offset (40px) was the reported bug: a tall
-  // step was already 90% in place before it was visible at all.
-  if (zone) {
-    const r = zone.getBoundingClientRect();
-    const stagingTop = document.querySelector('[data-slot="staging"]').getBoundingClientRect().top;
-    stepRise.activeClimbLeft = r.height > 0
-      ? Math.round(((r.top - (stagingTop - r.height)) / r.height) * 100) / 100
-      : null;
+  const stepRise = { samples: [] };
+  for (const at of [60, 160, 300]) {
+    await wait(at - (stepRise.samples.length ? [60, 160, 300][stepRise.samples.length - 1] : 0));
+    stepRise.samples.push({ at, ...revealSample() });
   }
   await wait(400);
-  stepRise.settled = tyOf();
-  await wait(300);
+  stepRise.settled = revealSample();
   stages.afterPlace = geometry();
   zoneFloors.afterPlace = floors();
   noteSeat('afterPlace');
-
-  // The other half of the motion: a step leaving. Undo the placement that was
-  // just made — the list should drop by the height of the row that is going,
-  // then settle with the row gone. The walk recovers below by placing again.
-  const undo = document.querySelector('[data-slot="stepstack"] [data-step-undo]');
-  let stepExit = null;
-  if (undo) {
-    const rowsBefore = document.querySelectorAll('[data-slot="stepstack"] [data-step-id]').length;
-    undo.click();
-    // Sampled mid-flight, not on the next frame. The exit *starts* at zero and
-    // travels down, so a sample taken one frame in reads ~0 whether the
-    // animation is running or not — which is how this probe first reported a
-    // false failure at one width and a pass at the other. 90ms is halfway
-    // through STEP_EXIT_MS (180ms in src/game/panel/stepMotion.ts).
-    await wait(90);
-    stepExit = { start: tyOf(), rowsBefore };
-    await wait(400);
-    stepExit.settled = tyOf();
-    stepExit.rowsAfter = document.querySelectorAll('[data-slot="stepstack"] [data-step-id]').length;
-  }
 
   // Keep playing until a chain has been founded and its shares are on sale.
   // One placement is almost never enough: with a random seed the opening tile
@@ -342,7 +313,6 @@ const MEASURE = `(async () => {
   return {
     seatVisible,
     stepRise,
-    stepExit,
     zoneFloors,
     // Zones that clip their content rather than fitting it. Horizontal
     // overflow inside a fixed-width panel is a bug everywhere except the
@@ -549,54 +519,49 @@ async function main() {
     if (m.finalOverlay && !m.finalOverlay.covers) {
       failures.push(`${width}px: the final scoring overlay does not cover the surface`);
     }
-    // The step stack's arrival motion. jsdom sees nothing here — every height
-    // is zero there, so the effect measures no growth and does nothing, and a
-    // jsdom test would pass just as happily on a list that never moves.
+    // The panel's step motion, measured as the relationship it exists for.
+    //
+    // Two earlier attempts at this motion shipped green because their probes
+    // measured the magnitude of whatever the implementation moved. This one
+    // asks what the motion is *for*: the zone grows, and the history stays
+    // stuck to the top of it while it does. Both are true of the right
+    // implementation and false of both wrong ones.
     const rise = m.stepRise;
-    if (!rise || rise.start === null) {
-      failures.push(`${width}px: no step list to measure the arrival motion on`);
-    } else if (rise.start <= 0) {
-      failures.push(
-        `${width}px: the step stack did not rise — one frame after a placement the list ` +
-        `sat at ${rise.start}px instead of below its resting place, so the new step ` +
-        `appeared rather than arriving`,
-      );
-    } else if (rise.settled !== 0) {
-      failures.push(
-        `${width}px: the step stack never settled — ${rise.settled}px off its resting ` +
-        `place after the animation should have finished`,
-      );
-    } else if (rise.activeAnimation !== 'step-rise' || !rise.activeMoving) {
-      failures.push(
-        `${width}px: the incoming step did not rise — the active zone reported ` +
-        `animation "${rise.activeAnimation}" and ${rise.activeMoving ? 'was' : 'was not'} ` +
-        `moving 80ms in. It appears in place instead of coming up from behind staging, ` +
-        `which is what happens when the zone is not keyed and React reuses the node.`,
-      );
-    } else if ((rise.activeClimbLeft ?? 0) < 0.5) {
-      failures.push(
-        `${width}px: the incoming step was already ` +
-        `${Math.round((1 - (rise.activeClimbLeft ?? 0)) * 100)}% in place 80ms in — it should ` +
-        `start a whole step-height below, with its top on the staging edge, and still have ` +
-        `most of the climb left this early. A short fixed offset reads as a fade.`,
-      );
-    }
-    // And a step leaving, which is the same machinery run backwards: undo the
-    // placement and the list should drop by the height of the row that is
-    // going, then settle one row shorter.
-    const exit = m.stepExit;
-    if (!exit) {
-      failures.push(`${width}px: no undo control to measure a step leaving with`);
-    } else if (exit.start <= 0) {
-      failures.push(
-        `${width}px: the undone step did not leave — the list sat at ${exit.start}px one ` +
-        `frame after the undo instead of dropping out of view`,
-      );
-    } else if (exit.settled !== 0 || exit.rowsAfter >= exit.rowsBefore) {
-      failures.push(
-        `${width}px: the step stack did not settle after an undo — ${exit.settled}px off, ` +
-        `${exit.rowsBefore} rows before and ${exit.rowsAfter} after`,
-      );
+    const settled = rise?.settled;
+    if (!rise || !settled || rise.samples.some((s) => !s)) {
+      failures.push(`${width}px: could not measure the step reveal — no active zone or step list`);
+    } else {
+      const mid = rise.samples.filter((s) => s.zoneHeight > 0 && s.zoneHeight < settled.zoneHeight);
+      if (mid.length === 0) {
+        failures.push(
+          `${width}px: the active zone never grew — it was ${settled.zoneHeight}px at every ` +
+          `sample (${rise.samples.map((s) => s.zoneHeight).join(', ')}), so the step appeared ` +
+          `at full height instead of rising into place`,
+        );
+      }
+      // The gap is a constant, not a zero: the stack has 8px of bottom padding
+      // between its list and its own edge. What "pinned" means is that the
+      // constant does not *change* while the zone grows — the history rides the
+      // zone's top edge rather than moving on its own schedule. Two pixels of
+      // tolerance for subpixel layout, and no more: the reported jump was 40px+.
+      const drift = rise.samples
+        .map((s) => ({ at: s.at, by: Math.abs(s.gap - settled.gap) }))
+        .filter((s) => s.by > 2);
+      if (drift.length > 0) {
+        failures.push(
+          `${width}px: the history came unstuck from the arriving step — ` +
+          drift.map((s) => `${s.at}ms out by ${s.by}px`).join(', ') +
+          ` — it should be pushed by the zone, not moved separately`,
+        );
+      }
+      const moved = [...rise.samples, settled].filter((s) => s.listTransform !== 'none');
+      if (moved.length > 0) {
+        failures.push(
+          `${width}px: the step list carries a transform of its own, which is the mechanism ` +
+          `this motion was reworked to remove — the list moves because the zone below it ` +
+          `grows, and nothing else`,
+        );
+      }
     }
     const seatSamples = Object.entries(m.seatVisible ?? {});
     if (seatSamples.length < 3) {
@@ -715,8 +680,7 @@ async function main() {
       `${width}px  roster samples ${JSON.stringify(m.seatVisible)}` +
       `\n         board ${m.board ? Math.round(m.board.width) + 'x' + Math.round(m.board.height) : 'none'}` +
       `\n         finalOverlay: ${JSON.stringify(m.finalOverlay)}` +
-      `\n         step rise ${JSON.stringify(m.stepRise)}` +
-      `\n         step exit ${JSON.stringify(m.stepExit)}` +
+      `\n         step reveal ${JSON.stringify(m.stepRise)}` +
       `\n         ` + stageNames.map((n) => `${n} ${JSON.stringify(m.stages[n])}`).join('\n         '),
     );
 

@@ -73,21 +73,18 @@ describe('GameScreen', () => {
   });
 
   /**
-   * The enter animation is CSS, and CSS animations play on mount. React reuses
-   * the active zone's node from one step to the next, so the animation ran once
-   * at the start of the game and never again — the reported "the next step just
-   * appears". A new step has to be a new node.
+   * The active zone is wrapped so it can animate its own height when the step
+   * changes — the one motion in the panel, which pushes the history above it.
+   * `GameScreen` supplies the step's identity; the zone has to *observe* that
+   * change rather than be remounted by it, or there is nothing left on screen
+   * to animate away.
    */
-  it('mounts a fresh active step when the step changes', () => {
+  it('hands the active zone a step identity to animate between', () => {
     const { container } = render(<GameScreen session={createGameSession({ state: playable() })} />);
     fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
-    const before = container.querySelector('[data-slot="active"]')!.firstElementChild;
-    fireEvent.click(onBoard('E6'));
-    const after = container.querySelector('[data-slot="active"]')!.firstElementChild;
-
-    expect(before).not.toBe(after);
-    expect(after!.className).toMatch(/active-step-enter/);
+    const zone = container.querySelector('[data-slot="active"] [data-step-reveal]');
+    expect(zone, 'the active zone is not wrapped for the reveal').not.toBeNull();
   });
 
   it('undoes a placement from the step stack', () => {
