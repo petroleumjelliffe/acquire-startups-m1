@@ -28,6 +28,17 @@ afterAll(async () => { await server.close(); });
  * `NetworkSession` arrived at, by predicting six of nine intents locally and
  * being corrected on the rest. If projection, the commit boundary, or the
  * optimistic reducer disagree with the server, it is this file that notices.
+ *
+ * That makes this a **consistency** oracle, not a **privacy** oracle — worth
+ * stating plainly, because the two are easy to conflate under one green run.
+ * Every per-seat assertion here compares a client's state to
+ * `project(room.committed(), seat.id)` — the same `project` under test on
+ * both sides. If `project` stopped hiding hands entirely, both sides would
+ * move together and all seventeen games would stay green; nothing here would
+ * notice. The privacy oracle — the thing that actually proves a hand stays
+ * hidden — is `server/projectionOverWire.test.ts`, which asserts the literal
+ * shape a non-actor receives (`hand === []`, `seed === ''`, `bag === []`),
+ * not just "equal to what the other side computed."
  */
 describe('two networked clients reach the same state the server holds', () => {
   // Summed across every game and floored after the loop. A comparison count
@@ -96,7 +107,7 @@ describe('two networked clients reach the same state the server holds', () => {
             // case: it only ever captures a state for `predictable` steps,
             // which by definition excludes every `DRAWS` type.
             expect(session.getView().state, `${where} — the client moved before the server answered`)
-              .toEqual(beforeDispatch);
+              .toBe(beforeDispatch);
             deferred++;
           }
 

@@ -9,7 +9,10 @@
 **Design:** [2026-08-05-phase-3b-networked-client-design.md](./2026-08-05-phase-3b-networked-client-design.md)
 **Predecessor:** [2026-08-05-phase-3a-carry-forward.md](./2026-08-05-phase-3a-carry-forward.md)
 **Execution ledger:** [progress.md](../../../.superpowers/sdd/2026-08-05-phase-3b-networked-client/progress.md)
+*(session artifact — `.superpowers/` is not tracked in git; this link resolves in the authoring
+working copy only, not after a clone)*
 **Browser pass:** [by-hand-pass.md](../../../.superpowers/sdd/2026-08-05-phase-3b-networked-client/by-hand-pass.md)
+*(session artifact — same caveat: not tracked in git, dead on clone)*
 
 **A client now speaks the server's protocol, and it has been driven — but not yet by a human.**
 `src/net/` is a real `GameSession` backed by a socket: six of nine intents apply optimistically,
@@ -61,6 +64,10 @@ only) and "a client actually received the right thing" (Task 8, outbound). 3b's 
 `server/clientOverWire.test.ts` (Task 7 of this phase), is what actually proves the second half for
 a *client* rather than a raw socket harness: two real `NetworkSession`s, driven only through the
 public `dispatch`/`getView` surface `GameScreen` itself uses, replaying all seventeen golden games.
+It is a **consistency** oracle — both sides move through the same `project`, so it would not notice
+`project` itself leaking a hand — not a **privacy** oracle; that proof stays `server/
+projectionOverWire.test.ts`'s, which asserts the literal shape (`hand === []`, …) a non-actor
+receives. The distinction is stated inline in the test file's own docstring, not just here.
 Measured, not assumed: **29 optimistic predictions** verified equal to the server's own projection
 (floor 25 — see Deviations, below, for why the floor moved), and **7 deferred bag-draws** verified
 to leave the client's own state untouched until the server answers (floor 5). Both breaks named in
