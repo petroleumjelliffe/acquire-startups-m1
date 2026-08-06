@@ -16,7 +16,7 @@ button {
   margin: 1px;
 }
 
-/* ---- src/game/ motion: a step arriving is the only enter animation ---- */
+/* ---- src/game/ motion: things arriving share one enter animation ---- */
 
 @keyframes step-up {
   from {
@@ -33,6 +33,10 @@ button {
 .active-step-enter {
   animation: step-up 280ms cubic-bezier(0.2, 0.7, 0.3, 1);
 }
+
+/* `TurnToast` reuses `.step-enter` rather than defining a second keyframe:
+   one arrival motion for the whole game surface, and one reduced-motion rule
+   below that covers everything using it. */
 
 @media (prefers-reduced-motion: reduce) {
   .step-enter,

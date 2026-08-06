@@ -273,7 +273,10 @@ describe('a dropped connection', () => {
     // contain "disconnect" and a bare text query would match twice.
     expect(screen.queryByText(/sending/i)).toBeNull();
     expect(screen.getByRole('alert')).toHaveTextContent(/disconnect/i);
-    expect(screen.getByRole('status')).toHaveTextContent(/disconnect/i);
+    // By test id, not by role: the turn toast is also a live region, and
+    // since it now announces your *own* turn as well there are two on screen
+    // whenever it is your move.
+    expect(screen.getByTestId('connection-strip')).toHaveTextContent(/disconnect/i);
   });
 
   it('resends the stored-identity join once the socket comes back', () => {

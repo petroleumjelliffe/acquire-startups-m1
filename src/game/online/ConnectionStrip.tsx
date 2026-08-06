@@ -13,6 +13,7 @@ export function ConnectionStrip({ status }: { status: ConnectionStatus }) {
 
   return (
     <div
+      data-testid="connection-strip"
       role="status"
       className="fixed left-1/2 top-2 z-50 -translate-x-1/2 rounded-full bg-amber-500 px-4 py-1.5 text-sm font-semibold text-white shadow-lg"
     >

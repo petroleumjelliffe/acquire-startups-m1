@@ -175,12 +175,20 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
       />
 
       {/*
-        Online only, and only while someone else holds the turn. Pass-and-play
-        has the curtain, which already says whose turn it is at full-screen
-        size; showing both would be saying it twice.
+        Online only. Pass-and-play has the curtain, which already says whose
+        turn it is at full-screen size; showing both would be saying it twice.
+
+        Keyed on the segment, so every handoff mounts a fresh toast: the
+        your-turn form announces itself and leaves, and without the key it
+        would announce once per game rather than once per turn.
       */}
-      {viewerId !== undefined && actor && actorId !== viewerId && (
-        <TurnToast name={actor.name} emoji={actor.emoji} />
+      {viewerId !== undefined && actor && (
+        <TurnToast
+          key={`${actorId}-${view.segmentStart}`}
+          name={actor.name}
+          emoji={actor.emoji}
+          mine={actorId === viewerId}
+        />
       )}
 
       {viewerId === undefined && awaitingReveal && actor && (

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { GameScreen } from './GameScreen';
 import { createGameSession } from '../../session/GameSession';
 import type { GameSession, SessionView } from '../../session/GameSession';
@@ -319,8 +319,36 @@ describe('GameScreen with a viewer who is not the actor', () => {
     expect(screen.getByTitle('A1')).toBeInTheDocument();
   });
 
-  it('shows no toast to the player whose turn it is', () => {
+  it('announces your own turn differently from someone else waiting', () => {
+    // Someone else up is a standing fact and persists; your turn arriving is
+    // an event that announces itself and goes.
     render(<GameScreen session={createGameSession({ state: playable() })} viewerId="p1" />);
+    expect(screen.getByTestId('turn-toast')).toHaveAttribute('data-turn', 'mine');
+    expect(screen.getByTestId('turn-toast')).toHaveTextContent(/your turn/i);
+  });
+
+  it('takes the your-turn announcement away again, but not the other one', () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = render(
+        <GameScreen session={createGameSession({ state: playable() })} viewerId="p1" />,
+      );
+      act(() => { vi.advanceTimersByTime(5000); });
+      expect(screen.queryByTestId('turn-toast'), 'the announcement never left').toBeNull();
+      unmount();
+
+      // The watcher's form is a standing fact, so time does not remove it.
+      render(<GameScreen session={createGameSession({ state: playable() })} viewerId="p2" />);
+      act(() => { vi.advanceTimersByTime(5000); });
+      expect(screen.getByTestId('turn-toast')).toHaveAttribute('data-turn', 'theirs');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows no toast at all in pass-and-play', () => {
+    // The curtain already announces the handoff, at full-screen size.
+    render(<GameScreen session={createGameSession({ state: playable() })} />);
     expect(screen.queryByTestId('turn-toast')).toBeNull();
   });
 
