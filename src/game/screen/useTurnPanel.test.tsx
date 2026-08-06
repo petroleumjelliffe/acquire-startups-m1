@@ -164,6 +164,40 @@ describe('useTurnPanel — buying', () => {
     expect(dispatch).toHaveBeenCalledWith({ type: 'endTurn', playerId: 'p1' });
   });
 
+  /**
+   * Sold out is information — it is how you know the brand is locked and what
+   * the other players have been doing with their money. Dropping the card
+   * destroys it, and the row silently gets shorter with nothing to say why.
+   */
+  it('keeps a sold-out brand in the row, inert', () => {
+    const soldOut = buildFixture({
+      stage: 'buy',
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['H8'], shares: { Messla: 13 } },
+        { name: 'Sam', cash: 6000, hand: ['A1'], shares: { Messla: 12 } },
+      ],
+      chains: [
+        { id: 'Messla', coords: ['E5', 'E6'] },
+        { id: 'Gobble', coords: ['B2', 'B3'] },
+      ],
+      bag: ['I11', 'I12'],
+    });
+    expect(
+      soldOut.startups.Messla.availableShares,
+      'the fixture did not actually sell Messla out',
+    ).toBe(0);
+
+    render(<Harness session={createGameSession({ state: soldOut })} dispatch={() => {}} />);
+
+    const messla = screen.getByRole('button', { name: /messla/i });
+    expect(messla).toBeDisabled();
+    // The name says it in full; the card wears the short form.
+    expect(messla).toHaveAccessibleName(/sold out/i);
+    expect(messla).toHaveTextContent(/sold/i);
+    // The brand with shares left is unaffected.
+    expect(screen.getByRole('button', { name: /buy one gobble/i })).toBeEnabled();
+  });
+
   it('buys and ends the turn in one press', () => {
     const dispatch = vi.fn();
     render(<Harness session={atBuy()} dispatch={dispatch} />);

@@ -391,7 +391,12 @@ export function useTurnPanel(
     const spent = staged.picks.reduce((sum, id) => sum + getSharePrice(state, id), 0);
     const remaining = MAX_BUYS_PER_TURN - (state.currentBuyCount ?? 0) - staged.picks.length;
 
-    const forSale = Object.values(state.startups).filter((s) => s.isFounded && s.availableShares > 0);
+    // Every founded brand, sold out or not. Filtering on `availableShares > 0`
+    // made a brand vanish from the row the moment its last share was bought —
+    // and sold out is information: it is how you learn the brand is locked and
+    // what everyone else has been spending on. A row that quietly gets shorter
+    // says none of that.
+    const founded = Object.values(state.startups).filter((s) => s.isFounded);
     const basket = Object.entries(
       staged.picks.reduce<Record<string, number>>(
         (acc, id) => ({ ...acc, [id]: (acc[id] ?? 0) + 1 }),
@@ -406,13 +411,14 @@ export function useTurnPanel(
           body={
             <>
               <div className="flex flex-wrap gap-2">
-                {forSale.map((s) => {
+                {founded.map((s) => {
                   // Bound to a const so the `isStartupId` narrowing survives
                   // into the click handler; narrowing a mutable property does
                   // not reach inside a closure.
                   const id = s.id;
                   if (!isStartupId(id)) return null;
                   const price = getSharePrice(state, id);
+                  const soldOut = s.availableShares === 0;
                   // The atom, not a bare button: shares are portrait
                   // certificates everywhere else in this UI — in the staging
                   // pile, in the hand zone, in the payout lines — and the buy
@@ -426,9 +432,19 @@ export function useTurnPanel(
                       price={price}
                       size="sm"
                       mode="add"
-                      label={`Buy one ${id}`}
-                      badge={id === freshBrand ? 'new' : undefined}
-                      disabled={!canAct || remaining <= 0 || (player?.cash ?? 0) < spent + price}
+                      // The pill has room for one short word at 9px on a 40px
+                      // card, so the badge says "sold" and the accessible name
+                      // carries the whole phrase — a card nobody can press
+                      // should not be announced as "Buy one Messla".
+                      label={soldOut ? `${id} — sold out` : `Buy one ${id}`}
+                      badge={soldOut ? 'sold' : id === freshBrand ? 'new' : undefined}
+                      badgeTone={soldOut ? 'muted' : 'info'}
+                      // Sold out is a third, independent reason to be inert.
+                      // Folding it into the cash or buy-count test would make
+                      // an empty pool look like an affordability problem.
+                      disabled={
+                        soldOut || !canAct || remaining <= 0 || (player?.cash ?? 0) < spent + price
+                      }
                       onClick={() => setStaged({ ...staged, picks: [...staged.picks, id] })}
                     />
                   );

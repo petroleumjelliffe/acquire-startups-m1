@@ -488,6 +488,54 @@ export const SECTIONS: CatalogSection[] = [
 
   {
     seq: '·',
+    title: 'Buy-row cards (vocabulary)',
+    intent:
+      'The three states a brand can be in during the buy step. Sold out stays in the row rather than disappearing from it — a shorter row says nothing about why.',
+    states: [
+      {
+        label: 'card · for sale',
+        node: (
+          <StockCard id="Messla" price={MESSLA_PRICE} size="sm" mode="add" label="Buy one Messla" onClick={noop} />
+        ),
+      },
+      {
+        label: 'card · founded this turn',
+        node: (
+          <StockCard
+            id="Messla"
+            price={MESSLA_PRICE}
+            size="sm"
+            mode="add"
+            badge="new"
+            label="Buy one Messla"
+            onClick={noop}
+          />
+        ),
+      },
+      {
+        label: 'card · sold out',
+        node: (
+          <StockCard
+            id="Messla"
+            price={MESSLA_PRICE}
+            size="sm"
+            mode="add"
+            badge="sold"
+            badgeTone="muted"
+            disabled
+            label="Messla — sold out"
+          />
+        ),
+      },
+    ].map((s) => ({
+      ...s,
+      kind: 'atom' as const,
+      fixture: authored('the vocabulary itself — a state, not a position'),
+    })),
+  },
+
+  {
+    seq: '·',
     title: 'Card stacks (vocabulary)',
     intent:
       'A stock card plus a count outside it. Composable along size (default / sm), depth (scaling with |count|), leaving and removable. Content variants: cash, zero.',

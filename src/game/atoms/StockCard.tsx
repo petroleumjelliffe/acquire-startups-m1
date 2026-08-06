@@ -15,6 +15,13 @@ export interface StockCardProps {
   /** Card edges peeking out behind the front card. See `stackDepth`. */
   depth?: 0 | 1 | 2;
   badge?: string;
+  /**
+   * What the badge means. `info` is news — a brand founded this turn. `muted`
+   * is a state the card is *in*, and must not compete with the live one: two
+   * blue pills in the same row read as two things worth acting on, when one of
+   * them is a card you cannot press.
+   */
+  badgeTone?: 'info' | 'muted';
   mode?: 'static' | 'select' | 'add' | 'remove';
   /**
    * What pressing this card does, for anyone not reading it visually. Without
@@ -53,6 +60,7 @@ export function StockCard({
   size,
   depth = 0,
   badge,
+  badgeTone = 'info',
   mode = 'static',
   label,
   selected,
@@ -97,7 +105,12 @@ export function StockCard({
         </span>
       )}
       {badge && (
-        <span className="absolute -right-[7px] -top-2 rounded-full bg-blue-600 px-1 text-[9px] font-bold text-white">
+        <span
+          className={
+            'absolute -right-[7px] -top-2 rounded-full px-1 text-[9px] font-bold text-white ' +
+            (badgeTone === 'muted' ? 'bg-gray-500' : 'bg-blue-600')
+          }
+        >
           {badge}
         </span>
       )}
