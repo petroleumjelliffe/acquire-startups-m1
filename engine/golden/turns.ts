@@ -40,10 +40,10 @@ const G1: GoldenGame = {
         boardOwner: { E5: 'Messla', E6: 'Messla' },
         shares: { p1: { Messla: 1 } },
         availableShares: { Messla: 24 },
-        // `foundStartup` logs twice under the same phase: `grantFoundingShare`
-        // logs the free-share grant first, then the founding itself — see
-        // task-11-report.md.
-        logPhases: ['Founded a brand', 'Founded a brand'],
+        // One action, one entry. `grantFoundingShare` used to log the free
+        // share under this same phase, so founding wrote two identical-looking
+        // steps; the share shows in the player's holdings instead.
+        logPhases: ['Founded a startup'],
       },
     },
     {

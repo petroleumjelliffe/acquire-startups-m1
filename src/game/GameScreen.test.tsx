@@ -92,7 +92,7 @@ describe('GameScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
     fireEvent.click(onBoard('E6'));
-    expect(screen.getByText(/found a brand/i)).toBeInTheDocument();
+    expect(screen.getByText(/found a startup/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /undo/i }));
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
@@ -107,7 +107,7 @@ describe('changing your mind about a tile', () => {
     // E6 sits next to the loner E5, so placing it asks which brand to found —
     // the stage has moved on, which is what used to make a second click an
     // error rather than a correction.
-    expect(screen.getByText(/found a brand/i)).toBeInTheDocument();
+    expect(screen.getByText(/found a startup/i)).toBeInTheDocument();
   }
 
   it('switches to the new tile without an undo first', () => {

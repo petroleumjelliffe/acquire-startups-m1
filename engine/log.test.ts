@@ -15,10 +15,10 @@ describe('log', () => {
 
   it('records phase, detail tokens and player', () => {
     const state = createTestGameState();
-    pushLog(state, 'Founded a brand', [tok.brand('Messla'), tok.text(' at '), tok.tile('C6')], 'p2');
+    pushLog(state, 'Founded a startup', [tok.brand('Messla'), tok.text(' at '), tok.tile('C6')], 'p2');
     expect(state.log[0]).toEqual({
       stepId: 1,
-      phase: 'Founded a brand',
+      phase: 'Founded a startup',
       playerId: 'p2',
       detail: [
         { kind: 'brand', startupId: 'Messla' },

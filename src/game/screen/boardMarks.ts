@@ -5,7 +5,7 @@ import { isStartupId } from '../../../engine/startups';
 /** The log phase a tile placement is filed under. */
 const PLACED = 'Placed a tile';
 /** …and a founding. */
-const FOUNDED = 'Founded a brand';
+const FOUNDED = 'Founded a startup';
 
 /**
  * Where each player last played, badged with their emoji.

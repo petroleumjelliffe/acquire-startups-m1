@@ -86,7 +86,7 @@ function foundingSize(state: GameState, coord: Coord): number {
 export function stageLabel(stage: GameState['stage']): string {
   switch (stage) {
     case 'draw': return 'Open the game';
-    case 'foundStartup': return 'Found a brand';
+    case 'foundStartup': return 'Found a startup';
     case 'chooseSurvivor': return 'Which chain survives?';
     case 'mergerLiquidation': return 'Liquidate shares';
     case 'buy': return 'Buy shares';
@@ -369,7 +369,15 @@ export function useTurnPanel(
       return {
         active: (
           <ActiveStep
-            label={stageLabel(state.stage)}
+            /*
+              The chain and the shareholder, not just the verb. A queue works
+              through several holders one at a time, and "Liquidate shares"
+              says neither which chain is being sorted nor whose turn in the
+              queue it is — which online leaves a watcher with a liquidation
+              step and no sign that it is not theirs. Built here rather than in
+              `stageLabel`, which takes a stage and should not reach for state.
+            */
+            label={`Liquidate ${absorbedId} — ${player.name}`}
             body={
               <>
                 <LiqQueue holders={holders} />
@@ -492,7 +500,16 @@ export function useTurnPanel(
     return {
       active: (
         <ActiveStep
-          label={stageLabel(state.stage)}
+          /*
+            The cap, which is otherwise a rule you discover by hitting it: the
+            cards simply stop responding at three. Counted from what the turn
+            has already committed plus what is staged, against
+            `MAX_BUYS_PER_TURN` — the same two numbers `remaining` above is
+            derived from, never a literal.
+          */
+          label={`${stageLabel(state.stage)} (${
+            (state.currentBuyCount ?? 0) + staged.picks.length
+          }/${MAX_BUYS_PER_TURN})`}
           body={
             <>
               {/*

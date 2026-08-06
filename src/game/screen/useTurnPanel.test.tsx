@@ -175,7 +175,7 @@ describe('useTurnPanel', () => {
     const dispatch = vi.fn();
     render(<Harness session={session} dispatch={dispatch} />);
 
-    expect(screen.getByText(/found a brand/i)).toBeInTheDocument();
+    expect(screen.getByText(/found a startup/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /messla/i }));
     expect(dispatch).toHaveBeenCalledWith({
       type: 'chooseFoundingBrand',
@@ -236,6 +236,32 @@ describe('useTurnPanel — buying', () => {
     render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
     expect(screen.queryByText(/found a startup to buy shares/i)).toBeNull();
     expect(screen.getByRole('button', { name: /messla — sold out/i })).toBeInTheDocument();
+  });
+
+  /**
+   * Three shares a turn is otherwise a rule you discover by hitting it — the
+   * cards just stop responding. Counted from what the turn has already
+   * committed *plus* what is staged: a player who bought one and staged
+   * another is at two, and a test that only stages would pass while ignoring
+   * the committed half.
+   */
+  it('shows how much of the buy limit is spent', () => {
+    const session = atBuy();
+    render(<Harness session={session} dispatch={() => {}} />);
+    expect(screen.getByText(/buy shares \(0\/3\)/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /buy one messla/i }));
+    expect(screen.getByText(/buy shares \(1\/3\)/i)).toBeInTheDocument();
+  });
+
+  it('counts what the turn already committed, not just what is staged', () => {
+    const session = atBuy();
+    session.dispatch({ type: 'buyShares', playerId: 'p1', picks: ['Messla'] });
+    render(<Harness session={session} dispatch={() => {}} />);
+
+    expect(screen.getByText(/buy shares \(1\/3\)/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /buy one messla/i }));
+    expect(screen.getByText(/buy shares \(2\/3\)/i)).toBeInTheDocument();
   });
 
   it('stages picks locally without dispatching', () => {
@@ -368,6 +394,26 @@ describe('useTurnPanel — mergers', () => {
     }
     throw new Error('no golden game reaches that state');
   }
+
+  /**
+   * A queue works through several holders one at a time. "Liquidate shares"
+   * says neither which chain is being sorted nor whose turn it is — and online
+   * that leaves a watcher looking at a liquidation step with no sign that it
+   * is not theirs.
+   */
+  it('names the chain being sorted and the shareholder sorting it', () => {
+    const state = stateWhere((s) => s.stage === 'mergerLiquidation');
+    const ctx = state.mergerContext!;
+    const absorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
+    const holder = state.players.find((p) => p.id === ctx.shareholderQueue[ctx.currentShareholderIndex])!;
+
+    render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
+    // Both facts in the one label — the name alone matches the queue below it
+    // too, which would pass without the label saying anything.
+    expect(
+      screen.getByText(new RegExp(`liquidate ${absorbed}.*${holder.name}`, 'i')),
+    ).toBeInTheDocument();
+  });
 
   it('renders the liquidation queue and the acting shareholder', () => {
     const session = createGameSession({ state: stateWhere((s) => s.stage === 'mergerLiquidation') });

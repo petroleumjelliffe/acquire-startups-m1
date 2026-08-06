@@ -149,7 +149,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       state.pendingFoundTile = coord;
       pushLog(state, 'Placed a tile', [
         tok.tile(coord),
-        tok.text(' — choose a brand to found'),
+        tok.text(' — choose a startup to found'),
       ], player.id);
 
       // The brand choice itself is the client's: the game parks on
@@ -207,7 +207,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       // `state.log`, so a silent segment is a hole in the feature.
       pushLog(state, 'Placed a tile', [
         tok.tile(coord),
-        tok.text(' — choose which brand survives'),
+        tok.text(' — choose which startup survives'),
       ], player.id);
     } else {
       // No tie - proceed with automatic survivor selection
@@ -480,7 +480,7 @@ export function foundStartup(
 
   //grant founding bondus
   grantFoundingShare(state, state.players[state.turnIndex].id, id);
-  pushLog(state, 'Founded a brand', [tok.brand(id), tok.text(' at '), tok.tile(foundingTile)], state.players[state.turnIndex].id);
+  pushLog(state, 'Founded a startup', [tok.brand(id), tok.text(' at '), tok.tile(foundingTile)], state.players[state.turnIndex].id);
 
   state.stage = "buy";
   delete state.pendingFoundTile;
@@ -571,11 +571,12 @@ export function grantFoundingShare(
   if (startup.availableShares > 0) {
     startup.availableShares -= 1;
     player.portfolio[startupId] = (player.portfolio[startupId] || 0) + 1;
-    pushLog(state, 'Founded a brand', [
-      tok.text('Received a free share of '),
-      tok.brand(startupId),
-      tok.text(' for founding it'),
-    ], player.id);
+    // Deliberately silent. Founding is **one** action and gets one step: this
+    // used to log "Received a free share of X for founding it" and then
+    // `foundStartup` logged "X at C4" straight after, so the stack showed the
+    // same step twice under the same phase. The share itself is not lost by
+    // saying less — it appears in the player's holdings, which is where every
+    // other share they own appears.
   }
 }
 

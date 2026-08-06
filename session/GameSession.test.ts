@@ -160,17 +160,32 @@ describe('segments', () => {
   });
 
   it('offers one undo point per intent, not per log entry', () => {
-    // Founding pushes two log entries under one intent (the founder share, then
-    // the founding itself), so step ids outrun snapshots. Only the intent is
-    // undoable.
-    const session = createGameSession({ state: playableGame() });
-    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
-    const beforeFound = session.getView().state.nextStepId;
-    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    /*
+      A merger is the case: one `placeTile` writes the placement, the merge and
+      the payout, so step ids outrun snapshots and only the intent is undoable.
 
-    expect(session.getView().state.nextStepId).toBeGreaterThan(beforeFound + 1);
-    expect(session.getView().undoableSteps).toContain(beforeFound);
-    expect(session.getView().undoableSteps).not.toContain(beforeFound + 1);
+      This used to be demonstrated with a founding, which pushed two entries —
+      the founder share and then the founding itself. It pushes one now (the
+      two rendered as the same step twice), so the example moved to the case
+      that still has the property rather than the assertion being softened.
+    */
+    const merging = ALL_GOLDEN_GAMES.find((g) => g.id === 'G2')!;
+    const states = replayGoldenGame(merging);
+    const before = states.findIndex((s) => s.stage === 'play');
+    if (before < 0) throw new Error('G2 no longer passes through a placeable state');
+
+    const session = createGameSession({ state: states[before] });
+    const view = session.getView();
+    const step = merging.steps[before];
+    if (step?.intent.type !== 'placeTile') throw new Error('G2 step order changed');
+
+    const beforeId = view.state.nextStepId;
+    session.dispatch(step.intent);
+
+    const after = session.getView();
+    expect(after.state.nextStepId, 'the merge logged only one entry').toBeGreaterThan(beforeId + 1);
+    expect(after.undoableSteps).toContain(beforeId);
+    expect(after.undoableSteps).not.toContain(beforeId + 1);
   });
 
   it('leaves the curtain down after undoing within a segment', () => {
