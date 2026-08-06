@@ -208,7 +208,28 @@ const MEASURE = `(async () => {
   // Place the first hand tile. Hand cells are the only clickable board cells.
   const handCell = document.querySelector('[data-board="grid"] button:not([disabled])');
   if (!handCell) throw new Error('no placeable tile at the first turn');
+
+  // The step stack's arrival motion, which only a real page can see: jsdom
+  // reports every height as zero, so the effect measures no growth, correctly
+  // does nothing, and any jsdom test of it passes on an unanimated list.
+  //
+  // The list is translated down by the height just added and released to zero,
+  // so one frame after the placement it should be *below* its resting place,
+  // and settled by the time the animation is over.
+  const tyOf = () => {
+    const list = document.querySelector('[data-slot="stepstack"] [data-step-list]');
+    if (!list) return null;
+    const t = getComputedStyle(list).transform;
+    if (!t || t === 'none') return 0;
+    const parts = t.match(/matrix\\(([^)]+)\\)/);
+    return parts ? Math.round(Number(parts[1].split(',')[5])) : 0;
+  };
+
   handCell.click();
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const stepRise = { start: tyOf() };
+  await wait(400);
+  stepRise.settled = tyOf();
   await wait(300);
   stages.afterPlace = geometry();
   zoneFloors.afterPlace = floors();
@@ -278,6 +299,7 @@ const MEASURE = `(async () => {
 
   return {
     seatVisible,
+    stepRise,
     zoneFloors,
     // Zones that clip their content rather than fitting it. Horizontal
     // overflow inside a fixed-width panel is a bug everywhere except the
@@ -484,6 +506,24 @@ async function main() {
     if (m.finalOverlay && !m.finalOverlay.covers) {
       failures.push(`${width}px: the final scoring overlay does not cover the surface`);
     }
+    // The step stack's arrival motion. jsdom sees nothing here — every height
+    // is zero there, so the effect measures no growth and does nothing, and a
+    // jsdom test would pass just as happily on a list that never moves.
+    const rise = m.stepRise;
+    if (!rise || rise.start === null) {
+      failures.push(`${width}px: no step list to measure the arrival motion on`);
+    } else if (rise.start <= 0) {
+      failures.push(
+        `${width}px: the step stack did not rise — one frame after a placement the list ` +
+        `sat at ${rise.start}px instead of below its resting place, so the new step ` +
+        `appeared rather than arriving`,
+      );
+    } else if (rise.settled !== 0) {
+      failures.push(
+        `${width}px: the step stack never settled — ${rise.settled}px off its resting ` +
+        `place after the animation should have finished`,
+      );
+    }
     const seatSamples = Object.entries(m.seatVisible ?? {});
     if (seatSamples.length < 3) {
       failures.push(
@@ -601,6 +641,7 @@ async function main() {
       `${width}px  roster samples ${JSON.stringify(m.seatVisible)}` +
       `\n         board ${m.board ? Math.round(m.board.width) + 'x' + Math.round(m.board.height) : 'none'}` +
       `\n         finalOverlay: ${JSON.stringify(m.finalOverlay)}` +
+      `\n         step rise ${JSON.stringify(m.stepRise)}` +
       `\n         ` + stageNames.map((n) => `${n} ${JSON.stringify(m.stages[n])}`).join('\n         '),
     );
 

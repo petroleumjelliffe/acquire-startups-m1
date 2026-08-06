@@ -33,6 +33,25 @@ describe('StepStack', () => {
     expect(container.querySelectorAll('[data-step-undo]')).toHaveLength(0);
   });
 
+  /**
+   * The list is one transformable element, not a set of self-animating rows.
+   * Both halves matter: a per-entry animation in a bottom-aligned list can
+   * only animate the newest row while every older one jumps, which is the
+   * defect the whole motion rework exists to fix.
+   *
+   * jsdom cannot see the motion itself — every height here is zero, so the
+   * effect measures a growth of 0 and correctly does nothing. What the
+   * animation looks like is settled on a real page by `verify:layout`'s
+   * step-rise probe and by eye.
+   */
+  it('animates the list, not the entries', () => {
+    const { container } = render(<StepStack entries={ENTRIES} />);
+    const list = container.querySelector('[data-step-list]');
+    expect(list).not.toBeNull();
+    expect(list!.querySelectorAll('[data-step-phase]')).toHaveLength(ENTRIES.length);
+    expect(container.querySelectorAll('.step-enter')).toHaveLength(0);
+  });
+
   // stepId is the entry's identity — the same id Plan 1a's rewindTo takes —
   // so undo must call back with that step's own id, not its array index.
   it('calls back with that entry own stepId', () => {

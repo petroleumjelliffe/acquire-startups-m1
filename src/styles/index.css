@@ -36,7 +36,14 @@ button {
 
 /* `TurnToast` reuses `.step-enter` rather than defining a second keyframe:
    one arrival motion for the whole game surface, and one reduced-motion rule
-   below that covers everything using it. */
+   below that covers everything using it.
+
+   The step stack no longer uses it. A completed step cannot animate its own
+   arrival in a bottom-aligned list — every entry above it has already jumped
+   by the time it exists — so `StepStack` moves the whole list with a measured
+   transform instead. It shares this duration and curve through
+   `panel/stepMotion.ts`, and skips itself under the same reduced-motion rule
+   in JavaScript, because there is no class to switch off. */
 
 @media (prefers-reduced-motion: reduce) {
   .step-enter,
