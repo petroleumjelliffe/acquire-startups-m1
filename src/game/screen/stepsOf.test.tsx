@@ -35,15 +35,89 @@ describe('stepsOf — this turn and the one before it', () => {
   });
 });
 
+describe('the draw is hidden, not deleted', () => {
+  /**
+   * Both halves in one test on purpose. Hiding the bag's bookkeeping from the
+   * panel is a display decision; losing it from the log would be a data one,
+   * and the server projects those entries, the golden corpus asserts on them,
+   * and Phase 4's recovery reads the log back. A test that only checked the
+   * panel would pass just as happily if the filter had been put in the engine.
+   */
+  it('keeps Drew tiles in the log and out of the stack', () => {
+    const states = replayGoldenGame(g('G1'));
+    const state = states[states.length - 1];
+
+    expect(
+      state.log.some((e) => e.phase === 'Drew tiles'),
+      'G1 no longer draws — this test is guarding nothing',
+    ).toBe(true);
+
+    expect(stepsOf(state, []).some((s) => s.phase === 'Drew tiles')).toBe(false);
+  });
+
+  /**
+   * The draw the players actually watch stays. It is the only record of who
+   * won the order, and unlike the end-of-turn refill it is a thing someone
+   * did.
+   */
+  it('keeps the turn-order draw', () => {
+    // Driven from a real opening, not a golden game: the corpus is built from
+    // `buildFixture`, which starts games already in progress, so no golden
+    // state has ever contained a turn-order draw to assert against.
+    const session = createGameSession({ seed: 'hidden-phase', names: ['Alex', 'Sam'] });
+    const opener = session.getView().actorId!;
+    session.dispatch({ type: 'startGame', playerId: opener });
+
+    const state = session.getView().state;
+    expect(
+      state.log.some((e) => e.phase === 'Drew for turn order'),
+      'the opening no longer logs a turn-order draw',
+    ).toBe(true);
+
+    expect(stepsOf(state, []).some((s) => s.phase === 'Drew for turn order')).toBe(true);
+  });
+
+  /**
+   * A hidden row must never take a control with it. `undoableSteps` is the
+   * caller's list of rewind points, and an id that is filtered out of the
+   * stack is an undo the player can no longer reach.
+   */
+  it('hides nothing that carries an undo', () => {
+    const session = createGameSession({
+      state: buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['E6'] },
+          { name: 'Sam', cash: 6000, hand: ['A1'] },
+        ],
+        bag: ['I11', 'I12', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+      }),
+    });
+
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+
+    const view = session.getView();
+    const drawIds = new Set(
+      view.state.log.filter((e) => e.phase === 'Drew tiles').map((e) => e.stepId),
+    );
+    expect(drawIds.size, 'ending a turn no longer draws').toBeGreaterThan(0);
+
+    for (const id of view.undoableSteps) {
+      expect(drawIds.has(id), `step ${id} is a draw and is offered as an undo`).toBe(false);
+    }
+  });
+});
+
 describe('stepsOf', () => {
   it('turns log entries into step stack entries', () => {
     const states = replayGoldenGame(g('G1'));
     const state = states[states.length - 1];
+    const shown = state.log.filter((e) => e.phase !== 'Drew tiles');
     const steps = stepsOf(state, []);
 
-    expect(steps.length).toBe(state.log.length);
-    expect(steps.map((s) => s.stepId)).toEqual(state.log.map((e) => e.stepId));
-    expect(steps[0].phase).toBe(state.log[0].phase);
+    expect(steps.length).toBe(shown.length);
+    expect(steps.map((s) => s.stepId)).toEqual(shown.map((e) => e.stepId));
+    expect(steps[0].phase).toBe(shown[0].phase);
   });
 
   it('marks only the steps that have a snapshot as undoable', () => {
