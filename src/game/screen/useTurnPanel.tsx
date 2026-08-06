@@ -13,6 +13,7 @@ import { floodFillUnclaimed } from '../../../engine/gameHelpers';
 import { isStartupId, MAX_BUYS_PER_TURN, TRADE_RATIO } from '../../../engine/startups';
 import { StockStack } from '../atoms/StockStack';
 import { StockCard } from '../atoms/StockCard';
+import { foundedThisTurn } from './boardMarks';
 import { getSharePrice } from '../../../engine/gameLogic';
 import { LiqQueue } from '../merger/LiqQueue';
 import { LiqActions } from '../merger/LiqActions';
@@ -74,6 +75,8 @@ export function useTurnPanel(
   canAct: boolean = true,
 ): TurnPanelSlots {
   const { state, actorId, error, pending } = view;
+  /** Founded this turn, so its shares are new to the table. */
+  const freshBrand = foundedThisTurn(state, view.segmentStart);
   const [staged, setStaged] = useState<Staged>(NOTHING_STAGED);
 
   // An abandoned basket must never survive into another player's turn, or into
@@ -424,6 +427,7 @@ export function useTurnPanel(
                       size="sm"
                       mode="add"
                       label={`Buy one ${id}`}
+                      badge={id === freshBrand ? 'new' : undefined}
                       disabled={!canAct || remaining <= 0 || (player?.cash ?? 0) < spent + price}
                       onClick={() => setStaged({ ...staged, picks: [...staged.picks, id] })}
                     />

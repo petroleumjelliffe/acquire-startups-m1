@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ownerBadges, foundingTiles } from './boardMarks';
+import { ownerBadges, foundingTiles, foundedThisTurn } from './boardMarks';
 import { buildFixture } from '../../../engine/golden/fixtures';
 import { applyIntent } from '../../../engine/intents';
 import { createGameSession } from '../../../session/GameSession';
@@ -96,5 +96,54 @@ describe('foundingTiles', () => {
 
   it('names nothing before anything is founded', () => {
     expect(foundingTiles(twoHands())).toEqual([]);
+  });
+});
+
+describe('foundedThisTurn', () => {
+  /** A lone tile with a hand tile beside it: placing founds a chain. */
+  function aboutToFound() {
+    return buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+    });
+  }
+
+  it('names the brand founded in the open segment', () => {
+    const session = createGameSession({ state: aboutToFound() });
+    expect(foundedThisTurn(session.getView().state, session.getView().segmentStart)).toBeNull();
+
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+
+    const view = session.getView();
+    expect(view.state.stage, 'the founding did not lead to the buy step').toBe('buy');
+    expect(foundedThisTurn(view.state, view.segmentStart)).toBe('Messla');
+  });
+
+  it('stops calling it new once the turn is over', () => {
+    const session = createGameSession({ state: aboutToFound() });
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+
+    const view = session.getView();
+    expect(view.actorId, 'the turn did not change hands').toBe('p2');
+    // The chain is still on the board; it is simply no longer news.
+    expect(foundedThisTurn(view.state, view.segmentStart)).toBeNull();
+  });
+
+  it('forgets it when the founding is undone', () => {
+    const session = createGameSession({ state: aboutToFound() });
+    const opened = session.getView().segmentStart;
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+    expect(foundedThisTurn(session.getView().state, session.getView().segmentStart)).toBe('Messla');
+
+    session.undoTo(opened);
+    expect(foundedThisTurn(session.getView().state, session.getView().segmentStart)).toBeNull();
   });
 });

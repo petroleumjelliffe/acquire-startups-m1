@@ -1,8 +1,11 @@
 import type { Coord } from '../../../engine/gameHelpers';
-import type { GameState } from '../../../engine/gameTypes';
+import type { GameState, StartupId } from '../../../engine/gameTypes';
+import { isStartupId } from '../../../engine/startups';
 
 /** The log phase a tile placement is filed under. */
 const PLACED = 'Placed a tile';
+/** …and a founding. */
+const FOUNDED = 'Founded a brand';
 
 /**
  * Where each player last played, badged with their emoji.
@@ -52,4 +55,29 @@ export function foundingTiles(state: GameState): Coord[] {
   return Object.values(state.startups)
     .map((startup) => startup.foundingTile)
     .filter((coord): coord is Coord => coord != null);
+}
+
+/**
+ * The brand founded during the open segment, if any — the one whose shares are
+ * on sale for the first time this turn.
+ *
+ * The prototype badged it and the port lost it, which matters most in the buy
+ * step: a chain founded moments ago looks exactly like one that has been on
+ * the board for ten turns, and the price difference between them is the whole
+ * game.
+ *
+ * Bounded to the open segment, so it is "new" for the turn that founded it and
+ * ordinary from the next turn on. Derived from the log for the same reason
+ * `ownerBadges` is: undo rewinds the log, so taking the founding back takes
+ * the badge with it.
+ */
+export function foundedThisTurn(state: GameState, segmentStart: number): StartupId | null {
+  for (let i = state.log.length - 1; i >= 0; i--) {
+    const entry = state.log[i];
+    if (entry.stepId < segmentStart) break;
+    if (entry.phase !== FOUNDED) continue;
+    const brand = entry.detail.find((token) => token.kind === 'brand');
+    if (brand?.kind === 'brand' && isStartupId(brand.startupId)) return brand.startupId;
+  }
+  return null;
 }
