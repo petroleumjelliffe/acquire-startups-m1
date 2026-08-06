@@ -1,5 +1,11 @@
 # Multiplayer Architecture Plan
 
+> **Superseded, 2026-08-05.** This describes an earlier design: `SocketContext.tsx`, `playerId.ts`
+> and `Game.tsx` are deleted, and the XState layer this plan led to was removed in Phase 3a. For the
+> current architecture, start at `CLAUDE.md` and
+> `docs/superpowers/specs/2026-08-05-phase-3b-networked-client-design.md`. Kept for history, not
+> current guidance.
+
 ## Overview
 Transform the single-client game into a multiplayer experience with:
 - Hidden hands (only current player sees their tiles)

@@ -12,8 +12,8 @@ import type { GameState } from './gameTypes';
  * The stages below are the ones `applyIntent` actually produces.
  * `setup`, `dealHands`, `mergerPayout`, `liquidation` and `liquidationPrompt`
  * exist in the `Stage` union but only the legacy `gameLogic` path (used by
- * `src/Game.tsx`) reaches them; they fall through to the active player so a
- * legacy state renders rather than crashes.
+ * `src/Game.tsx`, deleted in Phase 3b) reaches them; they fall through to the
+ * active player so a legacy state renders rather than crashes.
  */
 export function getCurrentActor(state: GameState): string | null {
   if (state.stage === 'end') return null;

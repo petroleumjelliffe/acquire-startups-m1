@@ -7,10 +7,10 @@ import type { TileCell } from '../../engine/gameTypes';
 /**
  * The 9×12 board, pure over a board fixture.
  *
- * Closes the five parity defects `src/components/Board.tsx` carries: A1-style
- * coordinates rather than `r-c`, an owner *initial* rather than a full name,
- * chain outlines, blocked/dead-tile treatment, and the coordinate staying
- * reachable on a founded tile.
+ * Closed the five parity defects the legacy `src/components/Board.tsx` (deleted in Phase 3b)
+ * carried: A1-style coordinates rather than `r-c`, an owner *initial* rather than a full name,
+ * chain outlines, blocked/dead-tile treatment, and the coordinate staying reachable on a founded
+ * tile.
  */
 export interface BoardProps {
   board: Record<Coord, TileCell>;

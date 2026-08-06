@@ -1,5 +1,11 @@
 # XState Refactor Plan for Acquire Game
 
+> **Superseded, 2026-08-05.** The XState layer this plan describes (`gameRoomMachine`,
+> `playerMachine`) was removed in Phase 3a in favour of a plain authoritative server; the client it
+> assumes (`Game.tsx`, `SocketContext.tsx`) is deleted as of Phase 3b. For the current architecture,
+> start at `CLAUDE.md` and `docs/superpowers/specs/2026-08-05-phase-3a-server-authority-design.md`.
+> Kept for history, not current guidance.
+
 ## Context
 
 **Current Issues:**
