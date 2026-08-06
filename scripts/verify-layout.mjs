@@ -243,7 +243,12 @@ const MEASURE = `(async () => {
       continue;
     }
 
-    const endTurn = byText(/^end turn$/i);
+    // The buy step commits and ends the turn with one button: "Confirm
+    // purchase" with something staged, "Skip" without. There is no separate
+    // "End turn" any more, and a walk still looking for one stalls here —
+    // which is exactly how this check went hollow once before, reporting
+    // green while never reaching the staging state it exists to measure.
+    const endTurn = byText(/^(end turn|confirm purchase|skip)$/i);
     if (endTurn) {
       endTurn.click();
       await wait(250);
