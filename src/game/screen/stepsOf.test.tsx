@@ -10,6 +10,29 @@ function g(id: string) {
   return game;
 }
 
+describe('stepsOf — this turn, not the whole game', () => {
+  it('drops every step below the open segment and keeps every step above it', () => {
+    const states = replayGoldenGame(g('G1'));
+    const state = states[states.length - 1];
+
+    const whole = stepsOf(state, []);
+    // The stack really did accumulate: without a floor, a finished game's
+    // panel carries every step of it. If this ever stops holding, the test
+    // below is comparing nothing against nothing.
+    expect(whole.length).toBeGreaterThan(3);
+
+    // A cut taken from the log itself rather than a written-down number, so a
+    // change to G1 moves the boundary rather than breaking the test.
+    const cut = state.log[Math.floor(state.log.length / 2)].stepId;
+    const scoped = stepsOf(state, [], cut);
+
+    expect(scoped.length).toBeLessThan(whole.length);
+    expect(scoped.map((e) => e.stepId)).toEqual(
+      whole.map((e) => e.stepId).filter((id) => id >= cut),
+    );
+  });
+});
+
 describe('stepsOf', () => {
   it('turns log entries into step stack entries', () => {
     const states = replayGoldenGame(g('G1'));

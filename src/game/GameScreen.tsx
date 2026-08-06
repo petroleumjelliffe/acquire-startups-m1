@@ -109,7 +109,7 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
       <Panel
         stepstack={
           <StepStack
-            entries={stepsOf(state, undoableSteps)}
+            entries={stepsOf(state, undoableSteps, view.segmentStart)}
             onUndo={(stepId) => session.undoTo(stepId)}
           />
         }
