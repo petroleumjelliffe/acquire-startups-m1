@@ -27,8 +27,23 @@ export function HandZone({ name, portfolio, cash, prices = {} }: HandZoneProps) 
 
   return (
     <div className="flex-none border-t border-gray-100 px-4 py-3">
-      <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-gray-400">
-        {hasViewer ? `${name}'s hand` : 'Hand'}
+      {/*
+        The balance rides the header, for the same reason the staging zone's
+        net does: as a green card among the share stacks it was the widest
+        thing in the row and read as a holding, which it is not. In the corner
+        at the header's own size it is a standing figure you can find without
+        it competing with the shares. `Cash` supplies the green.
+      */}
+      <div className="mb-2 flex items-baseline justify-between gap-2 text-[11px] font-bold uppercase tracking-[0.06em]">
+        <span className="min-w-0 truncate text-gray-400">{hasViewer ? `${name}'s hand` : 'Hand'}</span>
+        {cash !== undefined && (
+          <span className="flex shrink-0 items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-gray-500">Balance</span>
+            <span className="font-extrabold tracking-normal">
+              <Cash amount={cash} />
+            </span>
+          </span>
+        )}
       </div>
       {/*
         A floor, not a fixed height. 64px is one row of stock stacks, measured
@@ -55,14 +70,6 @@ export function HandZone({ name, portfolio, cash, prices = {} }: HandZoneProps) 
               <StockStack key={id} id={id} count={n} price={prices[id]} size="sm" />
             ) : null,
           )
-        )}
-        {cash !== undefined && (
-          <div className="inline-flex flex-col items-start justify-center rounded-lg border border-[#cfe8da] bg-green-50 px-3 py-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-gray-500">Balance</span>
-            <span className="text-lg font-extrabold">
-              <Cash amount={cash} />
-            </span>
-          </div>
         )}
       </div>
     </div>

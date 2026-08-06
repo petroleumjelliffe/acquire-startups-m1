@@ -10,7 +10,7 @@ import { Cash } from '../atoms/Cash';
  *
  *  1. the pile carries a `min-h` sized to a populated row, so empty ↔ filled
  *     does not shift;
- *  2. the `Net` total is always rendered, muted at zero;
+ *  2. the `Net` total is always rendered — in the header, muted at zero;
  *  3. the action slot is always rendered with a `min-h`, so button ↔ no button
  *     does not shift.
  *
@@ -31,7 +31,28 @@ export function StagingZone({ label, shares, cashDelta = 0, action }: StagingZon
       data-zone="staging"
       className="flex-none border-t border-dashed border-[#e7dfbf] bg-[#fffdf5] px-4 py-3"
     >
-      <div className="mb-2 text-[11px] font-bold uppercase tracking-[0.06em] text-gray-400">{label}</div>
+      {/*
+        The net total rides the header rather than sitting under the pile. On
+        its own row — label, dashed rule, an 18px figure — it took as much
+        vertical space as the shares it was totalling, in a column where the
+        step stack is already fighting for room. Inline it is the same fact at
+        the header's own size, right-aligned so the eye finds it in the corner
+        it already scans for totals. `Cash` keeps the tint, which is the part
+        that has to survive: red for money going out is how the figure reads
+        at a glance.
+      */}
+      <div className="mb-2 flex items-baseline justify-between gap-2 text-[11px] font-bold uppercase tracking-[0.06em]">
+        <span className="min-w-0 text-gray-400">{label}</span>
+        {/* `shrink-0` and no wrapping: a long label is allowed to take two
+            lines, but the figure must never break between its sign and its
+            digits — "NET −" over "$200" reads as two facts. */}
+        <span data-zone="net" className="flex shrink-0 items-baseline gap-1.5 whitespace-nowrap">
+          <span className="text-[#a8935a]">Net</span>
+          <span className="font-extrabold tracking-normal">
+            <Cash amount={cashDelta} sign="delta" />
+          </span>
+        </span>
+      </div>
 
       {/*
         Fixed, not merely minimum. A `min-h` sized to a *typical* row still
@@ -44,16 +65,6 @@ export function StagingZone({ label, shares, cashDelta = 0, action }: StagingZon
       */}
       <div data-zone="pile" className="flex h-[72px] min-h-[72px] flex-wrap items-end gap-3">
         {shares ?? <span className="self-center text-[13px] text-[#c9bd93]">empty</span>}
-      </div>
-
-      <div
-        data-zone="net"
-        className="mt-1.5 flex items-baseline justify-end gap-2.5 border-t border-dashed border-[#e7dfbf] pt-2"
-      >
-        <span className="text-[11px] font-bold uppercase tracking-[0.05em] text-[#a8935a]">Net</span>
-        <span className="text-lg font-extrabold">
-          <Cash amount={cashDelta} sign="delta" />
-        </span>
       </div>
 
       {/* Same story: the phase-advance button measures 38px, so a 32px
