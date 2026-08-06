@@ -14,15 +14,27 @@ export function CreateRoomPage({ connect = getConnection }: CreateRoomPageProps)
   const connection = connect();
   const [name, setName] = useState(getRandomEmojiName);
   const [waiting, setWaiting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // The name at the moment the request was sent, not at the moment the answer
   // arrives — the field is still editable in between.
   const sentName = useRef('');
 
-  useEffect(() => connection.onJoined((msg) => {
-    saveIdentity(msg.roomId, { playerId: msg.playerId, token: msg.token, name: sentName.current });
-    navigate(`/room/${msg.roomId}`);
-  }), [connection, navigate]);
+  useEffect(() => {
+    const offJoined = connection.onJoined((msg) => {
+      saveIdentity(msg.roomId, { playerId: msg.playerId, token: msg.token, name: sentName.current });
+      navigate(`/room/${msg.roomId}`);
+    });
+    // Without this, a server that is down or slow left `waiting` latched
+    // forever — a permanently disabled "Creating…" button with no way out.
+    // `JoinRoomPage` already clears its equivalent on a rejection; this is
+    // that same fix, carried across.
+    const offRejected = connection.transport.onRejected((msg) => {
+      setError(msg.message);
+      setWaiting(false);
+    });
+    return () => { offJoined(); offRejected(); };
+  }, [connection, navigate]);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -34,6 +46,7 @@ export function CreateRoomPage({ connect = getConnection }: CreateRoomPageProps)
           if (trimmed === '') return;
           sentName.current = trimmed;
           rememberName(trimmed);
+          setError(null);
           setWaiting(true);
           connection.createRoom(trimmed);
         }}
@@ -48,6 +61,12 @@ export function CreateRoomPage({ connect = getConnection }: CreateRoomPageProps)
             className="w-full rounded-lg border border-gray-300 px-4 py-2"
           />
         </label>
+
+        {error && (
+          <p role="alert" className="mb-4 text-sm font-semibold text-red-600">
+            {error}
+          </p>
+        )}
 
         <button
           type="submit"
