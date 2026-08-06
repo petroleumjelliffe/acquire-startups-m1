@@ -2402,3 +2402,188 @@ git -C ~/Developer/personal/acquire-startups-m1/.worktrees/phase-3b commit -m "d
 **Deliberate scope notes.** The design's "stubbed draw" needs no code — today's `startGame` already does it, and Task 9's by-hand pass step 3 checks it reads sensibly online. The per-player draw is recorded in the design and carried forward, not built.
 
 **Type consistency.** `RoomTransport` (Task 3) is consumed unchanged by Tasks 4, 5 and 7. `NetworkSession extends GameSession` with `dispose()` (Task 3) is what Task 5 stores and disposes. `Connection` (Task 4) is what Tasks 5 and 6 inject fakes for; its shape is fixed at Task 4 and every fake in Tasks 5 and 6 implements all ten members. `SessionView.pending` (Task 2) is read by `GameScreen` and `useTurnPanel` in the same task and written by `NetworkSession` in Task 3. `viewerId` (Task 2) is passed only by `RoomPage` (Task 5).
+
+---
+
+# Addendum: the by-hand pass findings (Tasks 10–16)
+
+Added 2026-08-05, after the first by-hand pass with two real clients. Seven
+findings, all confirmed against the code before being written down. Two were
+created by this phase; five predate it and are equally wrong in pass-and-play
+today. The repository owner ruled that all seven land on this branch rather
+than a follow-on phase.
+
+**Why these tasks carry prose rather than full code blocks:** each is one or
+two files against atoms that already exist (`StockCard`, `Tile`, `Board`'s
+`owners`/`hqTiles` props). The implementer reads the neighbouring component,
+which is a better specification than a transcription of it would be. Exact
+interfaces, exact test names and the break to run are still given in full.
+
+**The root cause behind three of them:** the pass-the-device curtain was
+carrying the "whose turn is it" signal, and online there is no curtain.
+Nothing replaced it.
+
+## Task 10: One join, one seat
+
+**Finding:** submitting the room screen's join form twice creates two seats.
+Reproduced by hand: two browsers produced a three-player roster.
+`RoomPage`'s `JoinForm` is the one path that never got the guard Task 6 added
+to `JoinRoomPage` — `useRoom.join()` sets its own latch, but nothing disables
+the button, and the server seats a fresh player because no token is presented.
+
+**Files:** modify `src/net/useRoom.ts`, `src/pages/RoomPage.tsx`; test
+`src/pages/RoomPage.test.tsx`.
+
+- [ ] Expose the in-flight state `useRoom` already tracks (`joining`) on its
+      returned `Room`, and have `RoomPage` pass it to `JoinForm`'s existing
+      `busy` prop. Clear it when a rejection arrives, exactly as
+      `JoinRoomPage` does — a mistyped code must stay correctable.
+- [ ] Test: two submits before any reply send exactly one `joinRoom`.
+- [ ] Test: a rejection re-enables the form.
+- [ ] Break each (remove the guard; leave `busy` set on rejection), confirm
+      each turns its own test red, restore, report both.
+
+## Task 11: An inert tile must look inert
+
+**Finding:** `src/game/atoms/Tile.tsx`'s `interactive` is
+`state === 'hand' || state === 'blocked' || onClick != null`, so a hand tile
+renders as an enabled `<button>` — hover, focus ring, tab order — even with no
+handler. Online the non-actor stares at six of their own live-looking tiles for
+someone else's whole turn and clicking does nothing. This is the standing
+`Board.tsx` finding from the 1b carry-forward, made user-visible by 3b.
+
+**Files:** modify `src/game/atoms/Tile.tsx`, `src/game/Board.tsx`; tests
+`src/game/atoms/Tile.test.tsx`, `src/game/Board.test.tsx`,
+`src/game/GameScreen.test.tsx`.
+
+- [ ] A tile renders as a `<button>` only when it has an `onClick`. `blocked`
+      keeps its disabled-button treatment (a disabled button is already out of
+      tab order and its cursor already says so).
+- [ ] The *look* of a hand tile does not change — it stays blue and bold,
+      because it is still yours. Only the affordance goes: no pointer cursor,
+      no hover shift, no focus ring, not focusable.
+- [ ] `Board` must still let a caller tell a hand cell from an empty one
+      without a handler. Add a stable hook for that — a `data-tile-state`
+      attribute on `Tile` carrying its state is the least invasive.
+- [ ] **`GameScreen.test.tsx`'s "shows me my own hand while someone else acts"
+      currently discriminates on `tagName === 'BUTTON'`, which this task
+      deliberately breaks.** Re-point it at `data-tile-state`, keeping both
+      halves of the assertion: my `A1` is a hand tile, the actor's `E6` is not.
+- [ ] Break: make `interactive` unconditional again; confirm the new
+      affordance test goes red. Restore, report.
+
+## Task 12: The step stack is this turn, not the whole game
+
+**Finding:** `src/game/screen/stepsOf.tsx:16` maps `state.log` entire, so the
+panel accumulates every step of the game. It was only ever meant to carry the
+open segment, as the undo surface.
+
+**Files:** modify `src/game/screen/stepsOf.tsx` and its caller in
+`src/game/GameScreen.tsx`; test `src/game/screen/stepsOf.test.tsx`.
+
+- [ ] `stepsOf` takes the segment start and drops every entry below it.
+      `SessionView.segmentStart` already carries it; pass it through.
+- [ ] Test, driven from a replayed golden game: a step from an earlier segment
+      is absent, every step of the open one is present.
+- [ ] Break: drop the filter; confirm the earlier-segment step reappears and
+      the test goes red. Restore, report.
+
+## Task 13: The board says who played what, and where each chain began
+
+**Finding:** `Board` has `owners` (a per-coord badge, top-right) and `hqTiles`
+(the one labelled cell per chain) and `GameScreen` passes neither.
+
+**Files:** modify `src/game/GameScreen.tsx`, `src/game/Board.tsx` if the badge
+needs to carry an emoji rather than an initial; test
+`src/game/GameScreen.test.tsx`.
+
+- [ ] **Founding tile per chain:** pass `hqTiles` from
+      `state.startups[*].foundingTile` (`engine/gameTypes.ts:94`), skipping
+      nulls. Nearly free.
+- [ ] **Owner badge:** each player's most recently placed tile carries their
+      emoji. `Player.lastPlacedTile` is *not* the right source — it is
+      documented as "the tile placed this turn, still undoable" and is cleared
+      the moment it stops being undoable (`engine/gameLogic.ts:291`). Derive it
+      instead from `state.log`: the latest entry per `playerId` whose phase is
+      a placement and whose `detail` carries a tile token. Check `LogToken`'s
+      shape before writing the extractor. **`engine/` stays untouched.**
+- [ ] Undo must take the badge with it. Because the log rewinds with the state,
+      deriving from it gives that for free — assert it rather than assuming it.
+- [ ] Test: after two players have each placed, each badge shows that player's
+      emoji at that player's coord; a founded chain's founding tile is labelled.
+- [ ] Break: pass `owners={{}}`; confirm the badge test goes red. Restore,
+      report.
+
+## Task 14: Shares for sale are cards
+
+**Finding:** the buy step renders bare `<button>{ticker} ${price}</button>`.
+`src/game/atoms/StockCard.tsx` exists and takes exactly the props needed:
+`id`, `price`, `mode="add"`, `disabled`, `onClick`, `size`.
+
+**Files:** modify `src/game/screen/useTurnPanel.tsx`; test
+`src/game/screen/useTurnPanel.test.tsx`.
+
+- [ ] Replace the buttons with `StockCard`s in `mode="add"`, price from
+      `getSharePrice` as now, `disabled` on the same condition as now (no buys
+      left, or not affordable with what is already staged).
+- [ ] Keep the accessible name a buyer can find: the existing tests query
+      `aria-label="Buy one <id>"`. If `StockCard` names itself differently,
+      update the tests to the name it actually renders rather than bending the
+      atom.
+- [ ] Panel-height stability: the buy row is taller as cards than as buttons.
+      Confirm the active zone's reservation still holds and note what you
+      measured — and remember jsdom reports zero for every layout, so this one
+      is settled by the by-hand pass, not by a test.
+
+## Task 15: Change your mind about a tile without undoing
+
+**Finding:** after placing, clicking a different hand tile is refused
+(`wrongStage`). It should replace the placement, so long as the open segment
+holds nothing but that placement — once a share is staged or a survivor chosen,
+the placement is settled and undo is the way back.
+
+**Files:** modify `src/game/GameScreen.tsx` (the `onCellClick` handler) and
+`src/game/screen/` as needed; test `src/game/GameScreen.test.tsx`.
+
+- [ ] When the actor clicks a hand tile and the open segment's only step is
+      their placement, undo to the segment start and place the new tile.
+- [ ] The gate is the *step count in the open segment*, not the stage —
+      `undoableSteps` carries it. One step means only the placement has
+      happened; more means something followed it.
+- [ ] Online this is two round trips (undo is the server's to grant, then the
+      placement). Sequence it so a rejected undo does not leave a placement
+      half-applied.
+- [ ] Test, pass-and-play: place `E6`, click `H8`, and the board shows `H8`
+      placed and `E6` back in hand, with no error.
+- [ ] Test: with a share staged, clicking another tile does *not* switch.
+- [ ] Break: remove the segment-length gate so it always switches; confirm the
+      second test goes red. Restore, report.
+
+## Task 16: Whose turn it is, said plainly
+
+**Finding, and this phase's own doing:** when it is not your turn the panel's
+active zone is replaced by "Waiting for Alex." in 13px grey. The owner's
+verdict: the panel should keep showing the player their own step, and the
+waiting state belongs in an obvious toast.
+
+**Files:** create `src/game/online/TurnToast.tsx`; modify
+`src/game/screen/useTurnPanel.tsx`, `src/game/GameScreen.tsx`; tests
+`src/game/online/TurnToast.test.tsx`, `src/game/GameScreen.test.tsx`.
+
+- [ ] The toast names the actor with their emoji and what they are doing —
+      "🦊 Alex is placing a tile" — using the same `stageLabel` source the
+      panel uses, so the two cannot drift.
+- [ ] It is obvious: a real overlay, not a caption. It must not cover the board
+      or the panel's controls.
+- [ ] It appears only when `viewerId` is set and is not the actor. Pass-and-play
+      never shows it — the curtain already says whose turn it is.
+- [ ] **The panel stops taking over.** `useTurnPanel`'s `!canAct` branch keeps
+      rendering the stage's own step, with its controls absent or disabled
+      rather than replaced by a sentence. "Place a tile" still shows the player
+      their hand.
+- [ ] `pending` ("Sending…") keeps its existing behaviour — that one *is* about
+      this player's own action.
+- [ ] Test: as a non-actor, the toast names the actor and the panel still shows
+      the stage's step; as the actor, no toast.
+- [ ] Break: render the toast unconditionally; confirm the actor-sees-no-toast
+      test goes red. Restore, report.
