@@ -35,6 +35,17 @@ describe('FoundGroups', () => {
     }
   });
 
+  /**
+   * Nothing asserted this label before, which is why it sat as the fragment
+   * "to start" through two by-hand passes: copy nothing protects is copy
+   * nobody notices.
+   */
+  it('names what the price is', () => {
+    const { container } = render(<FoundGroups available={ALL} taken={[]} foundSize={FOUND_SIZE} />);
+    const group = container.querySelector('[data-group-price]')!;
+    expect(within(group as HTMLElement).getByText(/initial share price/i)).toBeInTheDocument();
+  });
+
   it('lists every brand exactly once across the groups', () => {
     render(<FoundGroups available={ALL} taken={[]} foundSize={FOUND_SIZE} />);
     for (const id of ALL) {

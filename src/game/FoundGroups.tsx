@@ -45,7 +45,9 @@ export function FoundGroups({ available, taken, foundSize, onSelect }: FoundGrou
             <span className="font-bold">
               <Price value={price} />
             </span>
-            <span className="text-[11px] uppercase tracking-[0.03em] text-gray-400">to start</span>
+            <span className="text-[11px] uppercase tracking-[0.03em] text-gray-400">
+              initial share price
+            </span>
           </div>
           <div className="flex flex-wrap items-end gap-2">
             {groups.get(price)!.map((id) => (
