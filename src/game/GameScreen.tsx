@@ -7,7 +7,8 @@ import { HandZone } from './panel/HandZone';
 import { PlayersStrip } from './panel/PlayersStrip';
 import { RevealOverlay } from './RevealOverlay';
 import { FinalScoring } from './FinalScoring';
-import { useTurnPanel } from './screen/useTurnPanel';
+import { useTurnPanel, stageLabel } from './screen/useTurnPanel';
+import { TurnToast } from './online/TurnToast';
 import { stepsOf } from './screen/stepsOf';
 import { getDeadTilesInHand } from '../../engine/placement';
 import { isStartupId } from '../../engine/startups';
@@ -134,6 +135,15 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
           />
         }
       />
+
+      {/*
+        Online only, and only while someone else holds the turn. Pass-and-play
+        has the curtain, which already says whose turn it is at full-screen
+        size; showing both would be saying it twice.
+      */}
+      {viewerId !== undefined && actor && actorId !== viewerId && (
+        <TurnToast name={actor.name} emoji={actor.emoji} doing={stageLabel(state.stage)} />
+      )}
 
       {viewerId === undefined && awaitingReveal && actor && (
         <div data-testid="curtain" className="absolute inset-0 z-20">

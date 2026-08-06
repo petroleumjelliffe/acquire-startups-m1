@@ -12,6 +12,7 @@ import { FoundGroups } from '../FoundGroups';
 import { floodFillUnclaimed } from '../../../engine/gameHelpers';
 import { isStartupId, MAX_BUYS_PER_TURN, TRADE_RATIO } from '../../../engine/startups';
 import { StockStack } from '../atoms/StockStack';
+import { StockCard } from '../atoms/StockCard';
 import { getSharePrice } from '../../../engine/gameLogic';
 import { LiqQueue } from '../merger/LiqQueue';
 import { LiqActions } from '../merger/LiqActions';
@@ -56,7 +57,7 @@ function foundingSize(state: GameState, coord: Coord): number {
  * the same label the actor sees — a second copy would drift the moment a
  * label is reworded.
  */
-function stageLabel(stage: GameState['stage']): string {
+export function stageLabel(stage: GameState['stage']): string {
   switch (stage) {
     case 'draw': return 'Open the game';
     case 'foundStartup': return 'Found a brand';
@@ -108,31 +109,23 @@ export function useTurnPanel(
     </div>
   ) : null;
 
-  if (!canAct) {
-    const waitingFor = state.players.find((p) => p.id === actorId)?.name;
-    return {
-      staging: idleStaging,
-      active: (
-        <ActiveStep
-          label={stageLabel(state.stage)}
-          body={
-            <>
-              <span className="text-[13px] text-gray-600">
-                {pending ? 'Sending…' : `Waiting for ${waitingFor ?? 'the next player'}.`}
-              </span>
-              {/*
-                A rejection can arrive while it is not my turn — a dropped
-                connection, or a stale request the server finally answered
-                after the actor moved on — and without this it was invisible:
-                `problem` rendered in every other branch but this one.
-              */}
-              {problem}
-            </>
-          }
-        />
-      ),
-    };
-  }
+  /**
+   * The panel never stops showing this player their own step.
+   *
+   * It used to: when it was not your turn, every branch below was replaced by
+   * "Waiting for Alex." in one line of grey. Played by hand, that read as the
+   * screen going blank — the step you were in the middle of understanding was
+   * taken away and nothing said whose turn it was in any way you would notice.
+   * Whose turn it is now belongs to `TurnToast`, which is unmissable; the
+   * panel's job is to keep showing the step, minus the controls that are not
+   * yours to press.
+   *
+   * `pending` is this player's own action in flight, not someone else's turn,
+   * so it stays a caption on the step rather than a toast.
+   */
+  const waiting = pending ? (
+    <span className="text-[13px] font-semibold text-gray-500">Sending…</span>
+  ) : null;
 
   if (state.stage === 'draw') {
     return {
@@ -143,13 +136,16 @@ export function useTurnPanel(
           body={<span className="text-[13px] text-gray-600">Draw for turn order — highest tile plays first.</span>}
           button={
             <>
-              <button
-                type="button"
-                onClick={() => actorId && dispatch({ type: 'startGame', playerId: actorId })}
-                className="m-0 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                Draw for turn order
-              </button>
+              {canAct && (
+                <button
+                  type="button"
+                  onClick={() => actorId && dispatch({ type: 'startGame', playerId: actorId })}
+                  className="m-0 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Draw for turn order
+                </button>
+              )}
+              {waiting}
               {problem}
             </>
           }
@@ -179,12 +175,13 @@ export function useTurnPanel(
                   {`${dead.join(', ')} can never be played — ${dead.length === 1 ? 'it joins' : 'they join'} two safe chains.`}
                 </span>
               )}
-              {!canPlace && declareEnd}
+              {!canPlace && canAct && declareEnd}
+              {waiting}
               {problem}
             </>
           }
           button={
-            !actorId ? undefined : (
+            !actorId || !canAct ? undefined : (
               <div className="flex w-full flex-col gap-2">
                 {dead.length > 0 && (
                   <button
@@ -230,10 +227,14 @@ export function useTurnPanel(
                 available={available}
                 taken={taken}
                 foundSize={coord ? foundingSize(state, coord) : 2}
-                onSelect={(startupId) =>
-                  actorId && dispatch({ type: 'chooseFoundingBrand', playerId: actorId, startupId })
+                onSelect={
+                  canAct
+                    ? (startupId) =>
+                        actorId && dispatch({ type: 'chooseFoundingBrand', playerId: actorId, startupId })
+                    : undefined
                 }
               />
+              {waiting}
               {problem}
             </>
           }
@@ -261,13 +262,16 @@ export function useTurnPanel(
                   <Brand
                     key={id}
                     id={id}
-                    mode="select"
-                    onClick={() =>
-                      dispatch({ type: 'chooseSurvivor', playerId: actorId, startupId: id })
+                    mode={canAct ? 'select' : 'static'}
+                    onClick={
+                      canAct
+                        ? () => dispatch({ type: 'chooseSurvivor', playerId: actorId, startupId: id })
+                        : undefined
                     }
                   />
                 ))}
               </div>
+              {waiting}
               {problem}
             </>
           }
@@ -312,14 +316,16 @@ export function useTurnPanel(
                   absorbedId={absorbedId}
                   survivorId={survivorId}
                   unitPrice={unitPrice}
-                  canSell={keep >= 1}
+                  canSell={canAct && keep >= 1}
                   canTrade={
+                    canAct &&
                     keep >= TRADE_RATIO &&
                     (state.startups[survivorId]?.availableShares ?? 0) > staged.trade / TRADE_RATIO
                   }
                   onSell={() => setStaged({ ...staged, sell: staged.sell + 1 })}
                   onTrade={() => setStaged({ ...staged, trade: staged.trade + TRADE_RATIO })}
                 />
+                {waiting}
                 {problem}
               </>
             }
@@ -331,23 +337,25 @@ export function useTurnPanel(
             cashDelta={staged.sell * unitPrice}
             shares={<StockStack id={absorbedId} count={keep} size="sm" />}
             action={
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({
-                    type: 'liquidate',
-                    playerId: actorId,
-                    startupId: absorbedId,
-                    sell: staged.sell,
-                    trade: staged.trade,
-                    keep,
-                  });
-                  setStaged(NOTHING_STAGED);
-                }}
-                className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
-              >
-                Confirm
-              </button>
+              canAct ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({
+                      type: 'liquidate',
+                      playerId: actorId,
+                      startupId: absorbedId,
+                      sell: staged.sell,
+                      trade: staged.trade,
+                      keep,
+                    });
+                    setStaged(NOTHING_STAGED);
+                  }}
+                  className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Confirm
+                </button>
+              ) : undefined
             }
           />
         ),
@@ -382,21 +390,28 @@ export function useTurnPanel(
                   const id = s.id;
                   if (!isStartupId(id)) return null;
                   const price = getSharePrice(state, id);
+                  // The atom, not a bare button: shares are portrait
+                  // certificates everywhere else in this UI — in the staging
+                  // pile, in the hand zone, in the payout lines — and the buy
+                  // row was the one place they appeared as unstyled text. It
+                  // carries its own ticker, price and disabled treatment, so
+                  // there is nothing here to restyle.
                   return (
-                    <button
+                    <StockCard
                       key={id}
-                      type="button"
-                      aria-label={`Buy one ${id}`}
-                      disabled={remaining <= 0 || (player?.cash ?? 0) < spent + price}
+                      id={id}
+                      price={price}
+                      size="sm"
+                      mode="add"
+                      label={`Buy one ${id}`}
+                      disabled={!canAct || remaining <= 0 || (player?.cash ?? 0) < spent + price}
                       onClick={() => setStaged({ ...staged, picks: [...staged.picks, id] })}
-                      className="m-0 rounded-lg border border-gray-200 px-2 py-1 text-xs font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {`${s.ticker} $${price}`}
-                    </button>
+                    />
                   );
                 })}
               </div>
-              {declareEnd}
+              {canAct && declareEnd}
+              {waiting}
               {problem}
             </>
           }
@@ -409,7 +424,7 @@ export function useTurnPanel(
           shares={basket.map(([id, n]) =>
             isStartupId(id) ? <StockStack key={id} id={id} count={n} size="sm" /> : null,
           )}
-          action={
+          action={!canAct ? undefined : (
             <div className="flex w-full gap-2">
               <button
                 type="button"
@@ -430,7 +445,7 @@ export function useTurnPanel(
                 End turn
               </button>
             </div>
-          }
+          )}
         />
       ),
     };

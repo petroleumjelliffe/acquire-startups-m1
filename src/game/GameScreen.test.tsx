@@ -243,18 +243,36 @@ describe('GameScreen with a viewer who is not the actor', () => {
     expect(screen.getByTitle('H8').tagName).not.toBe('BUTTON');
   });
 
-  it('names who we are waiting for and offers nothing', () => {
+  it('says whose turn it is where you cannot miss it, and offers nothing', () => {
     render(watching());
-    expect(screen.getByText(/waiting for alex/i)).toBeInTheDocument();
+
+    // The toast carries this, not the panel. It used to be one line of grey
+    // inside the active zone, and the first by-hand session reported not being
+    // able to tell whose turn it was at all.
+    const toast = screen.getByTestId('turn-toast');
+    expect(toast).toHaveTextContent(/alex/i);
     expect(screen.queryByRole('button', { name: /end turn/i })).toBeNull();
+  });
+
+  it('keeps showing me my own step rather than replacing it', () => {
+    render(watching());
+    // The panel still says what stage the game is in — the step is not taken
+    // away from you just because the move is not yours.
+    const active = screen.getByTestId('game-surface').querySelector('[data-slot="active"]')!;
+    expect(active.textContent).toMatch(/place a tile/i);
   });
 
   it('ignores a click on my own tile when it is not my turn', () => {
     render(watching());
     fireEvent.click(screen.getByTitle('A1'));
-    // Still waiting, and A1 is still mine to play later.
-    expect(screen.getByText(/waiting for alex/i)).toBeInTheDocument();
+    // Still someone else's turn, and A1 is still mine to play later.
+    expect(screen.getByTestId('turn-toast')).toHaveTextContent(/alex/i);
     expect(screen.getByTitle('A1')).toBeInTheDocument();
+  });
+
+  it('shows no toast to the player whose turn it is', () => {
+    render(<GameScreen session={createGameSession({ state: playable() })} viewerId="p1" />);
+    expect(screen.queryByTestId('turn-toast')).toBeNull();
   });
 
   it('keeps all five panel slots, so waiting does not resize the panel', () => {

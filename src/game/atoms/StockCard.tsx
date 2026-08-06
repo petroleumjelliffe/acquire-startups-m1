@@ -16,6 +16,13 @@ export interface StockCardProps {
   depth?: 0 | 1 | 2;
   badge?: string;
   mode?: 'static' | 'select' | 'add' | 'remove';
+  /**
+   * What pressing this card does, for anyone not reading it visually. Without
+   * it the accessible name is the card's own face — "$M $200" — which names
+   * the share but not the action. Ignored in `static` mode, which renders no
+   * control to name.
+   */
+  label?: string;
   selected?: boolean;
   disabled?: boolean;
   onClick?: () => void;
@@ -47,6 +54,7 @@ export function StockCard({
   depth = 0,
   badge,
   mode = 'static',
+  label,
   selected,
   disabled,
   onClick,
@@ -103,6 +111,7 @@ export function StockCard({
         type="button"
         className={disabled ? className : `${className} cursor-pointer`}
         title={id}
+        aria-label={label}
         disabled={disabled}
         onClick={onClick}
       >

@@ -182,7 +182,7 @@ describe('the first state message starts the game', () => {
     // p2's own tile, and no curtain over it.
     expect(screen.getByTitle('A1')).toBeInTheDocument();
     expect(screen.queryByText(/pass to/i)).toBeNull();
-    expect(screen.getByText(/waiting for alex/i)).toBeInTheDocument();
+    expect(screen.getByTestId('turn-toast')).toHaveTextContent(/alex/i);
   });
 
   it('keeps updating the board after the session is built, not just for the first message', () => {
