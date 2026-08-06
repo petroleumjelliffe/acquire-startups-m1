@@ -736,6 +736,23 @@ async function main() {
     } else {
       console.log(`${width}px  merger panel ${JSON.stringify(wp.merger)}` +
                   `\n         step stack ${JSON.stringify(wp.mergerStack)}`);
+      // The holdings zone, empty against populated — a comparison neither the
+      // walk nor the catalog can make alone, which is why a 4px shift lived
+      // here for weeks while both measurements passed. The walk's opening
+      // panel shows a player holding nothing; the merger demo shows one
+      // holding shares. Owning a share is not gaining a *row*, so the two must
+      // be the same height, and the zone's own `data-may-grow` exemption does
+      // not apply to that.
+      const emptyHoldings = m.stages?.play?.holdings;
+      const heldHoldings = wp.merger?.holdings;
+      if (emptyHoldings && heldHoldings && emptyHoldings !== heldHoldings) {
+        failures.push(
+          `${width}px: the holdings zone is ${emptyHoldings}px with no shares and ` +
+          `${heldHoldings}px holding one — the floor is short by ` +
+          `${heldHoldings - emptyHoldings}px, so taking your first share shifts every ` +
+          `zone below it`,
+        );
+      }
       if (wp.mergerStack.height < STACK_FLOOR) {
         failures.push(
           `${width}px: the step stack collapses to ${wp.mergerStack.height}px during a merger ` +

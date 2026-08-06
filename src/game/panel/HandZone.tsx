@@ -46,19 +46,24 @@ export function HandZone({ name, portfolio, cash, prices = {} }: HandZoneProps) 
         )}
       </div>
       {/*
-        A floor, not a fixed height. 64px is one row of stock stacks, measured
-        on a real page by `npm run verify:layout` rather than derived — jsdom
-        reports 0 for all of it. The floor is what stops the jitter the
-        reservation exists for: without it the zone snapped 57px -> 64px the
-        moment a player bought their first share, shifting every zone below.
-        Growing past it is fine and expected — a player can hold all seven
-        brands, which needs a second row — and the panel scrolls to suit.
-        Re-measure the floor if the stack's size or this zone's padding changes.
+        A floor, not a fixed height, and it covers **one populated row** — 68px,
+        measured on a real page by `npm run verify:layout`, because jsdom
+        reports 0 for all of it.
+
+        It was 64px, which is the row *without* a stack in it: the founder's
+        free share grew the zone 64 -> 68 and shifted every zone below by 4px,
+        which was reported as the players strip moving. Gaining a share is not
+        gaining a row, so nothing should move — the 4px was the stack's depth
+        margin and its ×N label, neither of which the empty row has.
+
+        Growing past this is still fine and expected — a player can hold all
+        seven brands, which needs a second row — and the panel scrolls to suit.
+        Re-measure if the stack's size or this zone's padding changes.
       */}
       <div
         data-zone="holdings"
         data-may-grow="true"
-        className="flex min-h-[64px] flex-wrap items-end gap-3 transition-[min-height] duration-200 motion-reduce:transition-none"
+        className="flex min-h-[68px] flex-wrap items-end gap-3 transition-[min-height] duration-200 motion-reduce:transition-none"
       >
         {!hasViewer ? (
           <span className="text-xs text-gray-400">Not dealt yet</span>
