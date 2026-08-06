@@ -235,6 +235,26 @@ const MEASURE = `(async () => {
   zoneFloors.afterPlace = floors();
   noteSeat('afterPlace');
 
+  // The other half of the motion: a step leaving. Undo the placement that was
+  // just made — the list should drop by the height of the row that is going,
+  // then settle with the row gone. The walk recovers below by placing again.
+  const undo = document.querySelector('[data-slot="stepstack"] [data-step-undo]');
+  let stepExit = null;
+  if (undo) {
+    const rowsBefore = document.querySelectorAll('[data-slot="stepstack"] [data-step-id]').length;
+    undo.click();
+    // Sampled mid-flight, not on the next frame. The exit *starts* at zero and
+    // travels down, so a sample taken one frame in reads ~0 whether the
+    // animation is running or not — which is how this probe first reported a
+    // false failure at one width and a pass at the other. 90ms is halfway
+    // through STEP_EXIT_MS (180ms in src/game/panel/stepMotion.ts).
+    await wait(90);
+    stepExit = { start: tyOf(), rowsBefore };
+    await wait(400);
+    stepExit.settled = tyOf();
+    stepExit.rowsAfter = document.querySelectorAll('[data-slot="stepstack"] [data-step-id]').length;
+  }
+
   // Keep playing until a chain has been founded and its shares are on sale.
   // One placement is almost never enough: with a random seed the opening tile
   // usually lands isolated, nothing is founded, and the buy list is empty — so
@@ -300,6 +320,7 @@ const MEASURE = `(async () => {
   return {
     seatVisible,
     stepRise,
+    stepExit,
     zoneFloors,
     // Zones that clip their content rather than fitting it. Horizontal
     // overflow inside a fixed-width panel is a bug everywhere except the
@@ -524,6 +545,23 @@ async function main() {
         `place after the animation should have finished`,
       );
     }
+    // And a step leaving, which is the same machinery run backwards: undo the
+    // placement and the list should drop by the height of the row that is
+    // going, then settle one row shorter.
+    const exit = m.stepExit;
+    if (!exit) {
+      failures.push(`${width}px: no undo control to measure a step leaving with`);
+    } else if (exit.start <= 0) {
+      failures.push(
+        `${width}px: the undone step did not leave — the list sat at ${exit.start}px one ` +
+        `frame after the undo instead of dropping out of view`,
+      );
+    } else if (exit.settled !== 0 || exit.rowsAfter >= exit.rowsBefore) {
+      failures.push(
+        `${width}px: the step stack did not settle after an undo — ${exit.settled}px off, ` +
+        `${exit.rowsBefore} rows before and ${exit.rowsAfter} after`,
+      );
+    }
     const seatSamples = Object.entries(m.seatVisible ?? {});
     if (seatSamples.length < 3) {
       failures.push(
@@ -642,6 +680,7 @@ async function main() {
       `\n         board ${m.board ? Math.round(m.board.width) + 'x' + Math.round(m.board.height) : 'none'}` +
       `\n         finalOverlay: ${JSON.stringify(m.finalOverlay)}` +
       `\n         step rise ${JSON.stringify(m.stepRise)}` +
+      `\n         step exit ${JSON.stringify(m.stepExit)}` +
       `\n         ` + stageNames.map((n) => `${n} ${JSON.stringify(m.stages[n])}`).join('\n         '),
     );
 

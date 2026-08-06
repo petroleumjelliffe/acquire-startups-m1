@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within, act } from '@testing-library/react';
 import { StepStack } from './StepStack';
 import { ActiveStep } from './ActiveStep';
+import { STEP_EXIT_MS } from './stepMotion';
 
 // Every entry is a real undo point here; the `undoable` flag's own behaviour is
 // covered by 'offers undo only on entries marked undoable' below.
@@ -60,6 +61,84 @@ describe('StepStack', () => {
     const second = container.querySelectorAll('[data-step-undo]')[1];
     fireEvent.click(second);
     expect(onUndo).toHaveBeenCalledWith(2);
+  });
+});
+
+/**
+ * The exit is one of the few things about this motion jsdom *can* see: the
+ * question is not how far anything moved but *when* the old row stops being
+ * rendered. Sequential means it is still there for the whole exit and gone
+ * before the new one arrives — which is exactly a question about the DOM over
+ * time.
+ */
+describe('a step being replaced', () => {
+  const PLACED_E6 = { stepId: 1, phase: 'Placed a tile', detail: <span>E6</span>, undoable: true };
+  const PLACED_H8 = { stepId: 2, phase: 'Placed a tile', detail: <span>H8</span>, undoable: true };
+
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('holds the outgoing step on screen while it leaves, then lets the new one in', () => {
+    const { container, rerender } = render(<StepStack entries={[PLACED_E6]} />);
+    expect(container.textContent).toContain('E6');
+
+    rerender(<StepStack entries={[PLACED_H8]} />);
+
+    // Mid-exit: the old step is still rendered, and the new one has not
+    // arrived. Dropping the old row immediately is what "it just appears"
+    // looked like, and is the break for this test.
+    expect(container.textContent).toContain('E6');
+    expect(container.textContent).not.toContain('H8');
+
+    act(() => { vi.advanceTimersByTime(STEP_EXIT_MS); });
+
+    expect(container.textContent).not.toContain('E6');
+    expect(container.textContent).toContain('H8');
+  });
+
+  it('drops a whole rewind in one go rather than one row at a time', () => {
+    const three = [
+      PLACED_E6,
+      { stepId: 2, phase: 'Founded a brand', detail: <span>Messla</span>, undoable: true },
+      { stepId: 3, phase: 'Buy shares', detail: <span>2 × Messla</span>, undoable: true },
+    ];
+    const { container, rerender } = render(<StepStack entries={three} />);
+
+    rerender(<StepStack entries={[PLACED_E6]} />);
+    expect(container.textContent).toContain('Messla');
+
+    // One exit, not one per row: after a single exit's worth of time every
+    // removed row is gone.
+    act(() => { vi.advanceTimersByTime(STEP_EXIT_MS); });
+    expect(container.textContent).not.toContain('Messla');
+    expect(container.textContent).toContain('E6');
+  });
+
+  /**
+   * The panel re-renders for reasons that have nothing to do with the stack —
+   * a share staged, a socket status change — and `stepsOf` hands back a fresh
+   * array every time. An exit that cancelled itself on each of those would
+   * leave the outgoing step on screen for good, translated out of view, with
+   * its replacement never arriving.
+   */
+  it('survives a re-render in the middle of leaving', () => {
+    const { container, rerender } = render(<StepStack entries={[PLACED_E6]} />);
+    rerender(<StepStack entries={[PLACED_H8]} />);
+
+    act(() => { vi.advanceTimersByTime(STEP_EXIT_MS / 2); });
+    // Same entries, new array — exactly what a parent re-render produces.
+    rerender(<StepStack entries={[{ ...PLACED_H8 }]} />);
+    act(() => { vi.advanceTimersByTime(STEP_EXIT_MS); });
+
+    expect(container.textContent).not.toContain('E6');
+    expect(container.textContent).toContain('H8');
+  });
+
+  it('does not hold anything back when a step is only added', () => {
+    const { container, rerender } = render(<StepStack entries={[PLACED_E6]} />);
+    rerender(<StepStack entries={[PLACED_E6, PLACED_H8]} />);
+    // Nothing left, so there is nothing to wait for.
+    expect(container.textContent).toContain('H8');
   });
 });
 

@@ -30,6 +30,35 @@ export const STEP_RISE_MS = 280;
 /** The same curve as `step-up`: quick to leave, soft to land. */
 export const STEP_RISE_EASE = 'cubic-bezier(0.2, 0.7, 0.3, 1)';
 
+/**
+ * How long a step takes to leave.
+ *
+ * Shorter than the arrival on purpose. The two run in sequence — the old step
+ * drops out of view, *then* the new one rises, so a tile switch costs both —
+ * and a reversal reads faster than an arrival does: nothing new is being
+ * introduced, so there is nothing for the eye to take in on the way out.
+ */
+export const STEP_EXIT_MS = 180;
+
+/**
+ * The steps that are leaving.
+ *
+ * Identity is `stepId`, never position: the array is rebuilt from the log on
+ * every render, so comparing arrays or indices would report a removal on any
+ * commit at all.
+ *
+ * Everything that leaves, leaves together (owner's ruling). Undo removes a
+ * *suffix* — `rewindTo` throws away every step after the one you picked — so
+ * the rows that go are always the bottom ones, which is what lets the whole
+ * list drop by their height and land with the survivors already in place. A
+ * removal from the middle would need a different motion; the engine cannot
+ * produce one.
+ */
+export function leavingIds(shown: readonly number[], next: readonly number[]): number[] {
+  const staying = new Set(next);
+  return shown.filter((id) => !staying.has(id));
+}
+
 export interface RiseFrom {
   /** The distance the list starts below its resting place, in pixels. */
   offset: number;

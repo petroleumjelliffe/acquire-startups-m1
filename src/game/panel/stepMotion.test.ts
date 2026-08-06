@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { riseFrom, prefersReducedMotion, STEP_RISE_MS } from './stepMotion';
+import { riseFrom, prefersReducedMotion, leavingIds, STEP_RISE_MS } from './stepMotion';
 
 describe('riseFrom', () => {
   it('starts the list below its resting place by exactly what was added', () => {
@@ -29,6 +29,32 @@ describe('riseFrom', () => {
     expect(riseFrom(0, false)).toBeNull();
     expect(riseFrom(-64, false)).toBeNull();
     expect(riseFrom(Number.NaN, false)).toBeNull();
+  });
+});
+
+describe('leavingIds', () => {
+  it('names the steps that are going', () => {
+    expect(leavingIds([1, 2, 3], [1, 2])).toEqual([3]);
+  });
+
+  it('reports nothing when the same steps are rebuilt', () => {
+    // `stepsOf` returns a fresh array on every render. Comparing arrays — or
+    // lengths, or indices — would call every commit a removal.
+    expect(leavingIds([1, 2, 3], [1, 2, 3])).toEqual([]);
+  });
+
+  it('reports an arrival as no removal at all', () => {
+    expect(leavingIds([1, 2], [1, 2, 3])).toEqual([]);
+  });
+
+  it('takes a whole rewind together, not one step at a time', () => {
+    // Undoing into a merger drops several rows at once, and they go as one.
+    expect(leavingIds([1, 2, 3, 4], [1])).toEqual([2, 3, 4]);
+  });
+
+  it('counts a swap as one out and one in', () => {
+    // Switching a placed tile: step 2 goes, step 3 arrives.
+    expect(leavingIds([1, 2], [1, 3])).toEqual([2]);
   });
 });
 

@@ -26,7 +26,9 @@ export function StepEntry({ phase, detail, stepId, onUndo }: StepEntryProps) {
     // has already jumped to its new position. `StepStack` moves the whole list
     // instead, which is the motion this used to approximate by lifting its own
     // text 18px.
-    <div className="flex flex-col gap-[3px]">
+    // `data-step-id` is how `StepStack` measures the rows that are leaving, so
+    // it can drop the list by exactly their height.
+    <div data-step-id={stepId} className="flex flex-col gap-[3px]">
       <div className="flex items-center gap-2">
         <span
           data-step-phase
