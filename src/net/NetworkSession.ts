@@ -55,6 +55,13 @@ export function createNetworkSession(
 ): NetworkSession {
   let inner = createGameSession({ state: initial.state });
   let segmentStart = initial.segmentStart;
+  /**
+   * The segment before the open one, learned from the messages themselves: a
+   * commit carries a new `segmentStart`, and whatever it replaces is where
+   * the turn that just finished began. Corrections repeat the current one, so
+   * only a change moves this.
+   */
+  let previousSegmentStart: number | undefined;
   let rejection: SessionError | null = null;
   let pending = false;
   /**
@@ -76,6 +83,7 @@ export function createNetworkSession(
 
   const offState = transport.onState((msg) => {
     inner = createGameSession({ state: msg.state });
+    if (msg.segmentStart !== segmentStart) previousSegmentStart = segmentStart;
     segmentStart = msg.segmentStart;
     pending = false;
     // A `reset` is the rollback half of a rejection the player has just been
@@ -108,6 +116,7 @@ export function createNetworkSession(
       // No device is passed, so there is no curtain and nothing to reveal.
       awaitingReveal: false,
       segmentStart,
+      previousSegmentStart,
       pending,
       // Derived, not stored. Gated on being the actor because an optimistic
       // `liquidate` or a merger-triggering `placeTile` can hand the actor to

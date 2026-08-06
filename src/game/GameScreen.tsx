@@ -57,6 +57,9 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
   const view = useGameSession(session);
   const { state, actorId, awaitingReveal, undoableSteps, pending } = view;
 
+  /** This turn and the one before it. See `stepsOf`. */
+  const historyFrom = view.previousSegmentStart ?? view.segmentStart;
+
   // Inert while someone else is acting, while an answer only the server can
   // give is in flight, or while the socket itself is down — otherwise the buy
   // panel stays live after "End turn" and the next click is a rejection
@@ -144,7 +147,7 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
       <Panel
         stepstack={
           <StepStack
-            entries={stepsOf(state, undoableSteps, view.segmentStart)}
+            entries={stepsOf(state, undoableSteps, historyFrom)}
             onUndo={(stepId) => session.undoTo(stepId)}
           />
         }

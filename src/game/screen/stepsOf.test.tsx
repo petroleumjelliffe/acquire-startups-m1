@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { stepsOf } from './stepsOf';
+import { createGameSession } from '../../../session/GameSession';
+import { buildFixture } from '../../../engine/golden/fixtures';
 import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
 import { replayGoldenGame } from '../../../engine/golden/replay';
 
@@ -10,8 +12,8 @@ function g(id: string) {
   return game;
 }
 
-describe('stepsOf — this turn, not the whole game', () => {
-  it('drops every step below the open segment and keeps every step above it', () => {
+describe('stepsOf — this turn and the one before it', () => {
+  it('drops everything below the boundary it is given and keeps everything above', () => {
     const states = replayGoldenGame(g('G1'));
     const state = states[states.length - 1];
 
@@ -65,5 +67,44 @@ describe('stepsOf', () => {
     render(<div>{payoutStep.detail}</div>);
     // PayoutLines labels the role; a plain token list would not.
     expect(screen.getAllByText(/majority|minority/i).length).toBeGreaterThan(0);
+  });
+});
+
+describe('the turn before yours', () => {
+  /**
+   * Driven through a real session rather than a hand-picked log index,
+   * because the boundary under test is the one the session maintains — a
+   * fixture that names a step id would be asserting against a number this
+   * code no longer has to agree with.
+   */
+  it('shows what the previous player did, read-only, above your own steps', () => {
+    const session = createGameSession({
+      state: buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['E6'] },
+          { name: 'Sam', cash: 6000, hand: ['A1'] },
+        ],
+        bag: ['I11', 'I12', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+      }),
+    });
+
+    // Alex plays a whole turn: place, then end it.
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+
+    const view = session.getView();
+    expect(view.actorId, 'the turn did not change hands').toBe('p2');
+    expect(view.previousSegmentStart, 'no previous segment was recorded').toBeDefined();
+
+    const steps = stepsOf(view.state, view.undoableSteps, view.previousSegmentStart);
+
+    // Alex's placement is visible to Sam, and is not Sam's to undo.
+    const placement = steps.find((e) => e.phase === 'Placed a tile');
+    expect(placement, "the previous player's placement is missing").toBeDefined();
+    expect(placement!.undoable).toBe(false);
+
+    // Scoped to the open segment alone, Sam would see nothing of it.
+    const openOnly = stepsOf(view.state, view.undoableSteps, view.segmentStart);
+    expect(openOnly.some((e) => e.phase === 'Placed a tile')).toBe(false);
   });
 });

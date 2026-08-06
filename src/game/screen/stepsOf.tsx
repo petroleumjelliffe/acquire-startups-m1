@@ -13,19 +13,25 @@ import { PayoutLines } from '../merger/PayoutLines';
 export function stepsOf(
   state: GameState,
   undoableSteps: number[],
-  segmentStart = 0,
+  from = 0,
 ): StepStackEntry[] {
   const undoable = new Set(undoableSteps);
 
-  // This turn, not the whole game.
+  // This turn and the one before it — not the whole game, and not the open
+  // segment alone.
   //
-  // The stack existed to be the undo surface for the open segment, and it was
-  // accumulating every step ever taken instead — by the end of a game it was a
-  // scrolling transcript in which the two or three steps you could actually
-  // take back were buried. A segment's steps are exactly those filed at or
-  // after its start.
+  // Scoping it to the open segment was too deep a cut: a watcher could not see
+  // what the player before them had just done, which is most of what the panel
+  // is for when it is not your turn. Showing everything is the other failure —
+  // by the end of a game the two or three steps you can actually take back are
+  // buried in a transcript.
+  //
+  // One completed turn back is the whole of what someone else did: the tile
+  // they placed, the brand they founded, how the merger resolved, what they
+  // bought. Those entries render read-only, because `undoableSteps` only ever
+  // holds ids from the open segment.
   return state.log
-    .filter((entry) => entry.stepId >= segmentStart)
+    .filter((entry) => entry.stepId >= from)
     .map((entry) => ({
     stepId: entry.stepId,
     phase: entry.phase,

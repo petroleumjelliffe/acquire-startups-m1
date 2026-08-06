@@ -38,6 +38,18 @@ export interface SessionView {
    * duplication this module exists to prevent.
    */
   segmentStart: number;
+  /**
+   * Where the segment before this one began, or `undefined` if this is the
+   * first — the boundary the step stack needs to show the turn that just
+   * finished.
+   *
+   * Nothing derives this from the log, because the log cannot be read back
+   * into segments reliably: a merger files payout entries under players who
+   * are not the actor, so "the contiguous run with the same playerId" is not
+   * the same thing as "the previous segment". The session knows the boundary
+   * because it is the thing that closes it.
+   */
+  previousSegmentStart?: number;
   /** The last rejected intent, cleared by the next successful one. */
   error: SessionError | null;
   /**
@@ -96,6 +108,7 @@ export function createGameSession(init: SessionInit): GameSession {
    */
   let actorId: string | null = getCurrentActor(state);
   let segmentStart: number = state.nextStepId;
+  let previousSegmentStart: number | undefined;
   // A session opens behind the curtain, because it opens on somebody's hand.
   // The one exception is the turn-order draw: it is a gate in front of the
   // game rather than anyone's turn, no player's tiles or shares are on screen
@@ -121,6 +134,7 @@ export function createGameSession(init: SessionInit): GameSession {
       awaitingReveal,
       undoableSteps: [...store.keys()].filter((k) => k >= segmentStart).sort((a, b) => a - b),
       segmentStart,
+      previousSegmentStart,
       error,
     };
   }
@@ -143,6 +157,7 @@ export function createGameSession(init: SessionInit): GameSession {
     if (next === actorId && !leftDraw) return;
 
     actorId = next;
+    previousSegmentStart = segmentStart;
     segmentStart = state.nextStepId;
     awaitingReveal = true;
     for (const key of [...store.keys()]) {
