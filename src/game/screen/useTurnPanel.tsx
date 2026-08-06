@@ -336,7 +336,26 @@ export function useTurnPanel(
           <StagingZone
             label={`Keeping ${keep}`}
             cashDelta={staged.sell * unitPrice}
-            shares={<StockStack id={absorbedId} count={keep} size="sm" />}
+            shares={
+              <>
+                <StockStack id={absorbedId} count={keep} size="sm" />
+                {/*
+                  What you are getting, not only what you are giving up. A
+                  trade hands in `TRADE_RATIO` absorbed shares for one survivor
+                  share, and the pile showed the absorbed side alone — so the
+                  staging zone answered "what am I losing" and left "what am I
+                  gaining" to arithmetic. Derived from `TRADE_RATIO` rather
+                  than written down, because it is a rule.
+                */}
+                {staged.trade > 0 && (
+                  <StockStack
+                    id={survivorId}
+                    count={staged.trade / TRADE_RATIO}
+                    size="sm"
+                  />
+                )}
+              </>
+            }
             action={
               canAct ? (
                 <button

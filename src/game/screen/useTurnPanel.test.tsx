@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useTurnPanel } from './useTurnPanel';
 import { createGameSession, type GameSession, type SessionView } from '../../../session/GameSession';
 import type { Intent } from '../../../engine/intents';
@@ -8,6 +8,7 @@ import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
 import { replayGoldenGame } from '../../../engine/golden/replay';
 import type { GameState } from '../../../engine/gameTypes';
 import { getEndCondition } from '../../../engine/endGame';
+import { TRADE_RATIO } from '../../../engine/startups';
 
 function sessionFor(state = buildFixture({
   players: [{ name: 'Alex', cash: 6000, hand: ['E6', 'H8'] }, { name: 'Sam', cash: 6000, hand: ['A1'] }],
@@ -192,6 +193,39 @@ describe('useTurnPanel — mergers', () => {
 
     expect(screen.getByText(/liquidate/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sell one share/i })).toBeInTheDocument();
+  });
+
+  it('puts the survivor shares a trade gains into the staging pile', () => {
+    // A state where the acting shareholder can actually afford a trade —
+    // holding fewer than TRADE_RATIO absorbed shares leaves the button
+    // disabled and the test asserting nothing.
+    const state = stateWhere((s) => {
+      if (s.stage !== 'mergerLiquidation') return false;
+      const ctx = s.mergerContext;
+      if (!ctx) return false;
+      const absorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
+      const holder = ctx.shareholderQueue[ctx.currentShareholderIndex];
+      const player = s.players.find((p) => p.id === holder);
+      return (player?.portfolio[absorbed] ?? 0) >= TRADE_RATIO;
+    });
+
+    const survivorId = state.mergerContext!.survivorId;
+    const { container } = render(
+      <Harness session={createGameSession({ state })} dispatch={() => {}} />,
+    );
+    const staging = () => container.querySelector('[data-slot="staging"]') as HTMLElement;
+
+    // Nothing traded yet, so nothing of the survivor is in the pile.
+    expect(within(staging()).queryAllByTitle(survivorId)).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: /trade/i }));
+
+    // The pile showed only what you were giving up; what you get back for it
+    // was left to arithmetic.
+    expect(
+      within(staging()).queryAllByTitle(survivorId).length,
+      'the survivor shares gained are missing from the pile',
+    ).toBeGreaterThan(0);
   });
 
   it('accumulates a sale locally, then dispatches one liquidate intent', () => {
