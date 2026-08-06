@@ -7,9 +7,10 @@ import { JoinRoomPage } from "./pages/JoinRoomPage";
 import { PassAndPlayPage } from "./pages/PassAndPlayPage";
 import { RoomPage } from "./pages/RoomPage";
 
-// Lazy on purpose: the catalog pulls in the golden games and replays them, and
-// none of that belongs in the main chunk. `npm run check:bundle` is the guard.
+// Lazy on purpose: both pull in the golden games and replay them, and none of
+// that belongs in the main chunk. `npm run check:bundle` is the guard.
 const CatalogPage = React.lazy(() => import("./game/catalog/CatalogPage"));
+const ScenarioPage = React.lazy(() => import("./game/catalog/ScenarioPage"));
 
 export default function App() {
   return (
@@ -34,6 +35,19 @@ export default function App() {
         element={
           <React.Suspense fallback={null}>
             <CatalogPage />
+          </React.Suspense>
+        }
+      />
+
+      {/* Any golden-game state, playable from that point. The catalog shows
+          what a component looks like; this shows whether the game works from
+          here — a merger is two clicks away instead of several minutes of
+          play. */}
+      <Route
+        path="/scenarios"
+        element={
+          <React.Suspense fallback={null}>
+            <ScenarioPage />
           </React.Suspense>
         }
       />

@@ -352,7 +352,30 @@ deliberately deferred, not overlooked.
 
 ## Out of scope
 
-Cross-turn undo; undo-approval by other players; event sourcing; spectator mode.
+Cross-turn undo; undo-approval by other players; event sourcing.
+
+~~Spectator mode~~ — **back in scope as a wanted feature** (owner, 2026-08-06),
+though not scheduled. Two halves that only make sense together:
+
+- **A spectator seat.** Join a room by code and watch: the whole board, the
+  step stack, the roster — no hand, no controls, and **not counted as a player**.
+  Not a seat in the turn order, not a body the lobby's "waiting for another
+  player" is satisfied by, and not something a rejoining spectator can be
+  mistaken for. The projection layer already blanks other hands per player, so a
+  spectator is close to "project for a player id that holds no seat" — but the
+  seat model, the roster, the start-game gate and `identity.ts` all currently
+  assume everyone in a room is playing.
+- **A phone view, which is the reason it is wanted.** On a phone the board does
+  not fit beside the panel, so the phone shows **the side panel only** and you
+  play from it — while a spectator view on a laptop or TV carries the board for
+  everyone to see. That makes the phone view depend on the spectator seat rather
+  than being an independent responsive breakpoint, and it makes the panel's own
+  completeness the requirement: everything a turn needs must be reachable
+  without the board. Placing a tile from the panel's hand row already works
+  (Phase 5, Task 11); nothing else has been checked.
+
+Both are their own design pass. Recorded here so the roadmap stops saying
+spectator mode is unwanted.
 
 ### Deliberately not ported from the prototype
 
