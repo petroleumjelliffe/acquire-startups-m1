@@ -46,7 +46,7 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 
 ---
 
-## Task 1: The panel must reach its own undo during a merger
+## Task 1: The panel must reach its own undo during a merger ✅ `3ad88e8`
 
 **Finding:** in a merger the active zone grows — the liquidation queue plus its actions — and the step stack is pushed out of view with no way to scroll back to it. The undo you need is unreachable exactly when a merger makes you most likely to want it.
 
@@ -61,7 +61,7 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 - [ ] **Step 5: Break it** — restore the old overflow — and confirm the `verify:layout` check reports the step stack unreachable. Restore.
 - [ ] **Step 6:** `npm run verify:layout`, `npx vitest run`, `npm run typecheck`, commit.
 
-## Task 2: Liquidation options side by side
+## Task 2: Liquidation options side by side ✅ `d2e5212`
 
 **Finding:** the sell and trade controls stack vertically and should sit side by side.
 
@@ -71,7 +71,7 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 - [ ] **Step 2:** The existing tests assert on roles and names; keep them passing rather than rewriting them around the new layout. Add nothing that asserts a width in jsdom.
 - [ ] **Step 3:** `npm run verify:layout` — the merger state is one it already walks — plus the suite and typecheck. Commit.
 
-## Task 3: Traded shares appear in the staging pile
+## Task 3: Traded shares appear in the staging pile ✅ `0862885`
 
 **Finding:** trading absorbed shares two-for-one gives you survivor shares, and the staging pile never shows them. You are told what you are giving up and not what you are getting.
 
@@ -84,7 +84,7 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 - [ ] **Step 3: Break it** by rendering only the absorbed stack; confirm the new test goes red. Restore.
 - [ ] **Step 4:** Suite, typecheck, `npm run verify:layout` (the pile reservation is exactly what this grows). Commit.
 
-## Task 4: A newly founded brand's shares are badged "new"
+## Task 4: A newly founded brand's shares are badged "new" ✅ `2cbae32`
 
 **Finding:** the prototype badged the brand founded this turn during the buy step, and the port lost it.
 
@@ -97,7 +97,7 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 - [ ] **Step 3: Break it** by dropping the `segmentStart` bound so every founded brand counts; confirm the "earlier segment" case goes red. Restore.
 - [ ] **Step 4:** Suite, typecheck, commit.
 
-## Task 5: An "it's your turn" indicator
+## Task 5: An "it's your turn" indicator ✅ `15f453a`
 
 **Finding:** the toast tells you when someone else is up and says nothing when control arrives, which is the moment that actually needs announcing.
 
@@ -111,7 +111,7 @@ Five of the thirteen are done and on `main`. Recorded here so this plan reads as
 - [ ] **Step 4: Break it** by rendering the your-turn form unconditionally; confirm the pass-and-play case goes red. Restore.
 - [ ] **Step 5:** Suite, typecheck, commit.
 
-## Task 6: A tile landing on the board
+## Task 6: A tile landing on the board ✅ `14b386c`
 
 **Finding:** tiles appear instantly, and on someone else's screen a whole turn arrives at once with nothing to draw the eye to what changed.
 
@@ -155,7 +155,7 @@ a tile landing on the board should share that vocabulary rather than invent a
 second one. Two are copy, two are content the panel drops that it should keep,
 and one is the history being noisier than it is useful.
 
-## Task 8: The step stack stops showing the draw
+## Task 8: The step stack stops showing the draw ✅ `e2d6b68`
 
 **Finding:** every turn ends with a `Drew tiles` entry, which is the bag doing
 its bookkeeping, not a move anyone made. It doubles the length of the history
@@ -279,7 +279,7 @@ start it first.
   test that pins the outgoing entry still being rendered goes red. Restore.
 - [ ] **Step 6:** Suite, typecheck, by-hand check, commit.
 
-## Task 11: "Place a tile" shows the hand it is asking you to play from
+## Task 11: "Place a tile" shows the hand it is asking you to play from ✅ `a6f22e0`
 
 **Finding:** during the placement step your tiles are lit on the board and
 nowhere in the panel. The step asks for a tile without showing you which ones
@@ -309,7 +309,7 @@ empty row for every watcher.
 - [ ] **Step 4:** `npm run verify:layout` — this adds a row to the active zone,
   which is the zone that squeezes the step stack — suite, typecheck, commit.
 
-## Task 12: A sold-out brand stays in the buy row
+## Task 12: A sold-out brand stays in the buy row ✅ `a123b87`
 
 **Finding:** `forSale` filters on `availableShares > 0`, so a brand vanishes from
 the buy step the moment its last share is bought. Sold out is information — it
@@ -335,7 +335,7 @@ possibly `src/game/atoms/StockCard.tsx`; tests alongside.
 - [ ] **Step 5:** Suite, typecheck, `npm run verify:layout` (this row can now be
   wider), commit.
 
-## Task 13: Placements stop calling themselves "(isolated)"
+## Task 13: Placements stop calling themselves "(isolated)" ✅ `222146f`
 
 **Finding:** a tile that neither grows a chain, founds one, nor merges logs as
 `E6 (isolated)`. The word is jargon for "nothing happened", and the entry
@@ -359,7 +359,7 @@ finding.
 - [ ] **Step 4:** Run the whole suite including `engine/golden/golden.test.ts`.
 - [ ] **Step 5:** Suite, typecheck, commit.
 
-## Task 14: "Initial share price", not "to start"
+## Task 14: "Initial share price", not "to start" ✅ `de52488`
 
 **Finding:** the founding step groups the available brands by the price a share
 opens at and labels that price `to start`, which reads as a fragment.
@@ -389,7 +389,19 @@ the way across. That is now four; it is worth a pass over
 `prototype/index.html`'s panel against ours to find the rest in one go rather
 than one screen recording at a time.
 
-## Task 15: The container rises — not the contents
+## Task 15: The container rises — not the contents ✅ `0d82784`
+
+> **Done, with one deviation: there is no exit phase.** The plan's Step 3 had
+> the zone collapse with the old step still rendered, then grow with the new
+> one. Built that way it put a 240ms delay in front of every control the next
+> step offers, and five existing tests failed on the lag immediately. The step
+> that has just finished is not in that box any more — it is a row in the
+> history being pushed — so there is nothing to animate away, which is also what
+> the finding asked for ("the previous completed step should be pushed up, not
+> have its own transition"). `STEP_EXIT_MS` survives as an unused-by-the-zone
+> constant only if something later needs it; the reveal is one growth, and the
+> gate measures it.
+
 
 **Finding, in the owner's words:** *"the container is meant to animate up, not
 the contents inside. the container is meant to push everything above it up. the
@@ -450,7 +462,7 @@ synchronise, because there is only one motion.
   motion and the first two passed their gates. Record it and step through, in
   pass-and-play and online. Suite, typecheck, `npm run verify:layout`, commit.
 
-## Task 16: Staged shares can be taken back
+## Task 16: Staged shares can be taken back ✅ `0c0abdf`
 
 **Finding:** clicking a share in the staging pile should decrement it and return
 it to where it came from. Nothing in the pile is clickable, and there is no
@@ -478,7 +490,7 @@ state is never entered — the same dropped-prop shape as Tasks 3 and 12.
 - [ ] **Step 5:** Suite, typecheck, `npm run verify:layout` (the pile's
   reservation is what this changes the contents of), commit.
 
-## Task 17: The buy step says what to do when there is nothing to buy
+## Task 17: The buy step says what to do when there is nothing to buy ✅ `0c0abdf`
 
 **Finding:** before anything is founded, the buy step is a heading over an empty
 row.
@@ -495,7 +507,7 @@ row.
   sold-out case goes red. Restore.
 - [ ] **Step 4:** Suite, typecheck, commit.
 
-## Task 18: Whose step was it
+## Task 18: Whose step was it ✅ `83dc438`
 
 **Finding:** the stack shows two turns and attributes neither. The viewer should
 see "you", never their own name.
@@ -524,7 +536,7 @@ see "you", never their own name.
 - [ ] **Step 5:** Suite, typecheck, `npm run verify:layout` (an added name can
   wrap a step row), commit.
 
-## Task 19: The holdings floor is short by a row's worth
+## Task 19: The holdings floor is short by a row's worth ✅ `89da136`
 
 **Finding:** taking your first share — the founder's free one — shifts every
 zone below the hand by 4px.
@@ -549,7 +561,7 @@ which exempts it from the no-movement rule. Gaining a share is not gaining a
   reports the shift. Restore.
 - [ ] **Step 5:** `npm run verify:layout` at both widths, suite, typecheck, commit.
 
-## Task 20: The staging pile stops saying "empty"
+## Task 20: The staging pile stops saying "empty" ✅ `0c0abdf`
 
 **Finding:** the word `empty` in an empty staging pile is a label for nothing.
 
@@ -565,12 +577,19 @@ which exempts it from the no-movement rule. Gaining a share is not gaining a
 
 ## Verification
 
-This plan is done when:
+**Status 2026-08-06: every task is built and committed.** What remains is the
+last bullet, which is not a task and cannot be done by the person who wrote the
+code.
 
-- All twenty-six findings are closed, or explicitly parked with a ruling.
-- Every new test has been observed failing, with the break named in its task.
-- `npx vitest run`, `npm run typecheck`, `npx vite build`, `npm run check:bundle` and `npm run verify:layout` are green.
-- **A full two-browser game has been played to final scoring**, including a merger whose liquidation queue reaches both players, an undo inside a merger (Task 1's finding), a tile switched mid-turn (online, the bug that opened this plan), and a mid-game refresh. This is the pass that found all thirteen of these; it is the only one that has ever found anything here.
+- ✅ All twenty-six findings are closed. One deviation, recorded on Task 15: the
+  reveal has no exit phase.
+- ✅ Every new test was observed failing, with the break named in its task. Two
+  premises of my own were corrected by the corpus along the way: a merger payout
+  is filed under no player at all, and the buy step's empty state is about
+  nothing being *founded* rather than nothing being *buyable*.
+- ✅ `npx vitest run` (610), `npm run typecheck`, `npm run check:bundle` and
+  `npm run verify:layout` are green.
+- ⬜ **A full two-browser game has been played to final scoring**, including a merger whose liquidation queue reaches both players, an undo inside a merger (Task 1's finding), a tile switched mid-turn (online, the bug that opened this plan), and a mid-game refresh. This is the pass that found all thirteen of these; it is the only one that has ever found anything here.
 
 ## Risks
 

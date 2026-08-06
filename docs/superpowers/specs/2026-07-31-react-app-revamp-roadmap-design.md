@@ -318,11 +318,15 @@ restart with a game in progress. Then the same three by hand on prod.
 
 ### Phase 5 — Online UI
 
-> **Rewritten 2026-08-06, after the first two-browser sessions.** Two of the three items below were
-> already delivered by Phase 3b, and the third is done. What Phase 5 actually is now lives in
-> [2026-08-06-phase-5-online-ui.md](../plans/2026-08-06-phase-5-online-ui.md): the thirteen findings
-> from playing the thing with two people, of which six are closed. Playing it turned out to be a
-> better specification of "online UI" than these three bullets were.
+> **Rewritten 2026-08-06, after the first two-browser sessions; built out the same day.** Two of
+> the three items below were already delivered by Phase 3b, and the third is done. What Phase 5
+> actually became lives in
+> [2026-08-06-phase-5-online-ui.md](../plans/2026-08-06-phase-5-online-ui.md): **twenty-six findings
+> from playing the thing and watching a recording of it frame by frame, all closed.** Playing it
+> turned out to be a better specification of "online UI" than these three bullets were.
+>
+> **One thing is outstanding and it is not code:** a full two-browser game played to final scoring.
+> Every finding in that plan came from such a pass; none came from the test suite.
 
 Hidden hands under the new component layer (now genuinely enforced by Phase 3's projection) —
 **done in 3b**, via `GameScreen`'s `viewerId`. The step-stack as the spectator view of committed
