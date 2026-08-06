@@ -157,7 +157,10 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       // calls `foundStartup(state, id, coord)` to claim the group, grant the
       // founder share and move on to `buy`.
     } else {
-      pushLog(state, 'Placed a tile', [tok.tile(coord), tok.text(' (isolated)')], player.id);
+      // The coordinate alone. Every other branch here says what the placement
+      // *did* — grew, founded, merged — and a placement that did none of those
+      // has nothing to add; "(isolated)" was jargon for "nothing happened".
+      pushLog(state, 'Placed a tile', [tok.tile(coord)], player.id);
       //enter buy stage
       state.stage = "buy";
       state.currentBuyCount = 0;

@@ -101,6 +101,20 @@ describe('applyIntent', () => {
     expect(next.log.at(-1)).toMatchObject({ phase: 'Placed a tile', playerId: state.players[0].id });
   });
 
+  it('says where the tile went and nothing else', () => {
+    // A placement that neither grows a chain, founds one nor merges used to
+    // log "E5 (isolated)". The word is jargon for "nothing happened", on an
+    // entry whose whole content is already the coordinate — and every other
+    // branch of this log says what the placement *did*, which is the thing
+    // worth a sentence.
+    const state = playing();
+    state.players[0].hand = ['E5', 'A1'];
+
+    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E5' });
+
+    expect(next.log.at(-1)!.detail).toEqual([{ kind: 'tile', coord: 'E5' }]);
+  });
+
   it('opens the founding choice, then founds the brand and grants the free share', () => {
     const state = playing();
     state.board['E5'] = { placed: true };
