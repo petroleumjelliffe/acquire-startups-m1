@@ -77,6 +77,25 @@ as New Room and the button becomes `Join game`. `Leave` below.
   card: the game's name, its players as `🐸 Name 1, 🐷 Name 2`, and
   `Last played: 2 days ago`.
 
+### Tokens the file defines
+
+From `get_variable_defs` on the frame — the values to build against, not
+eyeballed from the export:
+
+| | |
+|---|---|
+| Title | Inter Bold 21/22.5, letter-spacing −0.234 |
+| Body | Inter Regular 12, letter-spacing −0.1 |
+| Body fill | `#495564` |
+| Primary button fill | `#0065F4` |
+| Secondary button | fill `#FFFFFF`, text `#0E1828`, stroke `#d0d5dc` |
+| Placeholder | stroke `#CCCCCC`, text `#666666` |
+
+**These disagree with the app.** Our primary buttons are Tailwind `bg-blue-600`
+(`#2563eb`); the mockup's is `#0065F4`. Decide once, when the lobby is built,
+whether the app moves to the file's blue or the file is treated as
+approximate — and do not silently ship two blues.
+
 ## What the mockup settles, and what it opens
 
 Settles the last open question from the rulings — **what the lobby shows about a
@@ -98,18 +117,16 @@ Three things it raises that nothing has answered yet:
 ## How to read the Figma file
 
 The desktop app's **Dev Mode MCP server** serves it on
-`http://127.0.0.1:3845/mcp` while Figma is running with the file open. It is not
-registered with Claude Code by default, so either:
-
-- register it — `claude mcp add --transport http figma http://127.0.0.1:3845/mcp`
-  — and the `get_screenshot` / `get_metadata` / `get_design_context` tools appear
-  natively; or
-- speak JSON-RPC to it directly: `initialize`, then `notifications/initialized`
-  carrying the returned `mcp-session-id` header, then `tools/call`. Responses come
-  back as `text/event-stream`, so strip the `data: ` prefix.
+`http://127.0.0.1:3845/mcp` while Figma is running with the file open, and it is
+**registered with Claude Code** (2026-08-06) — `get_screenshot`, `get_metadata`,
+`get_design_context`, `get_variable_defs` and `get_motion_context` are available
+directly. `nodeId` takes either form, `23-866` or `23:866`.
 
 Fetching the figma.com URL itself returns nothing — the file is private and the
-page is a JavaScript app.
+page is a JavaScript app. If the MCP tools are ever missing, the server can be
+driven over plain JSON-RPC instead: `initialize`, then `notifications/initialized`
+carrying the returned `mcp-session-id` header, then `tools/call`, with responses
+arriving as `text/event-stream` (strip the `data: ` prefix).
 
 ## Carried forward, not yet designed
 
