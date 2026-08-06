@@ -25,10 +25,23 @@
  * (`step-up` in `src/styles/index.css`); the stack shares it rather than
  * inventing a second sense of "arriving".
  */
-export const STEP_RISE_MS = 280;
+export const STEP_RISE_MS = 340;
 
-/** The same curve as `step-up`: quick to leave, soft to land. */
-export const STEP_RISE_EASE = 'cubic-bezier(0.2, 0.7, 0.3, 1)';
+/**
+ * Deliberately *not* `step-up`'s curve.
+ *
+ * That one is `cubic-bezier(0.2, 0.7, 0.3, 1)` — 70% of the distance in the
+ * first 20% of the time — which suits a fade-and-lift where the element is
+ * visible throughout. Here the distance *is* the reveal: the new step travels
+ * up through the clip edge, so front-loading the travel front-loads the whole
+ * effect. Measured on a real page, the row went from hidden to 91% visible in
+ * 120ms of a 280ms animation, and the remaining 160ms crept the last five
+ * pixels — which reads exactly as reported: the new step appears at once while
+ * the older ones slide.
+ *
+ * An even curve spends the time on the part that can be seen.
+ */
+export const STEP_RISE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 /**
  * How long a step takes to leave.

@@ -228,6 +228,16 @@ const MEASURE = `(async () => {
   handCell.click();
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   const stepRise = { start: tyOf() };
+  // The other half of the same motion: the *incoming* step rising from behind
+  // the staging zone (prototype/transitions.js, stepAdvance). It is a CSS
+  // animation, so it only plays when its element mounts — and React reuses that
+  // node between steps unless it is keyed, which is exactly how this animation
+  // existed for months and never ran. Sampled mid-flight; a step that is not
+  // animating reports none.
+  await wait(80);
+  const zone = document.querySelector('[data-slot="active"] > *');
+  stepRise.activeAnimation = zone ? getComputedStyle(zone).animationName : null;
+  stepRise.activeMoving = zone ? getComputedStyle(zone).transform !== 'none' : false;
   await wait(400);
   stepRise.settled = tyOf();
   await wait(300);
@@ -543,6 +553,13 @@ async function main() {
       failures.push(
         `${width}px: the step stack never settled — ${rise.settled}px off its resting ` +
         `place after the animation should have finished`,
+      );
+    } else if (rise.activeAnimation !== 'step-rise' || !rise.activeMoving) {
+      failures.push(
+        `${width}px: the incoming step did not rise — the active zone reported ` +
+        `animation "${rise.activeAnimation}" and ${rise.activeMoving ? 'was' : 'was not'} ` +
+        `moving 80ms in. It appears in place instead of coming up from behind staging, ` +
+        `which is what happens when the zone is not keyed and React reuses the node.`,
       );
     }
     // And a step leaving, which is the same machinery run backwards: undo the

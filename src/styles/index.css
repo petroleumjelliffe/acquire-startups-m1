@@ -29,9 +29,37 @@ button {
   }
 }
 
-.step-enter,
-.active-step-enter {
+.step-enter {
   animation: step-up 280ms cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+/* The incoming step rising from behind the staging zone — the second half of
+   the prototype's T2 (`prototype/transitions.js`, `stepAdvance`): "the incoming
+   step rises from below (behind staging) to fill the slot. The new step shoves
+   the old one up."
+
+   Nothing clips it. The staging zone is the next sibling and opaque, so it
+   paints over anything this zone overflows downwards — which is what makes 40px
+   of travel read as coming out from behind it.
+
+   The duration and curve are `STEP_RISE_MS` and `STEP_RISE_EASE` from
+   `src/game/panel/stepMotion.ts`, where the step stack's half of the same
+   motion reads them: the two run together and must agree. `verify:layout`
+   measures both, so drift between them fails the gate rather than shipping as
+   two things moving at different speeds. */
+@keyframes step-rise {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.active-step-enter {
+  animation: step-rise 340ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* `TurnToast` reuses `.step-enter` rather than defining a second keyframe:
@@ -51,3 +79,8 @@ button {
     animation: none;
   }
 }
+
+/* An element only plays its enter animation when it mounts, and React reuses
+   the active zone's DOM node from one step to the next — which is why this
+   animation existed and never ran after the first step. `GameScreen` keys the
+   zone by stage and actor so a new step is a new node. */
