@@ -157,10 +157,10 @@ describe('useTurnPanel — buying', () => {
   it('ends the turn without buying, through the one button', () => {
     const dispatch = vi.fn();
     render(<Harness session={atBuy()} dispatch={dispatch} />);
-    // An empty basket reads as "Skip", not "Confirm purchase" — and there is
-    // no separate "End turn" beside it to say the same thing twice.
-    expect(screen.queryByRole('button', { name: /end turn/i })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /^skip$/i }));
+    // One button, not two: an empty basket reads as "End turn" — the outcome
+    // of the press — rather than "Confirm purchase" with nothing to confirm.
+    expect(screen.getAllByRole('button', { name: /end turn|confirm purchase/i })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /^end turn$/i }));
     expect(dispatch).toHaveBeenCalledWith({ type: 'endTurn', playerId: 'p1' });
   });
 

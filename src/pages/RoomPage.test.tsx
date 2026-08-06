@@ -261,7 +261,7 @@ describe('a dropped connection', () => {
     // It is Sam's own turn. Skipping the buy ends it, and ending a turn is a
     // bag-drawing intent: it goes on the wire and the session marks itself
     // pending until the server answers.
-    fireEvent.click(screen.getByRole('button', { name: /^skip$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^end turn$/i }));
     expect(screen.getByText(/sending/i)).toBeInTheDocument();
 
     f.setStatus('closed');

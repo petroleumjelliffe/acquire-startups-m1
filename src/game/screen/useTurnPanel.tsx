@@ -471,7 +471,9 @@ export function useTurnPanel(
               over. A separate "End turn" beside it asked the player to say
               twice what they had already said once, and reading "Confirm
               purchase" with an empty basket is the same dead end from the
-              other side — hence "Skip", which is what an empty basket means.
+              other side — hence "End turn" with an empty basket, which is all
+              that press actually does. It says the outcome rather than the
+              omission: "Skip" invited the question "skip what?".
             */
             <button
               type="button"
@@ -484,13 +486,13 @@ export function useTurnPanel(
               }}
               className={
                 staged.picks.length === 0
-                  // Skipping is not the thing you came here to do, so it does
-                  // not wear the primary treatment.
+                  // Ending without buying is not the thing you came here to
+                  // do, so it does not wear the primary treatment.
                   ? 'm-0 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50'
                   : 'm-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700'
               }
             >
-              {staged.picks.length === 0 ? 'Skip' : 'Confirm purchase'}
+              {staged.picks.length === 0 ? 'End turn' : 'Confirm purchase'}
             </button>
           )}
         />
