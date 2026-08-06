@@ -260,6 +260,7 @@ function frozen(view: SessionView): GameSession {
     subscribe: () => () => {},
     dispatch: () => {},
     undoTo: () => {},
+    undoThen: () => {},
     reveal: () => {},
   };
 }

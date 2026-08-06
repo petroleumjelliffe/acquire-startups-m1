@@ -52,6 +52,19 @@ export interface GameSession {
   subscribe(listener: () => void): () => void;
   dispatch(intent: Intent): void;
   undoTo(stepId: number): void;
+  /**
+   * Take a step back and do something else instead — one operation, because
+   * the two halves are not independently sequenceable everywhere.
+   *
+   * Locally they are: undo then dispatch, on the next line. Over a wire they
+   * are not — undo is the server's to grant, so the session is waiting for a
+   * correction when the second call arrives and drops it on the floor. That
+   * is exactly what shipped: switching a placed tile worked in pass-and-play,
+   * and online un-placed the first tile without ever playing the second.
+   * Owning the pair here is what lets each implementation sequence it its own
+   * way.
+   */
+  undoThen(stepId: number, intent: Intent): void;
   reveal(): void;
 }
 
@@ -137,6 +150,22 @@ export function createGameSession(init: SessionInit): GameSession {
     }
   }
 
+  function applyLocally(intent: Intent): void {
+    try {
+      state = applyIntentWithHistory(store, state, intent);
+      error = null;
+    } catch (e) {
+      if (!(e instanceof IllegalIntentError)) throw e;
+      error = { code: e.code, message: e.message };
+    }
+    syncSegment();
+  }
+
+  function rewind(stepId: number): void {
+    state = rewindTo(store, stepId);
+    error = null;
+  }
+
   return {
     getView() {
       if (view === null) view = buildView();
@@ -149,20 +178,20 @@ export function createGameSession(init: SessionInit): GameSession {
     },
 
     dispatch(intent) {
-      try {
-        state = applyIntentWithHistory(store, state, intent);
-        error = null;
-      } catch (e) {
-        if (!(e instanceof IllegalIntentError)) throw e;
-        error = { code: e.code, message: e.message };
-      }
-      syncSegment();
+      applyLocally(intent);
       invalidate();
     },
 
     undoTo(stepId) {
-      state = rewindTo(store, stepId);
-      error = null;
+      rewind(stepId);
+      invalidate();
+    },
+
+    undoThen(stepId, intent) {
+      // Nothing to sequence: this session holds the whole game, so the two
+      // happen back to back and the screen sees one change.
+      rewind(stepId);
+      applyLocally(intent);
       invalidate();
     },
 

@@ -1,4 +1,5 @@
 import type { GameSession } from '../../session/GameSession';
+import type { Intent } from '../../engine/intents';
 import { useGameSession } from './session/useGameSession';
 import { Board } from './Board';
 import { Panel } from './panel/Panel';
@@ -82,6 +83,18 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
   /** Nobody is "up" until the draw has decided who is. */
   const turnKnown = state.stage !== 'draw';
 
+  /**
+   * Whether a click on a hand tile can succeed at all.
+   *
+   * At `play` it is the move. After a placement, while the open segment holds
+   * nothing else, it replaces that placement. Once anything has been built on
+   * top — a brand founded, shares bought — it cannot, and the tiles go inert
+   * rather than offering a click whose only outcome is an error message. That
+   * error was reachable by hand: clicking a tile during the buy step told you
+   * off for touching your own tiles.
+   */
+  const canPlaceNow = state.stage === 'play' || undoableSteps.length === 1;
+
   const prices = Object.fromEntries(
     Object.values(state.startups)
       .filter((s) => s.isFounded && isStartupId(s.id))
@@ -102,26 +115,26 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
           owners={ownerBadges(state)}
           hqTiles={foundingTiles(state)}
           onCellClick={
-            canAct && actorId
+            canAct && actorId && canPlaceNow
               ? (coord) => {
                   // Changing your mind is not an error.
                   //
                   // Placing a tile moves the stage on, so a second click used
                   // to be refused outright — you had to find the undo in the
                   // step stack first, for what reads as one action: "no, that
-                  // one." If the open segment holds nothing but the placement,
-                  // this takes it back and plays the new tile in its place.
+                  // one."
                   //
-                  // The gate is the segment's step count, not the stage: one
-                  // step means only the placement has happened, and anything
-                  // that followed it — founding a brand, choosing a survivor,
-                  // buying — settles the placement and makes undo the honest
-                  // way back. Online both halves are the server's to grant, in
-                  // that order.
+                  // `undoThen`, not undo-then-dispatch on the next line: over
+                  // a wire the undo is the server's to grant, and a second
+                  // call arriving while it is in flight is dropped. That is
+                  // how this shipped broken — the first tile came off the
+                  // board and the second was never played.
+                  const intent: Intent = { type: 'placeTile', playerId: actorId, coord };
                   if (state.stage !== 'play' && undoableSteps.length === 1) {
-                    session.undoTo(undoableSteps[0]);
+                    session.undoThen(undoableSteps[0], intent);
+                  } else {
+                    session.dispatch(intent);
                   }
-                  session.dispatch({ type: 'placeTile', playerId: actorId, coord });
                 }
               : undefined
           }

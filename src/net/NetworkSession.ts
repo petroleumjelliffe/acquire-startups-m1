@@ -57,6 +57,15 @@ export function createNetworkSession(
   let segmentStart = initial.segmentStart;
   let rejection: SessionError | null = null;
   let pending = false;
+  /**
+   * An intent waiting on an undo the server has not granted yet.
+   *
+   * Undo is a round trip here, so "take that back and play this instead"
+   * cannot be two calls in a row the way it is locally: the second would
+   * arrive while the first is still in flight and be dropped. The follow-up
+   * waits here and goes out when the correction lands.
+   */
+  let awaitingUndo: Intent | null = null;
   let view: SessionView | null = null;
   const listeners = new Set<() => void>();
 
@@ -74,12 +83,21 @@ export function createNetworkSession(
     // state it explains — they arrive as two messages, in that order, and are
     // one event.
     if (msg.reason !== 'reset') rejection = null;
+
+    // The undo this was waiting on has landed. Play the replacement now, on
+    // the state the server just confirmed.
+    const follow = awaitingUndo;
+    awaitingUndo = null;
     invalidate();
+    if (follow !== null) send(follow);
   });
 
   const offRejected = transport.onRejected((msg) => {
     rejection = { code: msg.code, message: msg.message };
     pending = false;
+    // The undo was refused, so its replacement is meaningless: the step it
+    // meant to replace is still there.
+    awaitingUndo = null;
     invalidate();
   });
 
@@ -103,18 +121,8 @@ export function createNetworkSession(
     };
   }
 
-  return {
-    getView() {
-      if (view === null) view = buildView();
-      return view;
-    },
-
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => { listeners.delete(listener); };
-    },
-
-    dispatch(intent: Intent) {
+  /** The one path an intent takes to the wire. */
+  function send(intent: Intent): void {
       // One answer is already outstanding; a second intent would race it and
       // come back as a rejection for pressing a button that was still there.
       if (pending) return;
@@ -144,12 +152,42 @@ export function createNetworkSession(
       // rejection and is worth knowing about.
       if (inner.getView().error === null) transport.sendIntent(wire);
       invalidate();
+  }
+
+  return {
+    getView() {
+      if (view === null) view = buildView();
+      return view;
     },
+
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+
+    dispatch: send,
 
     undoTo(stepId: number) {
       if (pending || !transport.isOpen()) return;
       rejection = null;
       pending = true;
+      transport.sendUndo(stepId);
+      invalidate();
+    },
+
+    /**
+     * Undo, and play `intent` the moment the server grants it.
+     *
+     * Two calls in a row cannot work here: `undoTo` marks the session pending
+     * until the correction arrives, and `send` refuses while pending. That is
+     * the bug this exists to fix — switching a placed tile online took the
+     * first one off the board and never played the second.
+     */
+    undoThen(stepId: number, intent: Intent) {
+      if (pending || !transport.isOpen()) return;
+      rejection = null;
+      pending = true;
+      awaitingUndo = intent;
       transport.sendUndo(stepId);
       invalidate();
     },

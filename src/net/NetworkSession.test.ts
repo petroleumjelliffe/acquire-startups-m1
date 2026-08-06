@@ -321,3 +321,62 @@ describe('the curtain has no meaning online', () => {
     expect(session.getView().awaitingReveal).toBe(false);
   });
 });
+
+describe('taking a step back and playing something else', () => {
+  /** p1 holds two playable tiles, so there is a second one to switch to. */
+  function twoInHand(): GameState {
+    return buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6', 'H8'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+  }
+
+  it('holds the replacement until the server grants the undo, then sends it', () => {
+    const h = harness(twoInHand());
+    const session = h.session();
+    const opened = session.getView().state.nextStepId;
+
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    expect(h.sent).toEqual([{ type: 'placeTile', coord: 'E6' }]);
+
+    // "No, that one instead." Undo is the server's to grant, so nothing but
+    // the undo goes out yet.
+    session.undoThen(opened, { type: 'placeTile', playerId: 'p1', coord: 'H8' });
+    expect(h.undos).toEqual([opened]);
+    expect(h.sent).toEqual([{ type: 'placeTile', coord: 'E6' }]);
+
+    // The correction lands: the board is back to where it was, and only now
+    // does the replacement go out. Sending it a line after `undoThen` — which
+    // is what shipped — hit the pending guard and was dropped, so the first
+    // tile came off the board and the second was never played.
+    const rewound = twoInHand();
+    h.serverSays({ state: rewound, reason: 'correction', segmentStart: rewound.nextStepId });
+
+    expect(h.sent).toEqual([
+      { type: 'placeTile', coord: 'E6' },
+      { type: 'placeTile', coord: 'H8' },
+    ]);
+    expect(session.getView().state.board['H8'].placed).toBe(true);
+    expect(session.getView().state.board['E6'].placed).toBe(false);
+  });
+
+  it('drops the replacement if the undo is refused', () => {
+    const h = harness(twoInHand());
+    const session = h.session();
+    const opened = session.getView().state.nextStepId;
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+
+    session.undoThen(opened, { type: 'placeTile', playerId: 'p1', coord: 'H8' });
+    h.serverRefuses({ code: 'undoOutOfSegment', message: 'not yours to undo' });
+
+    // The step it meant to replace is still there, so replacing it is
+    // meaningless — and playing a second tile on top of the first would be
+    // worse than doing nothing.
+    expect(h.sent).toEqual([{ type: 'placeTile', coord: 'E6' }]);
+    expect(session.getView().error?.code).toBe('undoOutOfSegment');
+  });
+});
