@@ -20,6 +20,20 @@ finished.
 | Curtain on reload | **Yes** — the reveal curtain comes up on load, so the device confirms whose turn it is before showing anyone's hand. A refresh is exactly the moment nobody is sure who is holding the phone. |
 | Where a game in progress is advertised | The pass-and-play lobby only. The home screen does not change. |
 
+## The lobby has a mockup
+
+**Figma:** <https://www.figma.com/design/pGLOfYYNCsYY8LzNeDpwX7/Untitled?node-id=23-866>
+(owner, 2026-08-06 — the lobby as it should work).
+
+**Read it before designing any lobby screen**, including this document's
+continue/end-game flow and the online create/join screens. The rulings above
+were made without it and it takes precedence where the two disagree.
+
+An agent cannot open that link: Figma design files are private and render as a
+JavaScript app, so a fetch returns nothing. Ask the owner for an export — PNG or
+PDF of the frame is enough — or for a walkthrough in prose. Do not design the
+lobby from the rulings above alone and call it done.
+
 ## Carried forward, not yet designed
 
 - **A library of finished games.** The owner's TODO: results of a completed
