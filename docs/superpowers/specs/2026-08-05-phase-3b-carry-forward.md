@@ -1,9 +1,42 @@
 # Phase 3b → Phase 4 carry-forward
 
+> ## Read this before the rest — the document below is 2026-08-05, and Phase 5 has happened
+>
+> **Merged.** Phases 3a and 3b are on `main` (fast-forward to `3dd2328`); the branch and both
+> worktrees are gone. Every "on the branch" reference below is historical.
+>
+> **Phase 5 closed twenty-six by-hand findings** ([the plan](../plans/2026-08-06-phase-5-online-ui.md)),
+> several of which *reverse UI decisions this document describes as shipped*. Where the two
+> disagree, that plan is current and this is the record of how things stood. In particular the
+> panel, the step stack, the buy row and the panel's motion have all changed substantially.
+>
+> **Numbers:** 541 tests in 54 files here; **622 in 60** on `main` today.
+>
+> **Two things this document hands Phase 4 are already fixed**, corrected inline below: the
+> `ExperimentalWarning` (gone — `src/test/setup.ts` now uses the `Object.defineProperty` fix this
+> document proposed; `npx vitest run` emits zero warnings) and `Board.tsx` rendering read-only hand
+> tiles as buttons (`Tile.interactive` is `onClick != null` since 3b's own addendum).
+>
+> **What Phase 4 actually inherits, in one line each:**
+>
+> - A **server restart still loses every room** — `saveGame` writes on each commit and nothing reads
+>   it back. Unchanged, and now the largest known gap.
+> - **Three end-to-end tests are owed** (owner, 2026-08-06, recorded in the
+>   [roadmap](./2026-07-31-react-app-revamp-roadmap-design.md#phase-4--presence-and-recovery)):
+>   refresh mid-turn, a socket dropped and revived mid-turn, and a server restart with a game in
+>   progress. Today every piece is tested and no *sequence* is.
+> - **The per-player turn-order draw now has a plan of its own**
+>   ([2026-08-06-turn-order-draw-round.md](../plans/2026-08-06-turn-order-draw-round.md)) — it
+>   rewrites `doStartGame`, `doEndTurn` and the server's handling of both, so it and Phase 4 should
+>   not run at the same time.
+> - **The by-hand gap below is still open**, and is the one thing twenty-six findings did not close:
+>   no merger's liquidation queue has reached a second player's screen, and no game has been played
+>   to final scoring in two browsers.
+
 **Date:** 2026-08-05
-**Status:** Phase 3b complete; this is the punch list it hands forward
-**Branch:** `revamp/phase-3b-networked-client` (16 commits, not pushed, not on `main`)
-**Worktree:** `.worktrees/phase-3b`
+**Status:** Phase 3b complete and merged to `main` (2026-08-05); superseded in part by Phase 5
+**Branch:** `revamp/phase-3b-networked-client` (16 commits) — merged and deleted
+**Worktree:** `.worktrees/phase-3b` — removed
 **Branch point:** `revamp/phase-3a-server-authority` @ `5d5be92`
 **Plan:** [2026-08-05-phase-3b-networked-client.md](../plans/2026-08-05-phase-3b-networked-client.md)
 **Design:** [2026-08-05-phase-3b-networked-client-design.md](./2026-08-05-phase-3b-networked-client-design.md)
@@ -202,7 +235,14 @@ assertions carried from 3a — depends on someone executing it in good faith and
 inconvenient result honestly. Three implementers did, this phase, on breaks the controller itself
 got wrong.
 
-## A defect found but not fixed this phase
+## A defect found but not fixed this phase — **fixed since (2026-08-06)**
+
+> `npx vitest run` is pristine again: zero `ExperimentalWarning` lines across all 60 files, and
+> `npx vitest run --project node engine/startups.test.ts` — the minimal reproduction below — emits
+> none. `src/test/setup.ts` now probes with `Object.getOwnPropertyDescriptor` and installs the shim
+> with `Object.defineProperty`, which is the first of the two fixes this section proposed. The
+> account below is kept because the *finding* — that reading a Node experimental global is itself
+> what fires the warning — is the useful part.
 
 **`npx vitest run` is not pristine, and has not been since Task 4.** It emits
 `(node:NNNNN) ExperimentalWarning: localStorage is not available because --localstorage-file was
@@ -227,8 +267,8 @@ non-pristine baseline and should treat this as the first thing to clear, not a c
   not touching `GameScreen` again. `identity.ts`'s per-room `{ playerId, token, name }` in
   `localStorage` is what a refresh already rejoins through; a dropped-and-restored socket beyond a
   refresh is explicitly out of this phase's scope and now Phase 4's first job.
-- **The unresolved `ExperimentalWarning`** (above) — small, but it means Phase 4 starts from a test
-  suite that is not the pristine baseline the project's own standard expects.
+- ~~**The unresolved `ExperimentalWarning`**~~ — **fixed 2026-08-06** (see above). Phase 4 starts
+  from a pristine suite after all.
 - **`DRAWS` now has three consumers, not two**, all importing the one definition in
   `session/protocol.ts`: `server/room.ts`, `server/projection.test.ts`, and (new this phase)
   `src/net/NetworkSession.ts`. The 3a carry-forward's warning about two independent copies that had
@@ -238,13 +278,15 @@ non-pristine baseline and should treat this as the first thing to clear, not a c
   when `gameManagerXState.ts` was deleted in 3a); `project()` shallow-copies `board`, `startups`
   and `mergerContext`, safe only because `applyIntent` always clones first. Neither was touched or
   re-verified this phase; both are exactly as the 3a carry-forward left them.
-- **The per-player turn-order draw**, specified in this phase's own design as a follow-on rather
-  than built: today one `startGame` intent draws for the whole table at once. What it should be —
-  each player draws in turn, the board updating as they do, the players strip reordering from
-  lobby-seating to play order once the draw resolves — needs a new engine intent, which is a rules
-  change and was deliberately kept out of this client-only phase. Not started.
-- **What the by-hand pass never touched, restated from `by-hand-pass.md` because Phase 4 needs to
-  treat it as untested, not merely under-tested:** a merger's liquidation queue reaching a second
+- **The per-player turn-order draw** — still not built, but **no longer unplanned**: it has its own
+  document ([2026-08-06-turn-order-draw-round.md](../plans/2026-08-06-turn-order-draw-round.md)),
+  and the design there needs *no new intent* after all. `startGame` deals one tile to each player,
+  `placeTile` puts it down, `endTurn` commits, and the last one resolves the order and deals the
+  hands — so the wire vocabulary is unchanged. It does rewrite `doStartGame`, `doEndTurn` and the
+  server's handling of them, which is why it should land after Phase 4 rather than beside it.
+- **What the by-hand pass never touched** — restated because Phase 4 must treat it as untested, and
+  because **twenty-six Phase 5 findings did not close it**: those came from opening-and-middlegame
+  passes, and the list below is still exactly as open as it was. a merger's liquidation queue reaching a second
   player's screen and handing them control mid-turn; a game played through to final scoring; the
   `pending` inert window, observed by eye rather than by unit test; anything about a real network —
   latency, packet loss, a dropped socket, a Render cold start; and a human's judgement about how any
@@ -269,11 +311,10 @@ Unchanged by this phase:
   the reverse of tabletop Acquire.
 - **`LiqQueue` still has no design review** (Phase 1b finding, restated in 2a, 2b, and 3a).
 - **Seat names truncate hard at 768px** ("Player 1" renders as "P").
-- **`Board.tsx` renders a hand tile as a `<button>` even with no `onCellClick`**, putting
-  read-only cells in keyboard tab order. This phase's own Task 2 deviation (#2, above) works
-  *around* this fact rather than fixing it — a future pass touching `Board.tsx`/`Tile.tsx` should
-  fix the underlying render, at which point the `tagName`-based test convention this phase
-  introduced may simplify back toward presence checks.
+- ~~**`Board.tsx` renders a hand tile as a `<button>` even with no `onCellClick`**~~ — **fixed in
+  this phase's own addendum** (`5b0b01b`): `Tile.interactive` is now `onClick != null`, so a
+  read-only cell is a `<span>` and stays out of the tab order. `data-tile-state` was added at the
+  same time, and is the convention later tests use to discriminate cell states.
 - **The catalog's `sections.tsx` still builds every fixture at module load.**
 
 ## This phase's own deferred minors
