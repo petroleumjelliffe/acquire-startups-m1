@@ -69,7 +69,7 @@ for `src`), socket.io 4.
 | | |
 |---|---|
 | `startGame` | Seat one opens. One tile from the bag into **each player's hand** — not onto the board. `turnIndex = 0`. Stage stays `draw`. |
-| `placeTile` (draw) | The actor's one tile goes on the board as an unclaimed cell. **No chain logic** — two adjacent draw tiles must not found anything. Logs `Drew for turn order` with that player's tile. |
+| `placeTile` (draw) | The actor's one tile goes on the board as an unclaimed cell. **No chain logic** — two adjacent draw tiles must not found anything. Logs `Placed a tile`, the same phase an ordinary placement logs, so the step stack entry is identical. |
 | `endTurn` (draw) | Commits the draw turn. Not the last seat: advance `turnIndex`, stage stays `draw`. Last seat: resolve the order, deal the opening hands, `stage = 'play'`, `turnIndex` = the winner. |
 | Curtain | Rises between draw turns, like any other handoff. |
 | Hands | Empty until the round resolves. |
@@ -108,7 +108,10 @@ whose draw turn it is — the value every other layer already reads.
 - [ ] **Step 1: Write the failing tests.**
   - The actor during `draw` follows `turnIndex`, not always seat one.
   - `placeTile` at `draw` marks the cell placed, removes the tile from that player's hand, leaves
-    `stage` at `draw`, and logs a `Drew for turn order` entry carrying that player's id and tile.
+    `stage` at `draw`, and logs a **`Placed a tile`** entry carrying that player's id and tile —
+    the same phase and the same shape as an ordinary placement, so the step stack shows the same
+    entry with the same undo. (Owner's ruling: the draw turn reuses the placement step exactly.)
+    The round's *resolution* logs the one `Drew for turn order` entry, in Task 3, naming the order.
   - **Two adjacent draw tiles found nothing**: place `E5` for seat one and `E6` for seat two, then
     assert no startup `isFounded` and the stage never became `foundStartup`. This is the test that
     justifies the whole branch, and it is the one a naive implementation fails.
@@ -138,7 +141,9 @@ whose draw turn it is — the value every other layer already reads.
 - [ ] **Step 2:** Implement the two branches. `endBuyPhase` is the wrong exit here — it resets buy
   state and lands on `play`; the draw's non-final exit stays at `draw`.
 - [ ] **Step 3:** Keep the existing rule and its comment: highest letter then highest number goes
-  first, which is deliberately the reverse of tabletop Acquire. Do not quietly re-derive it.
+  first, which is deliberately the reverse of tabletop Acquire. Do not quietly re-derive it. Log
+  the resolution as the round's one `Drew for turn order` entry, naming the finishing order — the
+  per-player entries are placements (Task 2), so this is the only record of who won.
 - [ ] **Step 4: Break it** by resolving the order after every draw turn rather than the last;
   confirm the mid-round test goes red. Restore.
 - [ ] **Step 5:** Whole suite — this is the task most likely to move something — typecheck, commit.
@@ -186,13 +191,21 @@ tests alongside each.
 
 **The screen, per the owner:** one highlighted tile, clicked on the board like any other placement,
 then **End turn** to complete the turn. The button is the same one the buy step uses — same slot,
-same treatment — because it is the same act: commit and hand over.
+same treatment — because it is the same act: commit and hand over. It sits there disabled until the
+tile is down, so the draw turn is the placement step plus one waiting button and nothing else new.
+
+**Depends on Phase 5's Task 11** (the placement step shows the viewer's hand), which is what puts
+the one drawn tile in the panel. If Task 11 has not landed, do it first rather than building a
+second hand display here.
 
 - [ ] **Step 1: Write the failing tests.**
   - During `draw`, the actor's single tile is clickable on the board and the panel shows it; every
     other cell is inert.
   - A watcher — someone else's draw turn — sees no clickable cell and none of the actor's tile.
-  - The action button appears only once the tile is placed, and dispatches `endTurn`.
+  - The **End turn** button is present from the start of the draw turn and **disabled until the
+    tile is placed** (owner's ruling) — the zone does not gain a control mid-turn, which is the
+    panel-stability rule, and the player can see what finishing looks like before they act. Once
+    placed it enables and dispatches `endTurn`.
   - After a draw tile is placed, it carries its owner's badge, so the board fills in seat order and
     you can see whose is whose. (`boardMarks.test.ts` currently asserts `ownerBadges` is empty
     during the draw — that expectation is now wrong and changes with the feature; say so in the
