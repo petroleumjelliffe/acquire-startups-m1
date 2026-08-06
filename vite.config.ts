@@ -8,7 +8,14 @@ export default defineConfig(({ command }) => ({
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: './src/test/setup.ts',
+    // No root-level `setupFiles`: vitest 4's `extends: true` merges arrays,
+    // so a child project's `setupFiles: []` does not override a root value —
+    // it only adds nothing to it. The `node` project's own `[]` below only
+    // means what it says because there is nothing here for it to inherit.
+    // Confirmed by the boundary assertion in `session/nodeEnvironment.test.ts`:
+    // without this, `globalThis.localStorage` was live under `--project
+    // node` too, silently disarming the guard the split below exists for.
+    //
     // Two projects, one reason: `engine/`, `session/` and `server/` must not
     // depend on browser globals. They run under Node in production — the
     // server process — and are imported by `src/` as well, so a stray
