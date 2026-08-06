@@ -231,12 +231,18 @@ export const SECTIONS: CatalogSection[] = [
             label="Place a tile"
             body={
               <>
-                <div className="flex flex-wrap items-end gap-2">
+                {/*
+                  No hint line any more. The panel shipped this step without
+                  one — its tiles and the board's are lit identically, which
+                  says "tap me" without a sentence — and a catalog card that
+                  carries copy the real component does not is a card that
+                  cannot be used to check the real component.
+                */}
+                <div className="flex flex-wrap items-center gap-1.5">
                   {active(G1_PLAY).hand.map((c) => (
                     <Tile key={c} coord={c} state="hand" onClick={noop} />
                   ))}
                 </div>
-                <p className="text-xs text-gray-500">Tap a highlighted tile — on the board or here.</p>
               </>
             }
           />

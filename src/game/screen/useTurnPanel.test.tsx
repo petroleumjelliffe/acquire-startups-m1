@@ -6,8 +6,9 @@ import type { Intent } from '../../../engine/intents';
 import { buildFixture } from '../../../engine/golden/fixtures';
 import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
 import { replayGoldenGame } from '../../../engine/golden/replay';
-import type { GameState } from '../../../engine/gameTypes';
+import type { GameState, Player } from '../../../engine/gameTypes';
 import { getEndCondition } from '../../../engine/endGame';
+import { getDeadTilesInHand } from '../../../engine/placement';
 import { TRADE_RATIO } from '../../../engine/startups';
 
 function sessionFor(state = buildFixture({
@@ -28,14 +29,29 @@ function Harness({
   dispatch,
   canAct = true,
   view,
+  viewer,
+  onPlaceTile,
 }: {
   session: GameSession;
   dispatch: (i: Intent) => void;
   canAct?: boolean;
   /** Overrides `session.getView()` — for shaping a view no real dispatch reaches. */
   view?: SessionView;
+  /**
+   * Whose hand the panel shows. `GameScreen` resolves this — the actor in
+   * pass-and-play, my own seat online — and hands it down; the default here is
+   * the pass-and-play rule.
+   */
+  viewer?: Player;
+  /** The board's own placement handler, which the panel's tiles share. */
+  onPlaceTile?: (coord: string) => void;
 }) {
-  const { active, staging } = useTurnPanel(view ?? session.getView(), dispatch, canAct);
+  const resolved = view ?? session.getView();
+  const shown = viewer ?? resolved.state.players.find((p) => p.id === resolved.actorId);
+  const { active, staging } = useTurnPanel(resolved, dispatch, canAct, {
+    viewer: shown,
+    onPlaceTile,
+  });
   return <div><div data-slot="active">{active}</div><div data-slot="staging">{staging}</div></div>;
 }
 
@@ -52,6 +68,84 @@ describe('useTurnPanel', () => {
   it('prompts for a tile during play', () => {
     render(<Harness session={sessionFor()} dispatch={() => {}} />);
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
+  });
+
+  /**
+   * The step asks for a tile, so it shows the tiles you have. They are lit on
+   * the board too, but the board is the other column — the panel was asking
+   * for something it never displayed.
+   *
+   * Static, not a second set of controls: placement stays on the board, and
+   * `Tile` treats `onClick != null` as the whole of its affordance, so passing
+   * no handler is what makes these read as a display.
+   */
+  it('shows the hand it is asking you to play from', () => {
+    const { container } = render(<Harness session={sessionFor()} dispatch={() => {}} />);
+    const active = container.querySelector('[data-slot="active"]')!;
+
+    for (const coord of ['E6', 'H8']) {
+      expect(within(active as HTMLElement).getByTitle(coord)).toBeInTheDocument();
+    }
+  });
+
+  it('plays a tile tapped here, through the board’s own handler', () => {
+    const onPlaceTile = vi.fn();
+    const { container } = render(
+      <Harness session={sessionFor()} dispatch={() => {}} onPlaceTile={onPlaceTile} />,
+    );
+    const active = container.querySelector('[data-slot="active"]')!;
+
+    fireEvent.click(within(active as HTMLElement).getByTitle('E6'));
+    expect(onPlaceTile).toHaveBeenCalledWith('E6');
+  });
+
+  it('offers no tap when the screen supplies no placement handler', () => {
+    // `GameScreen` withholds the handler whenever a placement cannot succeed —
+    // someone else's turn, mid-buy, a dropped socket. The panel must go inert
+    // with it, or it offers a click whose only outcome is an error message.
+    const { container } = render(<Harness session={sessionFor()} dispatch={() => {}} />);
+    const active = container.querySelector('[data-slot="active"]')!;
+    expect(active.querySelectorAll('button[title]')).toHaveLength(0);
+  });
+
+  it('marks a dead tile in the panel as blocked, not merely present', () => {
+    // A tile that would join two safe chains can never be played. The board
+    // greys it; the panel must not show it as an ordinary holding.
+    const g8 = ALL_GOLDEN_GAMES.find((game) => game.id === 'G8');
+    if (!g8) throw new Error('no golden game G8');
+    const states = replayGoldenGame(g8);
+    const state = states.find(
+      (s) => s.stage === 'play' && getDeadTilesInHand(s, s.players[s.turnIndex].id).length > 0,
+    );
+    if (!state) throw new Error('G8 no longer reaches a dead tile in hand');
+
+    const dead = getDeadTilesInHand(state, state.players[state.turnIndex].id)[0];
+    const { container } = render(
+      <Harness session={createGameSession({ state })} dispatch={() => {}} />,
+    );
+
+    const tile = container.querySelector(`[data-slot="active"] [title="${dead}"]`)!;
+    expect(tile.getAttribute('data-tile-state')).toBe('blocked');
+  });
+
+  /**
+   * Online, a watcher's projected state has the actor's hand blanked — so
+   * reading `state.players[actorId].hand` renders an empty row for everyone
+   * who is not up. The panel shows the *viewer's* hand, which is the seat this
+   * device holds, whoever is acting.
+   */
+  it("shows my own hand while someone else is placing", () => {
+    const session = sessionFor();
+    const view = session.getView();
+    const watcher = view.state.players[1];
+    const { container } = render(
+      <Harness session={session} dispatch={() => {}} canAct={false} viewer={watcher} />,
+    );
+
+    const active = container.querySelector('[data-slot="active"]')!;
+    expect(within(active as HTMLElement).getByTitle('A1')).toBeInTheDocument();
+    // The actor's tiles are not on show in my panel.
+    expect(active.querySelector('[title="E6"]')).toBeNull();
   });
 
   it('shows a rejection even while it is not my turn', () => {
@@ -333,7 +427,8 @@ describe('useTurnPanel — a player who cannot move', () => {
     // visible from the board alone.
     expect(screen.queryByText(/no tile you hold can be played/i)).toBeNull();
     expect(screen.getByText(/can never be played/i)).toBeInTheDocument();
-    expect(screen.getByText(/C1/)).toBeInTheDocument();
+    // Anchored to the sentence: the panel now also shows C1 as a tile.
+    expect(screen.getByText(/C1 can never be played/i)).toBeInTheDocument();
   });
 
   it('offers no such button while a placement is still legal', () => {
@@ -373,7 +468,8 @@ describe('useTurnPanel — dead tiles', () => {
 
   it('names the dead tiles so the player can see which they are', () => {
     render(<Harness session={createGameSession({ state: holdingDeadTile() })} dispatch={() => {}} />);
-    expect(screen.getByText(/C1/)).toBeInTheDocument();
+    // Anchored to the sentence: the panel now also shows C1 as a tile.
+    expect(screen.getByText(/C1 can never be played/i)).toBeInTheDocument();
   });
 
   it('offers nothing when no tile in hand is dead', () => {

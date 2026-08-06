@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { hasLegalTile, type Intent } from '../../../engine/intents';
-import type { GameState, StartupId } from '../../../engine/gameTypes';
+import type { GameState, Player, StartupId } from '../../../engine/gameTypes';
 import type { SessionView } from '../../../session/GameSession';
 import type { Coord } from '../../../engine/gameHelpers';
 import { getDeadTilesInHand } from '../../../engine/placement';
@@ -18,6 +18,7 @@ import { getSharePrice } from '../../../engine/gameLogic';
 import { LiqQueue } from '../merger/LiqQueue';
 import { LiqActions } from '../merger/LiqActions';
 import { Brand } from '../atoms/Brand';
+import { Tile } from '../atoms/Tile';
 
 /**
  * The panel's two interactive slots for the current stage.
@@ -30,6 +31,30 @@ import { Brand } from '../atoms/Brand';
 export interface TurnPanelSlots {
   active: ReactNode;
   staging: ReactNode;
+}
+
+/** What the screen around the panel knows that the view alone does not. */
+export interface TurnPanelContext {
+  /**
+   * Whose hand the panel shows — the seat this device holds, which is not
+   * always the actor.
+   *
+   * Resolved by `GameScreen` and passed down rather than derived here: online
+   * it is my own seat at every stage, pass-and-play it is the actor at every
+   * stage but the draw, and that rule already lives in one place. Deriving it
+   * a second time is how the panel and the board come to disagree about whose
+   * tiles are on screen. Reading `state.players[actorId]` instead would be
+   * worse than wrong online — a watcher's projected state has the actor's hand
+   * blanked, so it renders an empty row for everyone who is not up.
+   */
+  viewer?: Player;
+  /**
+   * Play a tile. The board's handler, so tapping a tile here and tapping it
+   * there are one move — including the undo-and-replace path a second tap
+   * takes. Absent when a placement cannot succeed, which is what makes these
+   * tiles inert rather than a click that only produces an error.
+   */
+  onPlaceTile?: (coord: Coord) => void;
 }
 
 /** Everything a turn stages locally before committing it as one intent. */
@@ -73,6 +98,7 @@ export function useTurnPanel(
   view: SessionView,
   dispatch: (intent: Intent) => void,
   canAct: boolean = true,
+  { viewer, onPlaceTile }: TurnPanelContext = {},
 ): TurnPanelSlots {
   const { state, actorId, error, pending } = view;
   /** Founded this turn, so its shares are new to the table. */
@@ -160,6 +186,11 @@ export function useTurnPanel(
   if (state.stage === 'play') {
     const canPlace = actorId ? hasLegalTile(state, actorId) : false;
     const dead = actorId ? getDeadTilesInHand(state, actorId) : [];
+    // The viewer's own tiles, which are the actor's only when the viewer is
+    // acting. `dead` above stays the actor's: it drives the trade-in button,
+    // which is the actor's move to make.
+    const viewerHand = viewer?.hand ?? [];
+    const viewerDead = viewer ? getDeadTilesInHand(state, viewer.id) : [];
 
     return {
       staging: idleStaging,
@@ -169,11 +200,37 @@ export function useTurnPanel(
           body={
             <>
               {/*
-                No prose about your own tiles. They are on the board, lit and
-                clickable, which says it better than a sentence does — and the
-                "no tile you hold can be played" line was telling you something
-                the empty board and the End turn button already told you.
+                The hand the step is asking you to play from — playable here or
+                on the board, which is what the catalog's `place · active` card
+                has shown since Phase 1b and the port quietly dropped.
+
+                A dead tile takes no handler, so it is inert: `Tile` treats
+                `onClick != null` as the whole of its affordance, and a click
+                whose only outcome is an error message is the thing Phase 3b
+                went through the panel removing.
+
+                No prose about your own tiles either. They are here and on the
+                board, lit in both — the "no tile you hold can be played" line
+                was telling you something the board and the End turn button
+                already told you.
               */}
+              {viewerHand.length > 0 && (
+                <div data-panel-hand className="flex flex-wrap items-center gap-1.5">
+                  {viewerHand.map((coord) => {
+                    const isDead = viewerDead.includes(coord);
+                    return (
+                      <Tile
+                        key={coord}
+                        coord={coord}
+                        state={isDead ? 'blocked' : 'hand'}
+                        onClick={
+                          onPlaceTile && !isDead ? () => onPlaceTile(coord) : undefined
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              )}
               {dead.length > 0 && (
                 <span className="text-[13px] text-gray-600">
                   {`${dead.join(', ')} can never be played — ${dead.length === 1 ? 'it joins' : 'they join'} two safe chains.`}

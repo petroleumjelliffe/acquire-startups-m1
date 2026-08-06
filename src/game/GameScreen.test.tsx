@@ -18,6 +18,16 @@ function playable() {
   });
 }
 
+/**
+ * A coordinate now appears in up to three places at once — the board cell, the
+ * hand shown in the panel's placement step, and any log token naming it — and
+ * all three carry `title={coord}`. Every query that means "the board" says so.
+ */
+function onBoard(coord: string) {
+  const grid = screen.getByTestId('game-surface').querySelector('[data-board="grid"]')!;
+  return within(grid as HTMLElement).getByTitle(coord);
+}
+
 describe('GameScreen', () => {
   it('covers the whole surface with the curtain until the actor claims it', () => {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
@@ -44,7 +54,7 @@ describe('GameScreen', () => {
       .map((el) => el.getAttribute('data-slot'));
     expect(slotsAtPlay).toEqual(['stepstack', 'active', 'staging', 'hand', 'players']);
 
-    fireEvent.click(screen.getByTitle('E6'));
+    fireEvent.click(onBoard('E6'));
     const slotsAtFound = [...container.querySelectorAll('[data-slot]')]
       .map((el) => el.getAttribute('data-slot'));
     expect(slotsAtFound).toEqual(slotsAtPlay);
@@ -54,7 +64,7 @@ describe('GameScreen', () => {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
     fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
-    fireEvent.click(screen.getByTitle('E6'));
+    fireEvent.click(onBoard('E6'));
     fireEvent.click(screen.getByRole('button', { name: /^messla$/i }));
     // One button ends the buy step: "Skip" with nothing staged.
     fireEvent.click(screen.getByRole('button', { name: /^end turn$/i }));
@@ -66,7 +76,7 @@ describe('GameScreen', () => {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
     fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
-    fireEvent.click(screen.getByTitle('E6'));
+    fireEvent.click(onBoard('E6'));
     expect(screen.getByText(/found a brand/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /undo/i }));
@@ -75,20 +85,10 @@ describe('GameScreen', () => {
 });
 
 describe('changing your mind about a tile', () => {
-  /**
-   * Scoped to the grid: once a tile is placed the step stack renders its
-   * coordinate as a log token, with a `title` of its own, so an unscoped
-   * `getByTitle` matches the board cell and the log entry both.
-   */
-  function onBoard(coord: string) {
-    const grid = screen.getByTestId('game-surface').querySelector('[data-board="grid"]')!;
-    return within(grid as HTMLElement).getByTitle(coord);
-  }
-
   function placedE6() {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
     fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
-    fireEvent.click(screen.getByTitle('E6'));
+    fireEvent.click(onBoard('E6'));
     // E6 sits next to the loner E5, so placing it asks which brand to found —
     // the stage has moved on, which is what used to make a second click an
     // error rather than a correction.
@@ -287,9 +287,9 @@ describe('GameScreen with a viewer who is not the actor', () => {
     // `data-tile-state`, not the tag: a hand tile with nothing to do is
     // deliberately no longer a `<button>`, so the tag can no longer tell
     // "mine" from "not mine". The state can, and is what the badge means.
-    expect(screen.getByTitle('A1')).toHaveAttribute('data-tile-state', 'hand');
-    expect(screen.getByTitle('E6')).not.toHaveAttribute('data-tile-state', 'hand');
-    expect(screen.getByTitle('H8')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('E6')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('H8')).not.toHaveAttribute('data-tile-state', 'hand');
   });
 
   it('says whose turn it is where you cannot miss it, and offers nothing', () => {
@@ -313,10 +313,10 @@ describe('GameScreen with a viewer who is not the actor', () => {
 
   it('ignores a click on my own tile when it is not my turn', () => {
     render(watching());
-    fireEvent.click(screen.getByTitle('A1'));
+    fireEvent.click(onBoard('A1'));
     // Still someone else's turn, and A1 is still mine to play later.
     expect(screen.getByTestId('turn-toast')).toHaveTextContent(/alex/i);
-    expect(screen.getByTitle('A1')).toBeInTheDocument();
+    expect(onBoard('A1')).toBeInTheDocument();
   });
 
   it('announces your own turn differently from someone else waiting', () => {

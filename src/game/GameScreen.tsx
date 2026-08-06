@@ -1,5 +1,6 @@
 import type { GameSession } from '../../session/GameSession';
 import type { Intent } from '../../engine/intents';
+import type { Coord } from '../../engine/gameHelpers';
 import { useGameSession } from './session/useGameSession';
 import { Board } from './Board';
 import { Panel } from './panel/Panel';
@@ -65,7 +66,6 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
   // panel stays live after "End turn" and the next click is a rejection
   // waiting to happen, or an intent nobody is there to receive.
   const canAct = (viewerId === undefined || viewerId === actorId) && !pending && connected;
-  const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent), canAct);
 
   const actor = state.players.find((p) => p.id === actorId);
 
@@ -98,6 +98,41 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
    */
   const canPlaceNow = state.stage === 'play' || undoableSteps.length === 1;
 
+  /**
+   * Playing a tile, from wherever it was tapped.
+   *
+   * Both the board and the panel's hand call this, so the two are the same
+   * move rather than two implementations of it — the catalog has said "on the
+   * board or here" since Phase 1b, and the difference between them is where
+   * your finger lands.
+   *
+   * Changing your mind is not an error. Placing a tile moves the stage on, so
+   * a second tap used to be refused outright — you had to find the undo in the
+   * step stack first, for what reads as one action: "no, that one."
+   *
+   * `undoThen`, not undo-then-dispatch on the next line: over a wire the undo
+   * is the server's to grant, and a second call arriving while it is in flight
+   * is dropped. That is how this shipped broken — the first tile came off the
+   * board and the second was never played.
+   */
+  const placeTile = canAct && actorId && canPlaceNow
+    ? (coord: Coord) => {
+        const intent: Intent = { type: 'placeTile', playerId: actorId, coord };
+        if (state.stage !== 'play' && undoableSteps.length === 1) {
+          session.undoThen(undoableSteps[0], intent);
+        } else {
+          session.dispatch(intent);
+        }
+      }
+    : undefined;
+
+  // The panel shows the same seat the board does — one resolution of "whose
+  // tiles are these", passed to both.
+  const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent), canAct, {
+    viewer,
+    onPlaceTile: placeTile,
+  });
+
   const prices = Object.fromEntries(
     Object.values(state.startups)
       .filter((s) => s.isFounded && isStartupId(s.id))
@@ -117,30 +152,7 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
           blocked={viewer ? getDeadTilesInHand(state, viewer.id) : []}
           owners={ownerBadges(state)}
           hqTiles={foundingTiles(state)}
-          onCellClick={
-            canAct && actorId && canPlaceNow
-              ? (coord) => {
-                  // Changing your mind is not an error.
-                  //
-                  // Placing a tile moves the stage on, so a second click used
-                  // to be refused outright — you had to find the undo in the
-                  // step stack first, for what reads as one action: "no, that
-                  // one."
-                  //
-                  // `undoThen`, not undo-then-dispatch on the next line: over
-                  // a wire the undo is the server's to grant, and a second
-                  // call arriving while it is in flight is dropped. That is
-                  // how this shipped broken — the first tile came off the
-                  // board and the second was never played.
-                  const intent: Intent = { type: 'placeTile', playerId: actorId, coord };
-                  if (state.stage !== 'play' && undoableSteps.length === 1) {
-                    session.undoThen(undoableSteps[0], intent);
-                  } else {
-                    session.dispatch(intent);
-                  }
-                }
-              : undefined
-          }
+          onCellClick={placeTile}
         />
       </div>
 

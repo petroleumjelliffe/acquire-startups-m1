@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { RoomPage } from './RoomPage';
 import type { Connection, ConnectionStatus } from '../net/connection';
@@ -56,6 +56,16 @@ function fakeConnection() {
       for (const l of statusListeners) l();
     }),
   };
+}
+
+/**
+ * The board's own cell for a coordinate. Scoped, because a coordinate can be
+ * on screen three times at once — the board, the hand the placement step
+ * shows, and a log token — all carrying `title={coord}`.
+ */
+function onBoard(coord: string) {
+  const grid = screen.getByTestId('game-surface').querySelector('[data-board="grid"]')!;
+  return within(grid as HTMLElement).getByTitle(coord);
 }
 
 function renderRoom(connection: Connection) {
@@ -180,7 +190,7 @@ describe('the first state message starts the game', () => {
 
     expect(screen.getByTestId('game-surface')).toBeInTheDocument();
     // p2's own tile, and no curtain over it.
-    expect(screen.getByTitle('A1')).toBeInTheDocument();
+    expect(onBoard('A1')).toBeInTheDocument();
     expect(screen.queryByText(/pass to/i)).toBeNull();
     expect(screen.getByTestId('turn-toast')).toHaveTextContent(/alex/i);
   });
@@ -203,7 +213,7 @@ describe('the first state message starts the game', () => {
     f.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
 
     // A1 starts out in Sam's hand — a clickable tile.
-    expect(screen.getByTitle('A1')).toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
 
     // A second state — the kind a real commit sends after a move — with A1
     // now placed on the board and a new tile, B2, drawn into the hand. This
@@ -221,9 +231,9 @@ describe('the first state message starts the game', () => {
     f.sendState({ state: afterMove, reason: 'commit', segmentStart: afterMove.nextStepId });
 
     // A1 is now a settled board tile, not a hand button.
-    expect(screen.getByTitle('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
     // B2 is the new hand tile.
-    expect(screen.getByTitle('B2')).toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('B2')).toHaveAttribute('data-tile-state', 'hand');
   });
 });
 
