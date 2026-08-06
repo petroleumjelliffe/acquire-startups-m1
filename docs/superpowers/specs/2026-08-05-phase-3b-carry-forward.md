@@ -11,8 +11,9 @@
 **Execution ledger:** [progress.md](../../../.superpowers/sdd/2026-08-05-phase-3b-networked-client/progress.md)
 *(session artifact — `.superpowers/` is not tracked in git; this link resolves in the authoring
 working copy only, not after a clone)*
-**Browser pass:** [by-hand-pass.md](../../../.superpowers/sdd/2026-08-05-phase-3b-networked-client/by-hand-pass.md)
-*(session artifact — same caveat: not tracked in git, dead on clone)*
+**Browser pass:** [2026-08-05-phase-3b-browser-pass.md](./2026-08-05-phase-3b-browser-pass.md)
+*(moved into `docs/` at merge time — `CLAUDE.md` cites it as the only browser verification this
+phase has, so it could not stay in an untracked session directory)*
 
 **A client now speaks the server's protocol, and it has been driven — but not yet by a human.**
 `src/net/` is a real `GameSession` backed by a socket: six of nine intents apply optimistically,
