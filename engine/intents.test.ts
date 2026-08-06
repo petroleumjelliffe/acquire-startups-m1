@@ -101,6 +101,49 @@ describe('applyIntent', () => {
     expect(next.log.at(-1)).toMatchObject({ phase: 'Placed a tile', playerId: state.players[0].id });
   });
 
+  describe('the founding step and the placement that led to it', () => {
+    /** A lone tile with a hand tile beside it: placing founds a startup. */
+    function aboutToFound() {
+      const state = playing();
+      state.board['E5'] = { placed: true };
+      state.players[0].hand = ['E6'];
+      return state;
+    }
+
+    it('rewrites the placement to name what it founded', () => {
+      const placed = applyIntent(aboutToFound(), {
+        type: 'placeTile', playerId: 'p1', coord: 'E6',
+      });
+      // While the game is asking, the entry asks.
+      expect(placed.log.at(-1)!.detail.map((t) => ('text' in t ? t.text : ''))).toContain(
+        ' — choose a startup to found',
+      );
+
+      const founded = applyIntent(placed, {
+        type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla',
+      });
+      const placement = founded.log.find((e) => e.phase === 'Placed a tile')!;
+
+      expect(placement.detail.some((t) => t.kind === 'brand' && t.startupId === 'Messla')).toBe(true);
+      expect(placement.detail.some((t) => 'text' in t && /choose/.test(t.text ?? ''))).toBe(false);
+    });
+
+    it('records the founder share, not the tile again', () => {
+      const placed = applyIntent(aboutToFound(), {
+        type: 'placeTile', playerId: 'p1', coord: 'E6',
+      });
+      const founded = applyIntent(placed, {
+        type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla',
+      });
+
+      const entry = founded.log.at(-1)!;
+      expect(entry.phase).toBe('Founded a startup');
+      expect(entry.detail.some((t) => t.kind === 'brand' && t.startupId === 'Messla')).toBe(true);
+      // The tile is on the placement above; repeating it here said nothing new.
+      expect(entry.detail.some((t) => t.kind === 'tile')).toBe(false);
+    });
+  });
+
   it('says where the tile went and nothing else', () => {
     // A placement that neither grows a chain, founds one nor merges used to
     // log "E5 (isolated)". The word is jargon for "nothing happened", on an

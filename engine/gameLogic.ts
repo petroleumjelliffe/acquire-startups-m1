@@ -478,9 +478,35 @@ export function foundStartup(
     }
   }
 
-  //grant founding bondus
+  /*
+    The placement told you to choose; now that you have, it says what you
+    chose. That entry was written while the game was *asking* — "I12 — choose a
+    startup to found" — and leaving it there after the answer left an
+    instruction sitting in the history, next to a founding entry repeating the
+    same tile.
+
+    Rewritten rather than derived at render time because it is a fact about the
+    placement, not a way of displaying it: this tile founded PaperfulPost. Undo
+    handles it for free — the log is state, so rewinding to before the founding
+    restores the question along with the stage that was asking it.
+  */
+  const placement = [...state.log].reverse().find(
+    (entry) => entry.phase === 'Placed a tile'
+      && entry.detail.some((t) => t.kind === 'tile' && t.coord === foundingTile),
+  );
+  if (placement) {
+    placement.detail = [tok.tile(foundingTile), tok.text(' founded '), tok.brand(id)];
+  }
+
   grantFoundingShare(state, state.players[state.turnIndex].id, id);
-  pushLog(state, 'Founded a startup', [tok.brand(id), tok.text(' at '), tok.tile(foundingTile)], state.players[state.turnIndex].id);
+  // What this step uniquely records: the share the founder is awarded. The
+  // tile and the startup are on the placement above, so repeating "PaperfulPost
+  // at I12" here said nothing the row above had not.
+  pushLog(state, 'Founded a startup', [
+    tok.text('Awarded '),
+    tok.brand(id),
+    tok.text(' ×1'),
+  ], state.players[state.turnIndex].id);
 
   state.stage = "buy";
   delete state.pendingFoundTile;

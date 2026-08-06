@@ -159,6 +159,27 @@ describe('segments', () => {
     expect(session.getView().undoableSteps).toEqual([first, second]);
   });
 
+  /**
+   * Founding rewrites the placement entry that led to it — the row stops asking
+   * "choose a startup" and says which one was chosen. That is a change to
+   * state, so undo has to take it back with everything else; if it were done at
+   * render time instead, this test could not exist.
+   */
+  it('restores the placement question when the founding is undone', () => {
+    const session = createGameSession({ state: playableGame() });
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    const beforeFound = session.getView().state.nextStepId;
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+
+    const asked = (s: ReturnType<typeof session.getView>) =>
+      s.state.log.some((e) => e.detail.some((t) => 'text' in t && /choose a startup/.test(t.text ?? '')));
+
+    expect(asked(session.getView()), 'the placement still asks after founding').toBe(false);
+
+    session.undoTo(beforeFound);
+    expect(asked(session.getView()), 'undo left the placement answered').toBe(true);
+  });
+
   it('offers one undo point per intent, not per log entry', () => {
     /*
       A merger is the case: one `placeTile` writes the placement, the merge and
