@@ -14,7 +14,7 @@ function golden(id: string) {
 
 /** Clears the curtain whenever it is up, so a driven test can keep going. */
 function passDevice() {
-  const reveal = screen.queryByRole('button', { name: /reveal/i });
+  const reveal = screen.queryByRole('button', { name: /^start$/i });
   if (reveal) fireEvent.click(reveal);
 }
 

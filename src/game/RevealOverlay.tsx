@@ -18,12 +18,18 @@ export function RevealOverlay({ playerName, emoji, onReveal }: RevealOverlayProp
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/95">
       {emoji && <span className="text-4xl leading-none">{emoji}</span>}
       <div className="text-lg font-bold text-gray-800">{`Pass to ${playerName}`}</div>
+      {/*
+        Just "Start". The line above already names who the device is for, and
+        the button was repeating it back — "I'm Alex — Reveal" made a handoff
+        into a two-part sentence and an identity check nobody was asking for.
+        The only thing this button does is begin the turn.
+      */}
       <button
         type="button"
         onClick={onReveal}
         className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700"
       >
-        {`I'm ${playerName} — Reveal`}
+        Start
       </button>
     </div>
   );

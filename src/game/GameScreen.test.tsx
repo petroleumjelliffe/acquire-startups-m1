@@ -29,7 +29,7 @@ describe('GameScreen', () => {
 
   it('shows the board and panel once revealed', () => {
     const { container } = render(<GameScreen session={createGameSession({ state: playable() })} />);
-    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
     expect(container.querySelector('[data-board="grid"]')).not.toBeNull();
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
@@ -38,7 +38,7 @@ describe('GameScreen', () => {
   it('renders all five panel slots at every stage, so the panel cannot resize', () => {
     const session = createGameSession({ state: playable() });
     const { container } = render(<GameScreen session={session} />);
-    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
     const slotsAtPlay = [...container.querySelectorAll('[data-slot]')]
       .map((el) => el.getAttribute('data-slot'));
@@ -52,7 +52,7 @@ describe('GameScreen', () => {
 
   it('plays a whole turn and raises the curtain for the next player', () => {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
-    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
     fireEvent.click(screen.getByTitle('E6'));
     fireEvent.click(screen.getByRole('button', { name: /^messla$/i }));
@@ -64,7 +64,7 @@ describe('GameScreen', () => {
 
   it('undoes a placement from the step stack', () => {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
-    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
     fireEvent.click(screen.getByTitle('E6'));
     expect(screen.getByText(/found a brand/i)).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('changing your mind about a tile', () => {
 
   function placedE6() {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
-    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
     fireEvent.click(screen.getByTitle('E6'));
     // E6 sits next to the loner E5, so placing it asks which brand to found —
     // the stage has moved on, which is what used to make a second click an

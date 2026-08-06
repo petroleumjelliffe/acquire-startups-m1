@@ -28,7 +28,7 @@ describe('PassAndPlayPage', () => {
 
     // The draw always hands off, whoever won it: seat one pressed the button
     // for the table, so the winner's hand still has to be revealed to them.
-    fireEvent.click(screen.getByRole('button', { name: /reveal/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
 
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
   });

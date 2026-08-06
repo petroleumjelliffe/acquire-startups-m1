@@ -199,7 +199,7 @@ const MEASURE = `(async () => {
   // one pressed the button for the table and the winner's hand is about to
   // appear — so this is a plain click, not a conditional one.
   await click(/draw for turn order/i, 'draw for turn order');
-  await click(/reveal/i, 'reveal (first turn)');
+  await click(/^start$/i, 'start (curtain, first turn)');
 
   const stages = { play: geometry() };
   const zoneFloors = { play: floors() };
@@ -252,7 +252,7 @@ const MEASURE = `(async () => {
     if (endTurn) {
       endTurn.click();
       await wait(250);
-      await clickIfPresent(/reveal/i);
+      await clickIfPresent(/^start$/i);
       // The sample that matters most: the turn has just changed hands, so the
       // active seat is a different one each time round the table. Without
       // rotation this is where a later seat is clipped off the end.
