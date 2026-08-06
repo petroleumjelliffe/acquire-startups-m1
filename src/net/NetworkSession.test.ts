@@ -163,6 +163,47 @@ describe('a bag-drawing intent waits for the server', () => {
     expect(h.sent).toEqual([{ type: 'endTurn' }]);
     expect(session.getView().state.board['E6'].placed).toBe(false);
   });
+
+  it('clears pending when the server refuses instead of answering', () => {
+    // One of only two paths that ever clear a stuck `pending` — the other is
+    // `connectionLost`, below. Today this is covered only incidentally, by
+    // the golden corpus happening to contain bag-drawing steps that expect
+    // an error; a corpus change could silently drop that coverage, so it is
+    // asserted directly here too.
+    const h = harness();
+    const session = h.session();
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+    expect(session.getView().pending).toBe(true);
+
+    h.serverRefuses({ code: 'wrongStage', message: 'not now' });
+
+    expect(session.getView().pending).toBe(false);
+  });
+});
+
+describe('a dropped connection clears a stuck pending', () => {
+  it('stops "Sending…" from being permanent and leaves a readable message', () => {
+    const h = harness();
+    const session = h.session();
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+    expect(session.getView().pending).toBe(true);
+
+    session.connectionLost();
+
+    expect(session.getView().pending).toBe(false);
+    expect(session.getView().error?.message).toMatch(/disconnect/i);
+  });
+
+  it('does nothing to the board itself — only the request state', () => {
+    const h = harness();
+    const session = h.session();
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    const before = session.getView().state;
+
+    session.connectionLost();
+
+    expect(session.getView().state).toBe(before);
+  });
 });
 
 describe('an intent the local state refuses never reaches the wire', () => {

@@ -35,20 +35,30 @@ export interface GameScreenProps {
    * where the viewer never changes and the curtain has nothing to protect.
    */
   viewerId?: string;
+  /**
+   * False while the transport backing `session` is down. Pass-and-play never
+   * passes this — there is no transport to be down, so `canAct` there is
+   * never affected by it. This is the belt to `NetworkSession.connectionLost`'s
+   * suspenders: even if a drop were somehow never reported to the session
+   * directly, threading connection status through here still forces the
+   * panel inert rather than leaving stale controls live over a dead socket.
+   */
+  connected?: boolean;
   /** Start over from setup. Omitted when nothing is hosting the screen. */
   onNewGame?: () => void;
   /** Leave the game entirely. Omitted when nothing is hosting the screen. */
   onExit?: () => void;
 }
 
-export function GameScreen({ session, viewerId, onNewGame, onExit }: GameScreenProps) {
+export function GameScreen({ session, viewerId, connected = true, onNewGame, onExit }: GameScreenProps) {
   const view = useGameSession(session);
   const { state, actorId, awaitingReveal, undoableSteps, pending } = view;
 
-  // Inert while someone else is acting, and while an answer only the server
-  // can give is in flight — otherwise the buy panel stays live after "End
-  // turn" and the next click is a rejection waiting to happen.
-  const canAct = (viewerId === undefined || viewerId === actorId) && !pending;
+  // Inert while someone else is acting, while an answer only the server can
+  // give is in flight, or while the socket itself is down — otherwise the buy
+  // panel stays live after "End turn" and the next click is a rejection
+  // waiting to happen, or an intent nobody is there to receive.
+  const canAct = (viewerId === undefined || viewerId === actorId) && !pending && connected;
   const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent), canAct);
 
   const actor = state.players.find((p) => p.id === actorId);

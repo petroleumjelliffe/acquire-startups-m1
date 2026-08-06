@@ -4,7 +4,7 @@ import { RoomLobby } from '../game/online/RoomLobby';
 import { ConnectionStrip } from '../game/online/ConnectionStrip';
 import { JoinForm } from '../game/online/JoinForm';
 import { useRoom } from '../net/useRoom';
-import { getConnection, type Connection } from '../net/connection';
+import { getConnection, closeConnection, type Connection } from '../net/connection';
 
 export interface RoomPageProps {
   /** Injectable so screen tests can drive a fake. The app never passes it. */
@@ -15,6 +15,14 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const room = useRoom(roomId ?? '', connect);
+
+  // Leaving is a real disconnect, not just a route change: the socket this
+  // room's session and roster depend on closes, and `getConnection()` opens a
+  // fresh one for wherever the player goes next.
+  const leave = () => {
+    closeConnection();
+    navigate('/');
+  };
 
   if (room.phase === 'playing' && room.session && room.playerId) {
     return (
@@ -27,7 +35,8 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
         <GameScreen
           session={room.session}
           viewerId={room.playerId}
-          onExit={() => navigate('/')}
+          connected={room.status === 'open'}
+          onExit={leave}
         />
       </>
     );
@@ -59,7 +68,7 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
           isHost={me?.isHost === true}
           note={room.message}
           onStart={room.begin}
-          onExit={() => navigate('/')}
+          onExit={leave}
         />
       </>
     );

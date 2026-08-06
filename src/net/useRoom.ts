@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RosterMessage } from '../../session/protocol';
 import { getConnection, type Connection, type ConnectionStatus } from './connection';
 import { createNetworkSession, type NetworkSession } from './NetworkSession';
-import { loadIdentity, rememberName, rememberedName, saveIdentity } from './identity';
+import { clearIdentity, loadIdentity, rememberName, rememberedName, saveIdentity } from './identity';
 
 export type RoomPhase = 'connecting' | 'joining' | 'needName' | 'lobby' | 'playing' | 'error';
 
@@ -42,11 +42,42 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   // same-instance param change. A future room-switch flow (leave and rejoin
   // without a full navigation) would need to revisit this.
   const identityRef = useRef(loadIdentity(roomId));
+  // True once a `roster` has actually seated us — the moment a rejection can
+  // no longer mean "our join was refused" and starts meaning "something we
+  // tried inside the lobby was refused" instead.
+  const seatedRef = useRef(false);
+  // Last known connection status, so the status subscription below can tell
+  // "just dropped" from "still down" and "just recovered" apart, rather than
+  // firing on every intermediate `connecting` pulse a reconnect attempt sends.
+  const wasOpenRef = useRef(false);
+  // Declared here, ahead of the effects that read and reset it, purely for a
+  // reader's sake — the status effect below closes over it regardless of
+  // source order, since every hook in this component runs before any effect
+  // body does.
+  const sent = useRef(false);
 
   // Status, roster, identity, and the lobby's own rejections.
   useEffect(() => {
     setStatus(connection.status());
-    const offStatus = connection.subscribe(() => setStatus(connection.status()));
+    wasOpenRef.current = connection.status() === 'open';
+
+    const offStatus = connection.subscribe(() => {
+      const next = connection.status();
+      if (wasOpenRef.current && next !== 'open') {
+        // A live connection just dropped. `sent` is what stops the join
+        // effect below from ever re-sending `joinRoom` — reset it so the
+        // reconnect this same subscription will observe (when `next` becomes
+        // 'open' again) resends it with the stored token, which is the
+        // machinery `server/rooms.ts`'s `join` already accepts for a rejoin.
+        // The session, if the game has already started, cannot hear a
+        // transport-level event on its own — nothing socket.io delivers
+        // tells it the wire is down — so it is told directly.
+        sent.current = false;
+        sessionRef.current?.connectionLost();
+      }
+      wasOpenRef.current = next === 'open';
+      setStatus(next);
+    });
 
     const offJoined = connection.onJoined((msg) => {
       const identity = {
@@ -60,17 +91,32 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
       setMessage(null);
     });
 
-    const offRoster = connection.onRoster((msg) => setRoster(msg));
+    const offRoster = connection.onRoster((msg) => {
+      seatedRef.current = true;
+      setRoster(msg);
+    });
 
     const offRejected = connection.transport.onRejected((msg) => {
       // Once a game is running, a rejection belongs to the session, which
       // shows it in the panel. Surfacing it here as well would replace the
       // board with an error screen over a refused click.
       if (sessionRef.current === null) setMessage(msg.message);
+
+      // A rejection that arrives before we have ever been seated can only be
+      // the join itself being refused — and if it was attempted with a
+      // stored identity, that identity is what got refused: a stale token,
+      // or a seat the server has forgotten. Nothing downstream can turn it
+      // into a working seat, so keeping it only guarantees every future visit
+      // repeats the same doomed rejoin. Clearing it is what lets a later load
+      // offer a clean join instead.
+      if (!seatedRef.current && identityRef.current !== null) {
+        clearIdentity(roomId);
+        identityRef.current = null;
+      }
     });
 
     return () => { offStatus(); offJoined(); offRoster(); offRejected(); };
-  }, [connection]);
+  }, [connection, roomId]);
 
   // The first state message is what turns a lobby into a game.
   useEffect(() => {
@@ -92,7 +138,6 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   }, [connection]);
 
   // Join once, as soon as the socket is open and we know what to say.
-  const sent = useRef(false);
   useEffect(() => {
     if (status !== 'open' || sent.current || roomId === '') return;
 

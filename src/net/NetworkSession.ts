@@ -11,6 +11,21 @@ import type { RoomTransport } from './transport';
 export interface NetworkSession extends GameSession {
   /** Detaches the transport handlers. Call when the room screen unmounts. */
   dispose(): void;
+  /**
+   * The transport dropped out from under an outstanding request.
+   *
+   * `pending` otherwise clears only two ways: the server's own `state` or
+   * `rejected` message — and neither arrives once the socket is gone. Without
+   * this, a dropped socket mid-request left `pending` latched forever: the
+   * panel read "Sending…" for good, socket.io's automatic reconnect gave no
+   * signal a session could act on, and once reconnected the server saw an
+   * unbound socket and dropped every intent silently. `useRoom` calls this on
+   * a connection-status transition away from `open`; it clears `pending` and
+   * leaves a message the player can read, and `GameScreen`'s own `connected`
+   * prop backs it up by forcing `canAct` false independently, so the panel
+   * goes inert even if this were somehow never called.
+   */
+  connectionLost(): void;
 }
 
 export interface NetworkSessionInit {
@@ -105,7 +120,7 @@ export function createNetworkSession(
       if (pending) return;
 
       if (!transport.isOpen()) {
-        rejection = { code: 'unknownIntent', message: 'Not connected. Reconnecting…' };
+        rejection = { code: 'notConnected', message: 'Not connected. Reconnecting…' };
         invalidate();
         return;
       }
@@ -141,6 +156,12 @@ export function createNetworkSession(
 
     reveal() {
       // Nothing to reveal: this device shows one player's own state, always.
+    },
+
+    connectionLost() {
+      pending = false;
+      rejection = { code: 'notConnected', message: 'Disconnected. Reconnecting…' };
+      invalidate();
     },
 
     dispose() {

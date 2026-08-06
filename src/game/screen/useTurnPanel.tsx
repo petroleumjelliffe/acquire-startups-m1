@@ -116,9 +116,18 @@ export function useTurnPanel(
         <ActiveStep
           label={stageLabel(state.stage)}
           body={
-            <span className="text-[13px] text-gray-600">
-              {pending ? 'Sending…' : `Waiting for ${waitingFor ?? 'the next player'}.`}
-            </span>
+            <>
+              <span className="text-[13px] text-gray-600">
+                {pending ? 'Sending…' : `Waiting for ${waitingFor ?? 'the next player'}.`}
+              </span>
+              {/*
+                A rejection can arrive while it is not my turn — a dropped
+                connection, or a stale request the server finally answered
+                after the actor moved on — and without this it was invisible:
+                `problem` rendered in every other branch but this one.
+              */}
+              {problem}
+            </>
           }
         />
       ),

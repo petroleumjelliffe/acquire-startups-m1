@@ -106,12 +106,17 @@ export function toWire(intent: Intent): WireIntent {
 }
 
 /**
- * Everything the engine can refuse, plus the one refusal the engine knows
+ * Everything the engine can refuse, plus the two refusals the engine knows
  * nothing about. Undo is not an intent — it never reaches `applyIntent` — so
  * `IllegalIntentCode` has no word for "that step belongs to a segment you no
- * longer own". Adding one here keeps `engine/` untouched.
+ * longer own". `notConnected` is not a refusal at all in the protocol sense —
+ * the server never sends it — it is the client's own signal that the
+ * transport is down, given a real member here rather than borrowing an
+ * unrelated wire code (`NetworkSession` used to reuse `unknownIntent` for
+ * this, a transport condition wearing a protocol code). Adding these here
+ * keeps `engine/` untouched.
  */
-export type RejectionCode = IllegalIntentCode | 'undoOutOfSegment';
+export type RejectionCode = IllegalIntentCode | 'undoOutOfSegment' | 'notConnected';
 
 /**
  * Why a state arrived. `commit` went to the whole table; `correction` and

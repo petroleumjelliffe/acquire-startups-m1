@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { useTurnPanel } from './useTurnPanel';
-import { createGameSession, type GameSession } from '../../../session/GameSession';
+import { createGameSession, type GameSession, type SessionView } from '../../../session/GameSession';
 import type { Intent } from '../../../engine/intents';
 import { buildFixture } from '../../../engine/golden/fixtures';
 import { ALL_GOLDEN_GAMES } from '../../../engine/golden';
@@ -22,8 +22,19 @@ function sessionFor(state = buildFixture({
  * one slot and assert on the other — which is the whole reason the hook hands
  * back two nodes instead of one.
  */
-function Harness({ session, dispatch }: { session: GameSession; dispatch: (i: Intent) => void }) {
-  const { active, staging } = useTurnPanel(session.getView(), dispatch);
+function Harness({
+  session,
+  dispatch,
+  canAct = true,
+  view,
+}: {
+  session: GameSession;
+  dispatch: (i: Intent) => void;
+  canAct?: boolean;
+  /** Overrides `session.getView()` — for shaping a view no real dispatch reaches. */
+  view?: SessionView;
+}) {
+  const { active, staging } = useTurnPanel(view ?? session.getView(), dispatch, canAct);
   return <div><div data-slot="active">{active}</div><div data-slot="staging">{staging}</div></div>;
 }
 
@@ -40,6 +51,20 @@ describe('useTurnPanel', () => {
   it('prompts for a tile during play', () => {
     render(<Harness session={sessionFor()} dispatch={() => {}} />);
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
+  });
+
+  it('shows a rejection even while it is not my turn', () => {
+    // Online, a rejection can arrive addressed to a non-actor (a dropped
+    // connection, or a stale request the server answers after the actor
+    // moved on) — every other stage renders `problem`; the `!canAct` branch
+    // used not to.
+    const session = sessionFor();
+    const view: SessionView = {
+      ...session.getView(),
+      error: { code: 'notConnected', message: 'not your turn pal' },
+    };
+    render(<Harness session={session} dispatch={() => {}} canAct={false} view={view} />);
+    expect(screen.getByText(/not your turn pal/i)).toBeInTheDocument();
   });
 
   it('always renders the staging slot, so the panel cannot resize between stages', () => {
