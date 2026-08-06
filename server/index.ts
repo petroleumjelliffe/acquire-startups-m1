@@ -7,7 +7,7 @@ import cors from 'cors';
 import { createServer as createHttpServer, type Server as HttpServer } from 'node:http';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import { project } from './projection.js';
-import { createRoomRegistry, type RoomRegistry } from './rooms.js';
+import { createRoomRegistry, type RoomRegistry, type Seat } from './rooms.js';
 import type { Delivery, GameRoom } from './room.js';
 import {
   CLIENT_EVENTS,
@@ -162,7 +162,31 @@ export function createServer(): ServerHandle {
         return;
       }
 
-      const seat = rooms.join(msg.roomId, msg.name, msg.playerId, msg.token);
+      // One socket holds one seat per room.
+      //
+      // A `joinRoom` with no `playerId`/`token` seats a *new* player — that is
+      // what makes a first join work, and it is why a second one from the same
+      // socket used to seat a second. Found by hand: two browsers produced a
+      // three-player roster, and the orphaned seat is one the game waits on
+      // forever when its turn comes, because nobody is behind it.
+      //
+      // A client cannot reliably prevent this on its own. It has no token to
+      // present until its own `joined` reply lands, so a socket blip during
+      // that window leaves it re-joining as a stranger with no way to say who
+      // it already is. The binding this server already keeps is the answer:
+      // if this socket is bound to a seat in the room it is asking to join,
+      // that seat is the answer to the request.
+      let seat: Seat | null = null;
+      const bound = bindings.get(socket.id);
+      if (bound && bound.roomId === msg.roomId) {
+        const room = rooms.get(bound.roomId);
+        const player = room?.players.find((p) => p.id === bound.playerId);
+        if (room && player) seat = { room, player };
+      }
+
+      seat ??= rooms.join(msg.roomId, msg.name, msg.playerId, msg.token);
+      if (seat) seat.player.connected = true;
+
       if (!seat) {
         socket.emit(SERVER_EVENTS.rejected, {
           code: 'unknownIntent',
