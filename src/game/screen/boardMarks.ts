@@ -43,6 +43,29 @@ export function ownerBadges(state: GameState): Record<Coord, string> {
 }
 
 /**
+ * The tile most recently put on the board, by anyone.
+ *
+ * Not `Player.lastPlacedTile`, which is per player and means "still undoable";
+ * this is the single newest placement in the game, which is the one thing a
+ * board arriving from someone else's turn should draw the eye to. Read from
+ * the log for the same reason `ownerBadges` is: the log is the only record
+ * that survives a commit.
+ *
+ * A whole turn can arrive in one message online — a placement, a founding,
+ * three purchases — and only the placement moved a tile, so animating "what
+ * changed" means animating this one cell and nothing else.
+ */
+export function lastPlacedTile(state: GameState): Coord | null {
+  for (let i = state.log.length - 1; i >= 0; i -= 1) {
+    const entry = state.log[i];
+    if (entry.phase !== PLACED) continue;
+    const tile = entry.detail.find((token) => token.kind === 'tile');
+    if (tile?.kind === 'tile') return tile.coord;
+  }
+  return null;
+}
+
+/**
  * The tile each founded chain grew from — the one cell per chain the board
  * labels with its ticker.
  *

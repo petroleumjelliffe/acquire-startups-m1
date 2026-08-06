@@ -13,6 +13,36 @@ const boardWith = (cells: { [K in Coord]?: TileCell }): Record<Coord, TileCell> 
   return board;
 };
 
+/**
+ * jsdom cannot see the animation — it has no frames — so what is pinned here
+ * is *which* cell gets it, which is the part that was easy to get wrong: a
+ * commit can carry a whole turn, and animating every changed cell would flash
+ * the entire chain the placement just grew. The motion itself is settled by
+ * eye.
+ */
+describe('a tile landing', () => {
+  it('marks only the newest placement', () => {
+    const board = boardWith({ E5: { placed: true }, E6: { placed: true } });
+    const { container } = render(<Board board={board} landed="E6" />);
+
+    const landed = container.querySelectorAll('[data-landed]');
+    expect(landed).toHaveLength(1);
+    expect(landed[0].querySelector('[title="E6"]')).not.toBeNull();
+  });
+
+  it('marks nothing when no tile has been placed', () => {
+    const { container } = render(<Board board={boardWith({})} landed={null} />);
+    expect(container.querySelectorAll('[data-landed]')).toHaveLength(0);
+  });
+
+  it('does not mark a cell that is not on the board yet', () => {
+    // A hand tile is a coordinate too. Landing is about what arrived on the
+    // board, not about what someone is holding.
+    const { container } = render(<Board board={boardWith({})} hand={['E6']} landed="E6" />);
+    expect(container.querySelectorAll('[data-landed]')).toHaveLength(0);
+  });
+});
+
 describe('Board', () => {
   it('labels cells A1-style, never r-c', () => {
     render(<Board board={createEmptyBoard()} />);

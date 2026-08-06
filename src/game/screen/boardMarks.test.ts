@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ownerBadges, foundingTiles, foundedThisTurn } from './boardMarks';
+import { ownerBadges, foundingTiles, foundedThisTurn, lastPlacedTile } from './boardMarks';
 import { buildFixture } from '../../../engine/golden/fixtures';
 import { applyIntent } from '../../../engine/intents';
 import { createGameSession } from '../../../session/GameSession';
@@ -73,6 +73,36 @@ describe('ownerBadges', () => {
       .toBe(true);
 
     expect(ownerBadges(state)).toEqual({});
+  });
+});
+
+describe('lastPlacedTile', () => {
+  it('is the newest placement in the game, whoever made it', () => {
+    const session = createGameSession({
+      state: buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['E6'] },
+          { name: 'Sam', cash: 6000, hand: ['A1'] },
+        ],
+        bag: ['I11', 'I12', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+      }),
+    });
+
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    expect(lastPlacedTile(session.getView().state)).toBe('E6');
+
+    session.dispatch({ type: 'endTurn', playerId: 'p1' });
+    session.dispatch({ type: 'placeTile', playerId: 'p2', coord: 'A1' });
+    // The other player's tile now, not the viewer's own — which is the case
+    // this exists for: someone else's turn arriving on your screen.
+    expect(lastPlacedTile(session.getView().state)).toBe('A1');
+  });
+
+  it('is null before anything has been placed', () => {
+    const state = buildFixture({
+      players: [{ name: 'Alex', cash: 6000, hand: ['E6'] }],
+    });
+    expect(lastPlacedTile(state)).toBeNull();
   });
 });
 

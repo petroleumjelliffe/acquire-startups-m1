@@ -24,6 +24,14 @@ export interface BoardProps {
   blocked?: Coord[];
   /** The one labelled cell per chain, showing the ticker. */
   hqTiles?: Coord[];
+  /**
+   * The newest tile on the board, by anyone — the one cell worth animating.
+   *
+   * A commit can carry a whole turn: a placement, a founding, three purchases.
+   * Only one of those moved a tile, so this is what "what changed" means when
+   * someone else's turn lands on your screen all at once.
+   */
+  landed?: Coord | null;
   onCellClick?: (c: Coord) => void;
 }
 
@@ -44,6 +52,7 @@ export function Board({
   owners = {},
   blocked = [],
   hqTiles = [],
+  landed = null,
   onCellClick,
 }: BoardProps) {
   return (
@@ -69,6 +78,7 @@ export function Board({
           owners={owners}
           blocked={blocked}
           hqTiles={hqTiles}
+          landed={landed}
           onCellClick={onCellClick}
         />
       ))}
@@ -84,6 +94,7 @@ function RowCells({
   owners,
   blocked,
   hqTiles,
+  landed,
   onCellClick,
 }: Required<Omit<BoardProps, 'onCellClick'>> & { row: (typeof ROWS)[number]; onCellClick?: (c: Coord) => void }) {
   return (
@@ -117,8 +128,18 @@ function RowCells({
         // a caller tab through 108 dead cells.
         const clickable = (inHand && !isBlocked) || placed === id;
 
+        // Keyed by the coordinate so the animation plays once, when this cell
+        // becomes the newest placement — a class alone would re-run on every
+        // render, and a class on every placed cell would animate the whole
+        // board each time a commit arrives.
+        const justLanded = landed === id && cell.placed;
+
         return (
-          <div key={id} className="relative">
+          <div
+            key={justLanded ? `${id}-landed` : id}
+            data-landed={justLanded || undefined}
+            className={justLanded ? 'relative tile-land' : 'relative'}
+          >
             <Tile
               coord={id}
               state={state}

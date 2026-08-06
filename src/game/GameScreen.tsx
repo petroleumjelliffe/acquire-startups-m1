@@ -12,7 +12,7 @@ import { FinalScoring } from './FinalScoring';
 import { useTurnPanel } from './screen/useTurnPanel';
 import { TurnToast } from './online/TurnToast';
 import { stepsOf } from './screen/stepsOf';
-import { ownerBadges, foundingTiles } from './screen/boardMarks';
+import { ownerBadges, foundingTiles, lastPlacedTile } from './screen/boardMarks';
 import { getDeadTilesInHand } from '../../engine/placement';
 import { isStartupId } from '../../engine/startups';
 import { getSharePrice } from '../../engine/gameLogic';
@@ -165,6 +165,7 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
           blocked={viewer ? getDeadTilesInHand(state, viewer.id) : []}
           owners={ownerBadges(state)}
           hqTiles={foundingTiles(state)}
+          landed={lastPlacedTile(state)}
           onCellClick={placeTile}
         />
       </div>
