@@ -1,17 +1,12 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import {
-  prefersReducedMotion,
-  STEP_EXIT_MS,
-  STEP_RISE_EASE,
-  STEP_RISE_MS,
-} from './stepMotion';
+import { prefersReducedMotion, STEP_RISE_EASE, STEP_RISE_MS } from './stepMotion';
 
 describe('the step motion values', () => {
-  it('leaves faster than it arrives', () => {
-    // The two run in sequence when a step is replaced, so a symmetrical pair
-    // would make a tile switch cost twice the arrival — and a reversal has
-    // nothing new for the eye to take in.
-    expect(STEP_EXIT_MS).toBeLessThan(STEP_RISE_MS);
+  it('is long enough to read as a reveal', () => {
+    // A step travels its own height, which is 187px in a merger. The two
+    // earlier attempts ran at 280ms and 340ms and were both reported as too
+    // quick to follow.
+    expect(STEP_RISE_MS).toBeGreaterThanOrEqual(400);
   });
 
   it('does not use the front-loaded arrival curve', () => {

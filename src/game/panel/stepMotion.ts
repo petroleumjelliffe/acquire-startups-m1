@@ -46,15 +46,13 @@ export const STEP_RISE_MS = 480;
  */
 export const STEP_RISE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
-/**
- * How long a step takes to leave.
- *
- * Shorter than the arrival on purpose. The two run in sequence — the old step
- * collapses, *then* the new one grows, so a replacement costs both — and a
- * reversal reads faster than an arrival: nothing new is being introduced, so
- * there is nothing for the eye to take in on the way out.
+/*
+ * There is no exit duration here on purpose. A step does not leave this zone —
+ * by the time the next one arrives, the one that finished is already a row in
+ * the history being pushed. An exit was built and removed: holding the outgoing
+ * step to animate it away put its whole duration in front of every control the
+ * next step offers.
  */
-export const STEP_EXIT_MS = 240;
 
 /**
  * Whether this device has asked for less motion.

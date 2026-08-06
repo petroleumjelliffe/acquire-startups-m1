@@ -23,14 +23,10 @@ export function StepEntry({ phase, actor, detail, stepId, onUndo }: StepEntryPro
   const undoable = onUndo != null && stepId != null;
 
   return (
-    // No arrival animation of its own. An entry cannot animate its own arrival
-    // in a bottom-aligned list — by the time it exists, every entry above it
-    // has already jumped to its new position. `StepStack` moves the whole list
-    // instead, which is the motion this used to approximate by lifting its own
-    // text 18px.
-    // `data-step-id` is how `StepStack` measures the rows that are leaving, so
-    // it can drop the list by exactly their height.
-    <div data-step-id={stepId} className="flex flex-col gap-[3px]">
+    // No motion of its own, and none in the list around it either. A completed
+    // step is pushed up by the active zone growing below it — see
+    // `StepReveal` — which is the whole of the panel's step motion.
+    <div className="flex flex-col gap-[3px]">
       <div className="flex items-center gap-2">
         {/*
           The name leads and the phase follows, both in the label's own
