@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Finish the online UI — the roadmap's Phase 5 — which in practice means closing the twenty findings from the real two-player sessions on the merged Phase 3 client: thirteen from the first wave (Tasks 1–7, five already landed) and seven from the second (Tasks 8–14).
+**Goal:** Finish the online UI — the roadmap's Phase 5 — which in practice means closing the twenty-six findings from the real two-player sessions on the merged Phase 3 client: thirteen from the first wave (Tasks 1–7), seven from the second (Tasks 8–14), and six from the third (Tasks 15–20), which came from a frame-by-frame reading of a screen recording rather than from playing.
 
 **Why this is Phase 5 rather than a polish pass:** the roadmap's Phase 5 named three things. Two of them Phase 3b already delivered — hidden hands (projection enforces them, `viewerId` renders them) and the `ReconnectionBanner` rework (it became `ConnectionStrip`, scoped to the room screen). The third, *the step stack as the spectator view of committed segments*, is Task 7 below and is now done. What remains of Phase 5 is exactly what playing the thing in two browsers turned up, which is the more honest specification of "online UI" than the roadmap's three bullets were.
 
@@ -191,7 +191,14 @@ the outcome of an action the player took, in the entry for that action.
   red. Restore.
 - [ ] **Step 5:** Suite, typecheck, commit.
 
-## Task 9: A step arrives by rising out from behind the staging area
+## Task 9: A step arrives by rising out from behind the staging area — **reworked by Task 15**
+
+> Shipped as `6f0ffcd` and `c49075d`, then found wrong by a frame-by-frame pass:
+> it animates the contents while the container's height changes in one frame.
+> **Task 15 replaces the mechanism** and deletes most of what these two tasks
+> built. Kept here because the reasoning about bottom-aligned lists is what led
+> to the wrong answer, and the next attempt should be able to read it.
+
 
 **Finding:** the intended motion was never built. Today `.step-enter` fades the
 new entry in and lifts its *text* 18px; the entries above it jump to their new
@@ -238,7 +245,11 @@ zone below, and it is one motion because it is one transform.
 - [ ] **Step 7:** `npm run verify:layout` — the stack's height reservation is
   what this animates inside of — suite, typecheck, commit.
 
-## Task 10: Replacing a step reverses the motion first
+## Task 10: Replacing a step reverses the motion first — **reworked by Task 15**
+
+> Shipped as `5abbce3`. The sequencing ruling survives; the mechanism does not —
+> the collapse becomes the same container's height, per Task 15 Step 3.
+
 
 **Finding:** switching your placed tile swaps one step for another, and the new
 one just appears. The old step should drop back down out of view — the entry
@@ -365,11 +376,198 @@ opens at and labels that price `to start`, which reads as a fragment.
 
 ---
 
+## Third by-hand wave — Tasks 15–20
+
+Six findings from the owner's frame-by-frame pass over a screen recording on
+2026-08-06, after Tasks 9 and 10 shipped. **Task 15 is a rework, not a
+tuning**: the motion those two tasks built is the wrong mechanism, and the fix
+deletes most of it. The other five are small and independent of it.
+
+Two of the six (16 and 17) are the same shape as Tasks 3 and 12 before them —
+a behaviour the prototype has, the atom still supports, and the port dropped on
+the way across. That is now four; it is worth a pass over
+`prototype/index.html`'s panel against ours to find the rest in one go rather
+than one screen recording at a time.
+
+## Task 15: The container rises — not the contents
+
+**Finding, in the owner's words:** *"the container is meant to animate up, not
+the contents inside. the container is meant to push everything above it up. the
+previous completed step should be pushed up, not have its own transition."*
+
+**What is wrong now.** Tasks 9 and 10 animate two sets of *contents* — the step
+list by one distance, the arriving step's content by another — while the thing
+that actually moves the layout, **the active zone's height, changes in a single
+frame**. Everything else is choreography over that jump. Observed frame by
+frame: the history snaps to its new position, the just-completed row then peeks
+out from behind staging under its own transform (it should never do that), and
+the arriving step fills a container that was already the right size.
+
+**What it should be.** One animated property on one element: the active zone's
+height, from zero to its natural height, with its overflow clipped. Everything
+else follows from layout — the step stack is the panel's flex spacer, so its
+bottom edge *is* the active zone's top edge, and a zone growing underneath the
+history pushes the history up in lockstep, by construction. Nothing to
+synchronise, because there is only one motion.
+
+**Files:** `src/game/panel/StepStack.tsx` (deletions), `src/game/panel/stepMotion.ts`
+(rewrite), `src/game/panel/Panel.tsx`, `src/game/GameScreen.tsx`,
+`src/styles/index.css`, `scripts/verify-layout.mjs`; tests alongside.
+
+- [ ] **Step 1: Delete before building.** `riseFrom`, the `data-step-list`
+  transform, the `lastHeight`/`prevTop` measurement, `.active-step-enter`'s
+  `step-rise` keyframe and the `shown`/`exitingTo`/`exitTimer` machinery all go.
+  Keep `prefersReducedMotion` and `leavingIds`. The step list must end up with
+  **no transform of its own at all** — that is the finding, stated as a
+  postcondition.
+- [ ] **Step 2:** A `StepReveal` wrapper around the active slot in `Panel`,
+  taking the step identity `GameScreen` already computes (`${stage}:${actorId}`)
+  as a prop rather than a React key — it needs to *observe* the change, not be
+  remounted by it. On a change: measure the natural height, set `height: 0` with
+  no transition, flush, then transition to that height, then release back to
+  `auto` so later content changes within one step are unconstrained. `height:
+  auto` is not animatable, which is why this is measured in JS like everything
+  else here.
+- [ ] **Step 3: The exit is the same property.** Replacing a step (switching a
+  placed tile) collapses the zone to zero with the *old* content still rendered,
+  then grows with the new — sequential, as ruled. The stack does not participate;
+  rows appear and disappear where they belong and are pushed by the zone.
+- [ ] **Step 4: Slow it down.** The owner has asked twice; whatever number
+  settles must be read off a real page, not chosen. Start from 480ms and let the
+  by-hand pass move it. One duration now, not two.
+- [ ] **Step 5: `prefers-reduced-motion` skips it** — the zone is simply its new
+  height, no interpolation. Hard rule.
+- [ ] **Step 6: Replace the layout gate's probes.** `stepRise` and `stepExit`
+  measure transforms that will no longer exist; they must be rewritten, not
+  deleted, or this ships unguarded. The property to measure is the one the
+  finding names: **at every sample during the animation, the step list's bottom
+  edge equals the active zone's top edge** — that is "pinned", stated as a
+  measurement — and the zone's height is strictly between 0 and its final value
+  mid-flight. Sample at three points.
+- [ ] **Step 7: Break it** by setting the height with no transition; confirm the
+  mid-flight sample reports the final height and the gate fails. Restore.
+- [ ] **Step 8: By hand, frame by frame.** This is the third attempt at this
+  motion and the first two passed their gates. Record it and step through, in
+  pass-and-play and online. Suite, typecheck, `npm run verify:layout`, commit.
+
+## Task 16: Staged shares can be taken back
+
+**Finding:** clicking a share in the staging pile should decrement it and return
+it to where it came from. Nothing in the pile is clickable, and there is no
+affordance saying it could be.
+
+**Files:** `src/game/screen/useTurnPanel.tsx` (both piles); tests alongside.
+
+**The atom is already built.** `StockCard`'s `mode="remove"` renders the `×`
+badge; `StockStack` lights it when `onRemove` is supplied; the catalog carries it
+as `stack · sm · removable`. The panel passes no handler on either pile, so the
+state is never entered — the same dropped-prop shape as Tasks 3 and 12.
+
+- [ ] **Step 1: Write the failing test.** In the buy step, stage two shares of a
+  brand, click the pile's remove control, and assert the staged count is one and
+  the net cost has dropped by one share's price. Then assert the `×` affordance
+  is present at all, which is the half that was missing.
+- [ ] **Step 2:** Pass `onRemove` on the buy pile: drop one pick of that brand.
+- [ ] **Step 3:** Pass `onRemove` on the liquidation pile. **Decision to make
+  and write down:** the prototype resets the whole sort (`liqSell = liqTrade =
+  0`); decrementing one unit (sell −1, trade −`TRADE_RATIO`) is more predictable
+  and matches what the buy pile does. Recommendation: decrement. Say which in the
+  commit either way.
+- [ ] **Step 4: Break it** by dropping the handler again; confirm the test goes
+  red. Restore.
+- [ ] **Step 5:** Suite, typecheck, `npm run verify:layout` (the pile's
+  reservation is what this changes the contents of), commit.
+
+## Task 17: The buy step says what to do when there is nothing to buy
+
+**Finding:** before anything is founded, the buy step is a heading over an empty
+row.
+
+**Files:** `src/game/screen/useTurnPanel.tsx` (the `buy` branch); test alongside.
+
+- [ ] **Step 1: Write the failing test** from a state with no founded brand: the
+  buy step renders `Found a startup to buy shares`.
+- [ ] **Step 2:** Render it. **Key it off "nothing is founded", not "nothing is
+  buyable"** — since Task 12, a founded brand with an empty pool renders a
+  sold-out card, so those two conditions have come apart. A test for the
+  all-sold-out case asserting the cards *are* shown pins that distinction.
+- [ ] **Step 3: Break it** by keying off `forSale.length === 0`; confirm the
+  sold-out case goes red. Restore.
+- [ ] **Step 4:** Suite, typecheck, commit.
+
+## Task 18: Whose step was it
+
+**Finding:** the stack shows two turns and attributes neither. The viewer should
+see "you", never their own name.
+
+**Files:** `src/game/screen/stepsOf.tsx`, `src/game/panel/StepEntry.tsx`,
+`src/game/GameScreen.tsx`; tests alongside.
+
+**The data is already there and thrown away:** every `LogEntry` carries
+`playerId`, and `stepsOf` drops it.
+
+- [ ] **Step 1: Decide the form and write it down.** The phases are engine
+  strings and not uniformly verb phrases — `Placed a tile` and `Bought shares`
+  take a subject, `Merger payout` does not. Recommendation: an attribution on the
+  phase line (emoji + name, or `You`), not a rewritten sentence, so every phase is
+  handled by one rule. Do not touch the engine's strings.
+- [ ] **Step 2: Write the failing tests.** An entry by another player carries
+  their name; an entry by the viewer reads `You`; and — the case that matters
+  online — a **merger payout entry filed under a player who is not the actor**
+  carries that player's name, not the actor's. Drive it from a golden game with a
+  payout rather than a hand-built log.
+- [ ] **Step 3:** Thread the viewer into `stepsOf`. `GameScreen` already resolves
+  it for the board and the panel; this is the same value one level further, not a
+  third derivation.
+- [ ] **Step 4: Break it** by naming the actor on every entry; confirm the payout
+  case goes red. Restore.
+- [ ] **Step 5:** Suite, typecheck, `npm run verify:layout` (an added name can
+  wrap a step row), commit.
+
+## Task 19: The holdings floor is short by a row's worth
+
+**Finding:** taking your first share — the founder's free one — shifts every
+zone below the hand by 4px.
+
+**Files:** `src/game/panel/HandZone.tsx`, `scripts/verify-layout.mjs`.
+
+**The gate has been printing this without failing on it:** `holdings` measures
+64px empty and 68px with one stack, and the zone is marked `data-may-grow="true"`,
+which exempts it from the no-movement rule. Gaining a share is not gaining a
+*row*, so the exemption is being spent on the wrong case.
+
+- [ ] **Step 1: Measure, do not guess.** Read the populated single-row height off
+  a real page at 768 and 1440 — the stack's depth margin and the `×N` label are
+  what the 64px floor was measured without.
+- [ ] **Step 2:** Raise the floor to cover one populated row.
+- [ ] **Step 3: Make the gate bite.** A floor that is silently 4px short is what
+  shipped; the check must fail on it. Either drop `data-may-grow` from this zone
+  and let the exact-height rule apply until a genuine second row appears, or add
+  a per-zone assertion that the empty and single-row heights match. Say which and
+  why.
+- [ ] **Step 4: Break it** by restoring the 64px floor; confirm `verify:layout`
+  reports the shift. Restore.
+- [ ] **Step 5:** `npm run verify:layout` at both widths, suite, typecheck, commit.
+
+## Task 20: The staging pile stops saying "empty"
+
+**Finding:** the word `empty` in an empty staging pile is a label for nothing.
+
+**Files:** `src/game/panel/StagingZone.tsx`; test in `StagingZone.test.tsx`.
+
+- [ ] **Step 1:** Remove the placeholder. The 72px reservation is on the pile
+  container (`h-[72px] min-h-[72px]`), not on the text, so the zone does not move
+  — and the existing height-stability test proves that rather than assuming it.
+- [ ] **Step 2:** Update any test matching the word.
+- [ ] **Step 3:** Suite, typecheck, `npm run verify:layout`, commit.
+
+---
+
 ## Verification
 
 This plan is done when:
 
-- All twenty findings are closed, or explicitly parked with a ruling.
+- All twenty-six findings are closed, or explicitly parked with a ruling.
 - Every new test has been observed failing, with the break named in its task.
 - `npx vitest run`, `npm run typecheck`, `npx vite build`, `npm run check:bundle` and `npm run verify:layout` are green.
 - **A full two-browser game has been played to final scoring**, including a merger whose liquidation queue reaches both players, an undo inside a merger (Task 1's finding), a tile switched mid-turn (online, the bug that opened this plan), and a mid-game refresh. This is the pass that found all thirteen of these; it is the only one that has ever found anything here.
@@ -377,6 +575,8 @@ This plan is done when:
 ## Risks
 
 **Five of these are layout or motion defects, and jsdom cannot see any of them.** Tasks 1, 2, 6, 9 and 10 are exactly the class of change that passes a structural test over a visibly broken page. `verify:layout` and a browser are the gates that matter; a green `vitest` run means nothing for them. Tasks 9 and 10 are the worst of the set: a measured height drives the whole effect, and jsdom reports every height as zero, so a test can only prove the mechanism is wired — never that anything moves.
+
+**The panel motion has now been wrong twice, and both attempts passed their gates.** Tasks 9 and 10 shipped green — suite, typecheck, and purpose-built browser probes — and were still the wrong mechanism, because the probes measured what the implementation did rather than what the motion is *for*. Task 15's gate is written the other way round: it measures the relationship the finding names (the history's bottom edge stays on the arriving step's top edge), which is true of the right implementation and false of both wrong ones. Expect the third attempt to need a frame-by-frame look regardless.
 
 **Order the motion work 9 → 10 → 6.** Task 9 defines what arriving looks like on this surface, Task 10 reverses it, and Task 6 (a tile landing on the board) should borrow that vocabulary instead of inventing a second one. Doing 6 first means either redoing it or living with two motions that disagree.
 
