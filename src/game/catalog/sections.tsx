@@ -582,6 +582,18 @@ export const SECTIONS: CatalogSection[] = [
         fixture: fromGolden('G1', 2),
         node: <TurnPanelDemo state={G1_BUY} canAct={false} />,
       },
+      {
+        label: 'panel · mid-merger (the worst squeeze)',
+        kind: 'wide',
+        fixture: fromGolden('G2', 1),
+        // The tallest the active zone ever gets: a liquidation queue plus its
+        // sell/trade actions. The step stack is the flex spacer above it, so
+        // this is the state that decides whether it survives being squeezed or
+        // collapses to nothing — and the undo you most want during a merger
+        // lives in it. Reported by hand as "sidebar scrolling doesn't let me
+        // scroll up to undo tile placement during mergers".
+        node: <TurnPanelDemo state={G2_MERGER} canAct />,
+      },
     ],
   },
 

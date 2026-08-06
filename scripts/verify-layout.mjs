@@ -335,6 +335,13 @@ const CURTAIN = `(() => {
 // (`src/game/catalog/sections.tsx`'s `TurnPanelDemo`, composed from the same
 // golden state as its "my turn" neighbour) for the price of one page
 // navigation this script already knows how to do.
+/**
+ * How little of the step stack is still usable. Two rows plus the zone's own
+ * padding — enough to see a step and reach its undo — rather than a round
+ * number chosen for looking like one.
+ */
+const STACK_FLOOR = 72;
+
 const WAITING_PANEL = `(() => {
   const zonesIn = (label) => {
     const fig = [...document.querySelectorAll('[data-catalog-state]')]
@@ -347,9 +354,30 @@ const WAITING_PANEL = `(() => {
     }
     return out;
   };
+  // The merger card additionally reports whether the step stack is reachable.
+  // A zone can be present in the DOM, and counted by zonesIn above, while a
+  // tall active zone squeezes it to nothing. That is the defect reported by
+  // hand: during a merger the undo could not be scrolled to.
+  const stackReach = (label) => {
+    const fig = [...document.querySelectorAll('[data-catalog-state]')]
+      .find((f) => f.getAttribute('data-catalog-state') === label);
+    if (!fig) return null;
+    const stack = fig.querySelector('[data-slot="stepstack"]');
+    const column = stack && stack.parentElement;
+    if (!stack || !column) return null;
+    return {
+      height: Math.round(stack.getBoundingClientRect().height),
+      // Whether the column scrolls rather than clipping, and by how much.
+      overflow: Math.max(0, column.scrollHeight - column.clientHeight),
+      scrollable: getComputedStyle(column).overflowY,
+    };
+  };
+
   return {
     myTurn: zonesIn('panel · my turn (waiting-panel baseline)'),
     waiting: zonesIn('panel · not my turn (waiting)'),
+    merger: zonesIn('panel · mid-merger (the worst squeeze)'),
+    mergerStack: stackReach('panel · mid-merger (the worst squeeze)'),
   };
 })()`;
 
@@ -568,6 +596,31 @@ async function main() {
     await send('Page.navigate', { url: `http://localhost:${VITE_PORT}/catalog` });
     await sleep(1500);
     const wp = await evaluate(WAITING_PANEL);
+
+    // The undo you most want during a merger lives in the step stack, and the
+    // step stack is the flex spacer that gives way when the active zone grows.
+    // Reported by hand: "sidebar scrolling doesn't let me scroll up to undo
+    // tile placement during mergers". A zone squeezed to nothing is still in
+    // the DOM, so only a real height can tell you it is there.
+    if (!wp.mergerStack) {
+      failures.push(`${width}px: the mid-merger panel catalog demo did not render`);
+    } else {
+      console.log(`${width}px  merger panel ${JSON.stringify(wp.merger)}` +
+                  `\n         step stack ${JSON.stringify(wp.mergerStack)}`);
+      if (wp.mergerStack.height < STACK_FLOOR) {
+        failures.push(
+          `${width}px: the step stack collapses to ${wp.mergerStack.height}px during a merger ` +
+          `(floor ${STACK_FLOOR}px) — the undo is unreachable exactly when it is most wanted`,
+        );
+      }
+      if (wp.mergerStack.overflow > 0 && !/auto|scroll/.test(wp.mergerStack.scrollable)) {
+        failures.push(
+          `${width}px: the merger panel overflows by ${wp.mergerStack.overflow}px ` +
+          `with overflow-y: ${wp.mergerStack.scrollable} — the bottom zones are clipped, not scrollable`,
+        );
+      }
+    }
+
     if (!wp.myTurn || !wp.waiting) {
       failures.push(`${width}px: the my-turn / waiting-panel catalog demo did not render`);
     } else {

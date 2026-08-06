@@ -36,7 +36,24 @@ export function Panel(props: PanelProps) {
           <div
             key={slot}
             data-slot={slot}
-            className={slot === 'stepstack' ? 'flex min-h-0 flex-1 flex-col' : 'flex-none'}
+            className={
+              slot === 'stepstack'
+                // A floor, not `min-h-0`.
+                //
+                // As the flex spacer this zone gives way first, and with no
+                // floor it gave way entirely: measured at **0px** during a
+                // merger, where the active zone reaches 263px. The column
+                // scrolls, so nothing was clipped — but a zone of zero height
+                // has nothing to scroll to, which is why the undo was
+                // unreachable exactly when a merger made it most wanted.
+                //
+                // 96px is two rows and the zone's own padding: enough to see a
+                // step and reach its undo. Past that the column overflows and
+                // `overflow-y-auto` above takes over, which is the behaviour
+                // that was always intended.
+                ? 'flex min-h-[96px] flex-1 flex-col'
+                : 'flex-none'
+            }
           >
             {props[slot]}
           </div>
