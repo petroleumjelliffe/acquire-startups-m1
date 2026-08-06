@@ -99,8 +99,11 @@ export function foundedThisTurn(state: GameState, segmentStart: number): Startup
     const entry = state.log[i];
     if (entry.stepId < segmentStart) break;
     if (entry.phase !== FOUNDED) continue;
-    const brand = entry.detail.find((token) => token.kind === 'brand');
-    if (brand?.kind === 'brand' && isStartupId(brand.startupId)) return brand.startupId;
+    // From the payload, which is where the founding step keeps its startup now
+    // that the row renders a share certificate rather than a sentence. Reading
+    // a brand token here worked until that changed, and the tests said so.
+    const { payload } = entry;
+    if (payload?.kind === 'founding' && isStartupId(payload.startupId)) return payload.startupId;
   }
   return null;
 }

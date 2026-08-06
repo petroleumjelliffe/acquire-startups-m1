@@ -13,9 +13,16 @@ export function pushLog(
   phase: string,
   detail: LogToken[],
   playerId?: string,
+  /**
+   * A typed payload for a step whose content is richer than a sentence — a
+   * merger's payout table, a founder's share certificate. The panel renders a
+   * component for it; `detail` may be empty when the payload says everything.
+   */
+  payload?: LogEntry['payload'],
 ): LogEntry {
   const entry: LogEntry = { stepId: state.nextStepId, phase, detail };
   if (playerId !== undefined) entry.playerId = playerId;
+  if (payload !== undefined) entry.payload = payload;
   state.nextStepId += 1;
   state.log.push(entry);
   return entry;

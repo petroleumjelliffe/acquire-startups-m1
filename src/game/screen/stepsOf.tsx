@@ -1,6 +1,8 @@
 import type { GameState } from '../../../engine/gameTypes';
 import type { StepStackEntry } from '../panel/StepStack';
 import { LogDetail } from '../panel/LogDetail';
+import { StockStack } from '../atoms/StockStack';
+import { isStartupId } from '../../../engine/startups';
 import { PayoutLines } from '../merger/PayoutLines';
 
 /**
@@ -85,6 +87,17 @@ export function stepsOf(
             amount: b.amount,
           }))}
         />
+      ) : entry.payload?.kind === 'founding' && isStartupId(entry.payload.startupId) ? (
+        /*
+          The certificate itself, not a sentence about it — the same stack the
+          staging pile and the hand zone render, so a share reads as a share
+          wherever it appears. "Founding share" says which one it is; the
+          startup and the tile are on the placement row above.
+        */
+        <span className="flex items-center gap-2">
+          <StockStack id={entry.payload.startupId} count={entry.payload.shares} size="sm" />
+          <span className="text-[13px] text-gray-600">founding share</span>
+        </span>
       ) : (
         <LogDetail detail={entry.detail} />
       ),

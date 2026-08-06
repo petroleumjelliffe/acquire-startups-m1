@@ -51,7 +51,15 @@ export type LogToken =
  * rendered text, which is correct until someone rewords a log string.
  */
 export type LogPayload =
-  | { kind: 'payout'; bonuses: BonusResult[] };
+  | { kind: 'payout'; bonuses: BonusResult[] }
+  /**
+   * The founder's share. A payload rather than tokens because the thing to
+   * show is a share *certificate* — the same card the staging pile and the
+   * hand zone render — and the token vocabulary is text, tiles, brands and
+   * cash. Same reasoning as `payout`: a step whose content is richer than a
+   * sentence carries the data and lets the panel render the component.
+   */
+  | { kind: 'founding'; startupId: string; shares: number };
 
 export interface LogEntry {
   stepId: number;

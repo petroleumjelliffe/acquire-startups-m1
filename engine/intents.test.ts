@@ -138,7 +138,10 @@ describe('applyIntent', () => {
 
       const entry = founded.log.at(-1)!;
       expect(entry.phase).toBe('Founded a startup');
-      expect(entry.detail.some((t) => t.kind === 'brand' && t.startupId === 'Messla')).toBe(true);
+      // A typed payload, so the panel can render the certificate itself — the
+      // token vocabulary is text, tiles, brands and cash, and a share is none
+      // of those.
+      expect(entry.payload).toEqual({ kind: 'founding', startupId: 'Messla', shares: 1 });
       // The tile is on the placement above; repeating it here said nothing new.
       expect(entry.detail.some((t) => t.kind === 'tile')).toBe(false);
     });

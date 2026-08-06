@@ -499,14 +499,16 @@ export function foundStartup(
   }
 
   grantFoundingShare(state, state.players[state.turnIndex].id, id);
-  // What this step uniquely records: the share the founder is awarded. The
-  // tile and the startup are on the placement above, so repeating "PaperfulPost
-  // at I12" here said nothing the row above had not.
-  pushLog(state, 'Founded a startup', [
-    tok.text('Awarded '),
-    tok.brand(id),
-    tok.text(' ×1'),
-  ], state.players[state.turnIndex].id);
+  // What this step uniquely records: the share the founder is awarded, carried
+  // as a payload so the panel can render the certificate itself rather than a
+  // sentence about it. The tile and the startup are on the placement above.
+  pushLog(
+    state,
+    'Founded a startup',
+    [],
+    state.players[state.turnIndex].id,
+    { kind: 'founding', startupId: id, shares: 1 },
+  );
 
   state.stage = "buy";
   delete state.pendingFoundTile;

@@ -144,6 +144,41 @@ describe('stepsOf', () => {
   });
 });
 
+describe('the founding step', () => {
+  /**
+   * The founder's share is a share, so it renders as one — the same stack the
+   * staging pile and the hand zone use. It arrives as a typed payload for the
+   * same reason a payout does: the token vocabulary is text, tiles, brands and
+   * cash, and a certificate is none of those.
+   */
+  it('renders the founder share as a stock certificate', () => {
+    const session = createGameSession({
+      state: buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['E6'] },
+          { name: 'Sam', cash: 6000, hand: ['A1'] },
+        ],
+        loners: ['E5'],
+        bag: ['I11', 'I12', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8'],
+      }),
+    });
+    session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
+    session.dispatch({ type: 'chooseFoundingBrand', playerId: 'p1', startupId: 'Messla' });
+
+    const view = session.getView();
+    const founding = stepsOf(view.state, view.undoableSteps).find(
+      (e) => e.phase === 'Founded a startup',
+    );
+    if (!founding) throw new Error('no founding step');
+
+    render(<div>{founding.detail}</div>);
+    // A counted stack, not a brand chip: ×1 is the count, and the words say
+    // which share it is.
+    expect(screen.getByText('×1')).toBeInTheDocument();
+    expect(screen.getByText(/founding share/i)).toBeInTheDocument();
+  });
+});
+
 describe('whose step it was', () => {
   /**
    * The stack shows two turns. Without a name on them the previous player's
