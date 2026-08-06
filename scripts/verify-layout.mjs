@@ -303,6 +303,13 @@ const MEASURE = `(async () => {
   };
 })()`;
 
+// `active` holds the current decision, so its content genuinely differs by
+// stage — `stepstack` is `flex-1` and exists to absorb exactly what `active`
+// does not use, so the pair is compared by *sum*, not by zone. Hoisted here
+// (not just inside the per-width loop below) because the waiting-panel check
+// reuses the same exemption.
+const SPACER_PAIR = ['stepstack', 'active'];
+
 const CURTAIN = `(() => {
   const surface = document.querySelector('[data-testid="game-surface"]');
   const curtain = document.querySelector('[data-testid="curtain"]');
@@ -311,6 +318,34 @@ const CURTAIN = `(() => {
   const c = curtain.getBoundingClientRect();
   return { surface: { w: Math.round(s.width), h: Math.round(s.height) },
            curtain: { w: Math.round(c.width), h: Math.round(c.height) } };
+})()`;
+
+// The not-my-turn waiting panel exists online (`GameScreen`'s `canAct` goes
+// false whenever `viewerId` is not the actor, or the connection drops) but
+// never on `/pass-and-play`, which is the only route everything above this
+// point measures — so nothing above ever renders it, let alone measures it.
+// Standing up two networked `NetworkSession`s and a server inside this script
+// just to reach that one panel state was judged not worth it; the catalog
+// route already reaches the identical DOM the real hook produces
+// (`src/game/catalog/sections.tsx`'s `TurnPanelDemo`, composed from the same
+// golden state as its "my turn" neighbour) for the price of one page
+// navigation this script already knows how to do.
+const WAITING_PANEL = `(() => {
+  const zonesIn = (label) => {
+    const fig = [...document.querySelectorAll('[data-catalog-state]')]
+      .find((f) => f.getAttribute('data-catalog-state') === label);
+    if (!fig) return null;
+    const out = {};
+    for (const el of fig.querySelectorAll('[data-slot], [data-zone]')) {
+      const key = el.getAttribute('data-slot') ?? el.getAttribute('data-zone');
+      out[key] = Math.round(el.getBoundingClientRect().height);
+    }
+    return out;
+  };
+  return {
+    myTurn: zonesIn('panel · my turn (waiting-panel baseline)'),
+    waiting: zonesIn('panel · not my turn (waiting)'),
+  };
 })()`;
 
 // The curtain lives behind the setup screen *and* behind the turn-order draw:
@@ -434,13 +469,10 @@ async function main() {
     // reports 0 for both. Comparing real heights across real stages is the
     // only thing that catches an under-sized reservation.
     //
-    // Two zones are exempt from per-zone equality and checked as a pair
-    // instead. `active` holds the current decision, so its content genuinely
-    // differs by stage, and `stepstack` is `flex-1` — it exists to absorb
-    // exactly what `active` does not use. Their *sum* is the real invariant:
-    // if it drifts, the panel itself grew, which is the thing the rule
-    // forbids. Every other zone must not move by so much as a pixel.
-    const SPACER_PAIR = ['stepstack', 'active'];
+    // Two zones (module-level `SPACER_PAIR`) are exempt from per-zone
+    // equality and checked as a pair instead. Their *sum* is the real
+    // invariant: if it drifts, the panel itself grew, which is the thing the
+    // rule forbids. Every other zone must not move by so much as a pixel.
     const sumOf = (g) => SPACER_PAIR.reduce((n, k) => n + (g[k] ?? 0), 0);
 
     // A reservation too small for its content clips it — Phase 1b's bug, and
@@ -525,6 +557,44 @@ async function main() {
       `\n         finalOverlay: ${JSON.stringify(m.finalOverlay)}` +
       `\n         ` + stageNames.map((n) => `${n} ${JSON.stringify(m.stages[n])}`).join('\n         '),
     );
+
+    // The not-my-turn waiting panel — see `WAITING_PANEL`, above, for why
+    // this is a catalog page rather than a second `/pass-and-play` walk.
+    await send('Page.navigate', { url: `http://localhost:${VITE_PORT}/catalog` });
+    await sleep(1500);
+    const wp = await evaluate(WAITING_PANEL);
+    if (!wp.myTurn || !wp.waiting) {
+      failures.push(`${width}px: the my-turn / waiting-panel catalog demo did not render`);
+    } else {
+      for (const key of Object.keys(wp.myTurn)) {
+        if (SPACER_PAIR.includes(key)) continue;
+        // Unlike the per-stage walk above, no zone is legitimately absent
+        // here: `waiting` and `myTurn` render the exact same golden state
+        // through the exact same `Panel`, so a zone vanishing (not just
+        // shrinking) between them is itself the jitter this exists to catch
+        // — `StagingZone`'s reservation is supposed to hold regardless of
+        // `canAct`, not disappear when it goes false.
+        if (!(key in wp.waiting)) {
+          failures.push(
+            `${width}px: waiting-panel is missing zone "${key}" entirely ` +
+            `(present at ${wp.myTurn[key]}px on the my-turn baseline)`,
+          );
+          continue;
+        }
+        if (wp.myTurn[key] !== wp.waiting[key]) {
+          failures.push(
+            `${width}px: waiting-panel zone "${key}" is ${wp.waiting[key]}px vs ` +
+            `${wp.myTurn[key]}px on the my-turn baseline — going inert moved a zone ` +
+            `it should not have`,
+          );
+        }
+      }
+      if (sumOf(wp.waiting) === 0) {
+        failures.push(`${width}px: the waiting panel's stepstack+active pair collapsed to 0px`);
+      }
+    }
+
+    console.log(`${width}px  waiting-panel ${JSON.stringify(wp)}`);
     ws.close();
   }
 

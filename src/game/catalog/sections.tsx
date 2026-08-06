@@ -17,6 +17,7 @@ import { LiqActions } from '../merger/LiqActions';
 import { FoundGroups } from '../FoundGroups';
 import { FinalScoring } from '../FinalScoring';
 import { RevealOverlay } from '../RevealOverlay';
+import { useTurnPanel } from '../screen/useTurnPanel';
 import { authored, fromGolden, goldenState, type CatalogFixture } from './fixtures';
 
 import { AVAILABLE_STARTUPS, TRADE_RATIO, isStartupId } from '../../../engine/startups';
@@ -25,6 +26,7 @@ import { floodFillUnclaimed } from '../../../engine/gameHelpers';
 import { getDeadTilesInHand } from '../../../engine/placement';
 import { finalScore } from '../../../engine/endGame';
 import type { Coord, GameState, StartupId } from '../../../engine/gameTypes';
+import type { SessionView } from '../../../session/GameSession';
 
 /* ------------------------------------------------------------------ *
  * Derivations. Everything a catalog state shows is read back out of a
@@ -134,6 +136,61 @@ const G9_END = goldenState('G9', 2);
 const G10_END = goldenState('G10', 1);
 
 const MESSLA_PRICE = getSharePrice(G1_BUY, 'Messla');
+
+/**
+ * The real `useTurnPanel` output for one golden state, with `canAct` forced
+ * either way — composed into a full `Panel` so the result carries the same
+ * `data-slot`/`data-zone` attributes every other panel state on this page
+ * does.
+ *
+ * This is what lets `npm run verify:layout` measure the not-my-turn waiting
+ * panel at all: it exists online (`GameScreen`'s `canAct` goes false whenever
+ * `viewerId` is not the actor, or the socket is down) but never on
+ * `/pass-and-play`, the only route the script drove before. Standing up a
+ * real networked room inside the layout script would mean two clients and a
+ * server; this reaches the same DOM the hook actually produces, on a real
+ * page, for the price of one more catalog card — reusing the same golden
+ * state as its "my turn" neighbour so the two are comparable pixel for pixel.
+ */
+function TurnPanelDemo({ state, canAct }: { state: GameState; canAct: boolean }) {
+  const view: SessionView = {
+    state,
+    actorId: active(state).id,
+    awaitingReveal: false,
+    undoableSteps: [],
+    segmentStart: state.nextStepId,
+    error: null,
+  };
+  const { active: activeSlot, staging } = useTurnPanel(view, noop, canAct);
+  return (
+    <div className="h-[420px] border border-gray-200">
+      <Panel
+        stepstack={<StepStack entries={stepsOf(state)} onUndo={noop} />}
+        active={activeSlot}
+        staging={staging}
+        hand={
+          <HandZone
+            name={active(state).name}
+            portfolio={active(state).portfolio}
+            cash={active(state).cash}
+            prices={pricesOf(state)}
+          />
+        }
+        players={
+          <PlayersStrip
+            players={state.players.map((p, i) => ({
+              id: p.id,
+              emoji: p.emoji,
+              name: p.name,
+              cash: p.cash,
+              active: i === state.turnIndex,
+            }))}
+          />
+        }
+      />
+    </div>
+  );
+}
 
 function buyRow(s: GameState) {
   return (
@@ -508,6 +565,22 @@ export const SECTIONS: CatalogSection[] = [
             />
           </div>
         ),
+      },
+      {
+        // `verify:layout`'s only look at the not-my-turn waiting panel — see
+        // `TurnPanelDemo`. Same state as its neighbour below; `canAct` is the
+        // only thing that differs, which is exactly what a connection drop
+        // or an actor handoff changes online.
+        label: 'panel · my turn (waiting-panel baseline)',
+        kind: 'wide',
+        fixture: fromGolden('G1', 2),
+        node: <TurnPanelDemo state={G1_BUY} canAct />,
+      },
+      {
+        label: 'panel · not my turn (waiting)',
+        kind: 'wide',
+        fixture: fromGolden('G1', 2),
+        node: <TurnPanelDemo state={G1_BUY} canAct={false} />,
       },
     ],
   },
