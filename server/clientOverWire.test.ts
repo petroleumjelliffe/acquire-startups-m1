@@ -200,6 +200,30 @@ function midTurnFixture() {
   });
 }
 
+/**
+ * Bounded poll for a fact about a *different* socket than the one we can
+ * order against.
+ *
+ * `settleSocket`'s own docstring only promises ordering for messages sent to
+ * the socket it is called on — a round trip through Alex's own channel
+ * proves the server has processed everything sent *to Alex* before it, not
+ * that the server has finished handling a disconnect on Sam's separate
+ * connection. `disconnect` is handled by the server asynchronously, off the
+ * client's own emit, so there is no round trip on any socket that orders
+ * behind it. This is the deterministic substitute — same role
+ * `recovery.test.ts`'s `waitForPersist` plays for a write racing a socket
+ * round trip, applied here to a cross-socket state change instead of a
+ * filesystem write.
+ */
+async function waitFor(check: () => boolean, what: string): Promise<void> {
+  const deadline = Date.now() + 2000;
+  for (;;) {
+    if (check()) return;
+    if (Date.now() > deadline) throw new Error(`timed out waiting for: ${what}`);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
 describe('a socket that drops mid-segment and comes back', () => {
   it('returns the actor to their own open draft, not to the start of the turn', async () => {
     const room = server.rooms.fromState('DROP01', ['Alex', 'Sam'], midTurnFixture());
@@ -239,9 +263,16 @@ describe('a socket that drops mid-segment and comes back', () => {
     const seenBySamBefore = s.states.length;
     const previousSegmentStartBeforeDrop = room.previousSegmentStart();
 
-    // The drop.
+    // The drop. `settleSocket(s.socket)` would only order behind messages
+    // sent *to Sam's* channel — it says nothing about the server having
+    // finished handling a disconnect on Alex's separate connection, which is
+    // what this assertion is actually about. A bounded poll is the honest
+    // substitute; see `waitFor`'s own comment.
     a.socket.disconnect();
-    await settleSocket(s.socket);
+    await waitFor(
+      () => room.players.find((p) => p.id === alex.id)!.connected === false,
+      `Alex marked disconnected in room ${room.id}`,
+    );
     expect(room.players.find((p) => p.id === alex.id)!.connected).toBe(false);
 
     // The return: a new socket presenting the same token, which is exactly

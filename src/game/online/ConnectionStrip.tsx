@@ -29,9 +29,15 @@ function useOnline(): boolean {
     const down = () => setOnline(false);
     window.addEventListener('online', up);
     window.addEventListener('offline', down);
-    // Read again on mount: the events only fire on a *change*, so a component
-    // mounted while already offline would otherwise believe the initial
-    // `navigator.onLine` read from before it existed.
+    // Read again here, not just in the `useState` initializer above: the
+    // initializer runs at render time, and this effect attaches its
+    // listeners strictly later — render, then commit, then effects. An
+    // `offline` event landing in that gap is missed by the listeners (they
+    // do not exist yet) and never seen by the initializer (it already ran).
+    // This line is what still catches it. No test exercises this gap today
+    // — reproducing "the event lands between render and effect attachment"
+    // needs control over React's own commit timing that this suite does not
+    // have — so it stays covered by inspection, not by a red/green test.
     setOnline(navigator.onLine);
     return () => {
       window.removeEventListener('online', up);
@@ -50,21 +56,34 @@ function useOnline(): boolean {
  * disconnected from. A centred pill rather than a full-width bar, because the
  * board underneath it is the thing the player is trying to read.
  *
- * Three things it can say, and the distinction between the last two was found
- * by hand, on a phone, with its wifi switched off:
+ * Three things it can say. What prompted the split: found by hand, on a
+ * phone whose wifi was switched off but whose cellular data was on — so
+ * `navigator.onLine` correctly read `true`, and the pill still said "waking
+ * the server" while sitting on a network that in fact could not reach it (an
+ * address only resolvable over the wifi it no longer had). That specific
+ * case — online by every signal this component has, but unable to reach the
+ * server — is **not** what the split below fixes, and is still open. What it
+ * does fix is the case where the device is provably offline outright.
  *
- * - **No network.** The device itself is offline. Nothing else can be said
+ * - **No network.** `navigator.onLine` is `false`. Nothing else can be said
  *   honestly, because no claim about the server has been tested.
  * - **The server may be waking.** We are on a network and the connect is
  *   taking longer than an ordinary blip. The free Render tier sleeps after
  *   fifteen minutes and takes about thirty seconds to wake (DEPLOYMENT.md),
  *   which is the case worth naming — a player who knows that waits, and a
  *   player watching "Connecting…" for half a minute assumes it is broken.
+ *   This is also what shows for the phone-on-cellular case above, which is
+ *   the honest gap: the copy names a specific cause ("waking") this
+ *   component cannot actually tell apart from "reachable network, unreachable
+ *   server for some other reason." The accurate repair is copy that asserts
+ *   no cause at all — something like "Can't reach the server — retrying" —
+ *   but that is a product decision on user-visible text, not made here.
  * - **Connecting / reconnecting.** The ordinary short wait.
  *
- * Saying "waking the server" while the device has no network was the bug: it
- * asserted a cause that had not been established, about a server the device
- * had not even tried to reach.
+ * Saying "waking the server" while the device has no network *at all* was
+ * the original bug this file fixed: it asserted a cause that had not been
+ * established, about a server the device had not even tried to reach. The
+ * `navigator.onLine`-false case above is what that fix actually covers.
  */
 export function ConnectionStrip({ status }: { status: ConnectionStatus }) {
   const [slow, setSlow] = useState(false);

@@ -150,15 +150,20 @@ export function createFileStore(dir: string): RoomStore {
         return [];
       }
 
+      // `!`, not `✗`: vitest prints `✗` for a failed test, and a boot log
+      // carrying the same glyph reads as a test failure to anyone skimming
+      // it — the exact confusion an earlier commit already fixed once, for
+      // the test run itself. This is that same objection, moved to the boot
+      // log rather than answered there.
       const out: SavedRoom[] = [];
       for (const name of names) {
         if (!name.endsWith('.json')) continue;
         try {
           const parsed: unknown = JSON.parse(await readFile(join(dir, name), 'utf-8'));
           if (isSavedRoom(parsed)) out.push(parsed);
-          else console.warn(`✗ Ignoring unreadable save ${name}`);
+          else console.warn(`! Ignoring unreadable save ${name}`);
         } catch {
-          console.warn(`✗ Ignoring unreadable save ${name}`);
+          console.warn(`! Ignoring unreadable save ${name}`);
         }
       }
       return out;

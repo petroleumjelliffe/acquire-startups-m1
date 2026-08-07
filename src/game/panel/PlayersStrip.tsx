@@ -66,6 +66,7 @@ export function PlayersStrip({ players }: PlayersStripProps) {
             // grew by a label would push the seat that matters off the end.
             <span
               data-presence="away"
+              role="img"
               aria-label={`${p.name} is disconnected`}
               className="h-1.5 w-1.5 flex-none rounded-full bg-gray-400"
             />

@@ -79,7 +79,7 @@ describe('the file store', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     expect(await createFileStore(dir).loadAll()).toEqual([]);
-    expect(warn).toHaveBeenCalledWith('✗ Ignoring unreadable save OLD123.json');
+    expect(warn).toHaveBeenCalledWith('! Ignoring unreadable save OLD123.json');
   });
 
   it('ignores a file that is not a record at all', async () => {
@@ -89,8 +89,8 @@ describe('the file store', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     expect(await createFileStore(dir).loadAll()).toEqual([]);
-    expect(warn).toHaveBeenCalledWith('✗ Ignoring unreadable save JUNK01.json');
-    expect(warn).toHaveBeenCalledWith('✗ Ignoring unreadable save HALF02.json');
+    expect(warn).toHaveBeenCalledWith('! Ignoring unreadable save JUNK01.json');
+    expect(warn).toHaveBeenCalledWith('! Ignoring unreadable save HALF02.json');
   });
 
   it('is empty, not broken, when the directory does not exist yet', async () => {

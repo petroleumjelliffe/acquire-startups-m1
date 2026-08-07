@@ -62,8 +62,13 @@ describe('a device with no network of its own', () => {
 
     act(() => { vi.advanceTimersByTime(3000); });
 
-    // Found by hand, on a phone with its wifi switched off: the pill claimed
-    // the server was waking. It had not been reached, or even tried.
+    // The bug this guards: `navigator.onLine` false, `status` not `open` —
+    // the device itself has no network, so nothing about the server can be
+    // claimed. This is the outright-offline case, not the case actually
+    // found by hand (a phone on cellular data with its wifi off, where
+    // `navigator.onLine` read `true` and the pill still wrongly said "waking
+    // the server" for an address only reachable over wifi) — that case is
+    // still open; see `ConnectionStrip`'s own docstring.
     const strip = screen.getByTestId('connection-strip');
     expect(strip).toHaveTextContent('No network — waiting for this device to reconnect');
     expect(strip).not.toHaveTextContent('Waking the server');
@@ -84,10 +89,15 @@ describe('a device with no network of its own', () => {
       .toHaveTextContent('Waking the server — this can take up to 30 seconds');
   });
 
-  it('notices it is offline even when it mounts that way', () => {
-    // The `offline` event fires on a *change*. A room screen mounted while
-    // already offline — which is what a reload in a dead spot is — would
-    // otherwise never hear one.
+  it('reads as offline on the very first render when it mounts that way', () => {
+    // This only proves the `useState` initializer's own `navigator.onLine`
+    // read — a room screen mounted while already offline, which is what a
+    // reload in a dead spot is. It does NOT exercise the effect's later
+    // re-read (`setOnline(navigator.onLine)` in `useOnline`): deleting that
+    // line leaves this test green, because the initializer alone already
+    // gets the right answer here. That line covers a narrower case — an
+    // `offline` event landing between render and the listeners attaching —
+    // that this test cannot reach; see its comment for why.
     setOnline(false);
     render(<ConnectionStrip status="closed" />);
 

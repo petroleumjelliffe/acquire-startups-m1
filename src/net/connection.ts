@@ -26,6 +26,13 @@ import { createSocketTransport, type RoomTransport } from './transport';
  * the server process rather than to this bundle.
  */
 const DEV_SERVER_PORT = 3001;
+// `window` is read at module scope here, which throws on import in an
+// environment with no `window` — a node test, most concretely. Safe today:
+// every importer of this module lives under `src/**`, which vitest always
+// runs under the `app` (jsdom) project. It stops being safe the moment
+// something under `server/**` or `session/**` (the `node` project) imports
+// this module, directly or transitively — that import would fail before a
+// single test in the file runs, with a stack trace pointing here.
 const SERVER_URL =
   import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:${DEV_SERVER_PORT}`;
 
