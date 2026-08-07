@@ -425,3 +425,88 @@ describe('a room that is gone', () => {
     expect(screen.queryByText(/no longer available/i)).toBeNull();
   });
 });
+
+/**
+ * A refresh, as closely as jsdom can hold one.
+ *
+ * **This is a remount, not a reload**, and the difference is worth stating
+ * where it can be read next to the assertions rather than in a document
+ * nobody opens. A real `F5` destroys the module-level socket `getConnection()`
+ * holds, every listener on it, and all React state, then rebuilds from
+ * whatever `localStorage` kept. What this reproduces: the component tree is
+ * destroyed and rebuilt, the connection is a *new* object with no listeners
+ * carried over, and `localStorage` is the only thing that survives — which is
+ * what makes the second mount a rejoin rather than a first visit. What it
+ * cannot reproduce: a real browser's page teardown, module re-evaluation, or
+ * anything about socket.io's own reconnect. The prod by-hand pass covers
+ * those; this covers the identity-and-resume path underneath them.
+ *
+ * `closeConnection()` is deliberately not called: it acts on the module
+ * singleton, which `RoomPage`'s injected `connect` bypasses entirely. A fresh
+ * fake is the honest stand-in.
+ */
+describe('a refresh mid-turn', () => {
+  it('rejoins the same seat and comes back to the open segment, not the start of the turn', () => {
+    const first = fakeConnection();
+    const { unmount } = renderRoom(first.connection);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    first.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    const opening = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+      currentPlayerIndex: 1,
+    });
+    first.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
+
+    // Sam plays their tile. The segment is open and uncommitted: the server
+    // holds a draft, and nothing has been broadcast.
+    fireEvent.click(onBoard('A1'));
+    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+
+    // The refresh.
+    unmount();
+    const second = fakeConnection();
+    renderRoom(second.connection);
+
+    // The stored identity is what makes this the same seat rather than a new
+    // one — the token, not the name.
+    expect(second.joins).toEqual([
+      { roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok' },
+    ]);
+
+    second.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    // What the server sends a reconnecting actor: its own open draft, under
+    // `resume`. Built here the way the server builds it — from the state
+    // after the placement, with the draft's own segmentStart.
+    const drafted = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: [] },
+      ],
+      loners: ['E5', 'A1'],
+      bag: ['I11', 'I12'],
+      currentPlayerIndex: 1,
+      stage: 'buy',
+    });
+    second.sendState({
+      state: drafted,
+      reason: 'resume',
+      segmentStart: opening.nextStepId,
+      previousSegmentStart: 0,
+    });
+
+    // Back on the board, still played. A `commit` carrying the pre-placement
+    // state — which is what a rejoin got before Phase 4 — would put A1 back
+    // in the hand while the server still believed it was played.
+    expect(screen.getByTestId('game-surface')).toBeInTheDocument();
+    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+  });
+});
