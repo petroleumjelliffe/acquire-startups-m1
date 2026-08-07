@@ -116,15 +116,37 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
     });
 
     const offRejected = connection.transport.onRejected((msg) => {
+      // Nothing this player can do reaches this room: it has ended, or the
+      // server restarted onto a disk that no longer holds it. A join form
+      // would invite them to keep trying something that cannot work. This is
+      // terminal — handled fully here, not folded into the phase ternary
+      // below — because a mid-game player already holds a `session`, and
+      // `playing` outranks every other phase there. Leaving `session`
+      // non-null would mean `gone` could never win: the board stays on
+      // screen, looking live, while every click it sends is dropped by
+      // `server/index.ts`'s `if (!bound || !room) return`.
+      if (msg.code === 'noSuchRoom') {
+        setGone(true);
+        // Nothing can use a token for a room that is not there, and a
+        // mid-game player is `seated`, so the clearing below would skip
+        // them.
+        clearIdentity(roomId);
+        identityRef.current = null;
+        // Tear the session down, or `playing` outranks `gone` forever and
+        // the player keeps a live-looking board whose every click is
+        // dropped. Nulling the ref first means the `onState` effect's own
+        // cleanup (unmount, or a future `connection` change) sees a null
+        // ref and does not dispose a second time.
+        sessionRef.current?.dispose();
+        sessionRef.current = null;
+        setSession(null);
+        return;
+      }
+
       // Once a game is running, a rejection belongs to the session, which
       // shows it in the panel. Surfacing it here as well would replace the
       // board with an error screen over a refused click.
       if (sessionRef.current === null) setMessage(msg.message);
-
-      // Nothing this player can do reaches this room: it has ended, or the
-      // server restarted onto a disk that no longer holds it. A join form
-      // would invite them to keep trying something that cannot work.
-      if (msg.code === 'noSuchRoom') setGone(true);
 
       // A rejection that arrives before we have ever been seated can only be
       // the join itself being refused — and if it was attempted with a
@@ -201,10 +223,14 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   // ranking `message` above `roster` would throw a seated player back to a
   // join form over a button they were not allowed to press.
   //
-  // `gone` outranks all of those and yields only to `playing`: a room that
-  // does not exist cannot be joined, listed or corrected, so no earlier
-  // screen has anything useful to offer. It sits below `playing` because a
-  // running session means we are in a room that plainly does exist.
+  // `gone` outranks everything below it here, but it sits *below* `playing`
+  // in the chain — and that is fine. A mid-game player already holds a
+  // `session`, so `session !== null` would win regardless of where `gone`
+  // was placed in this chain; reordering the ternary cannot be what makes
+  // `gone` win. What actually makes it win is the `onRejected` handler above
+  // tearing the session down (`setSession(null)`) in the same tick it sets
+  // `gone`, so by the time this expression runs, `session` is already null
+  // and `playing` no longer applies.
   const phase: RoomPhase =
     session !== null ? 'playing'
       : gone ? 'gone'

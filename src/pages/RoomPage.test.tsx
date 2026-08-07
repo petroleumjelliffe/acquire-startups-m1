@@ -472,6 +472,38 @@ describe('a room that is gone', () => {
     expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
     expect(screen.queryByText(/no longer available/i)).toBeNull();
   });
+
+  it('replaces a live board with the ending screen, not a dead one, when it disappears mid-game', () => {
+    // The exact path a server restart takes: a mid-game player already holds
+    // a session (the board is on screen) when the reconnect's stored-identity
+    // join comes back `noSuchRoom`. Before this fix, `session !== null`
+    // outranked `gone` in the phase ternary, so the board never left the
+    // screen — it just went dead, `status` back to `'open'` and every click
+    // dropped silently by the server.
+    const f = fakeConnection();
+    renderRoom(f.connection);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+    expect(screen.getByTestId('game-surface')).toBeInTheDocument();
+    expect(loadIdentity('ABC123')).toEqual({ playerId: 'p2', token: 'tok', name: 'Sam' });
+
+    f.sendRejected({ code: 'noSuchRoom', message: 'Room ABC123 is no longer available' });
+
+    expect(screen.getByTestId('room-gone')).toBeInTheDocument();
+    expect(screen.queryByTestId('game-surface')).toBeNull();
+    expect(loadIdentity('ABC123')).toBeNull();
+  });
 });
 
 /**
