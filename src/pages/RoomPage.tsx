@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { GameScreen } from '../game/GameScreen';
 import { RoomLobby } from '../game/online/RoomLobby';
 import { RoomGone } from '../game/online/RoomGone';
+import { StaleClient } from '../game/online/StaleClient';
 import { ConnectionStrip } from '../game/online/ConnectionStrip';
 import { JoinForm } from '../game/online/JoinForm';
 import { useRoom } from '../net/useRoom';
@@ -52,6 +53,21 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
           presence={presence}
           onExit={leave}
         />
+      </>
+    );
+  }
+
+  if (room.phase === 'stale') {
+    return (
+      <>
+        <ConnectionStrip status={room.status} />
+        {/*
+          A plain reload is the whole remedy today, because a refresh fetches
+          the current bundle. Once a service worker caches the shell this has
+          to reload past the worker instead — which is the reason the protocol
+          version landed before the PWA rather than inside it.
+        */}
+        <StaleClient onReload={() => window.location.reload()} onExit={leave} />
       </>
     );
   }

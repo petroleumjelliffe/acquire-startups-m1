@@ -519,6 +519,108 @@ describe('a room that is gone', () => {
 });
 
 /**
+ * A client and a server that cannot talk.
+ *
+ * The mid-game case below is Phase 4's worst bug re-run deliberately. There,
+ * `session !== null` outranked `gone` in the phase expression, so a mid-game
+ * player kept a live-looking board whose every click the server dropped. The
+ * same shape is available to `versionMismatch`, and the same remedy applies:
+ * handle it terminally in the rejection handler and tear the session down,
+ * rather than adding a branch to the ternary and hoping it wins.
+ */
+describe('a version the server does not speak', () => {
+  it('offers a reload rather than a join form', () => {
+    const f = fakeConnection();
+    renderRoom(f.connection);
+
+    f.sendRejected({ code: 'versionMismatch', message: 'This client speaks protocol 0' });
+
+    expect(screen.getByTestId('stale-client')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/your name/i)).toBeNull();
+  });
+
+  it('replaces a live board rather than leaving one that cannot act', () => {
+    const f = fakeConnection();
+    renderRoom(f.connection);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+    expect(screen.getByTestId('game-surface')).toBeInTheDocument();
+
+    f.sendRejected({ code: 'versionMismatch', message: 'This client speaks protocol 0' });
+
+    expect(screen.getByTestId('stale-client')).toBeInTheDocument();
+    expect(screen.queryByTestId('game-surface')).toBeNull();
+  });
+
+  /**
+   * The screen alone does not prove this.
+   *
+   * `stale` sits ahead of `playing` in the phase expression, so the right
+   * screen appears whether or not the session is torn down — which means
+   * removing the teardown leaves every assertion above still green. Found by
+   * running exactly that break. The session is a live transport listener that
+   * would otherwise outlive the screen, so it is asserted directly here rather
+   * than inferred from what is rendered.
+   */
+  it('tears the session down, not just the screen', () => {
+    const f = fakeConnection();
+    let latest: ReturnType<typeof useRoom> | null = null;
+    function Probe() {
+      latest = useRoom('ABC123', () => f.connection);
+      return null;
+    }
+    render(<Probe />);
+
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+    expect(latest!.session, 'no session to tear down — the test proves nothing').not.toBeNull();
+
+    f.sendRejected({ code: 'versionMismatch', message: 'This client speaks protocol 0' });
+
+    expect(latest!.session).toBeNull();
+  });
+
+  /**
+   * The difference from `noSuchRoom`, and it matters: that one clears the
+   * stored seat because nothing can use a token for a room that is not there.
+   * Here the room is fine and the seat is still theirs — the *client* is the
+   * problem. Clearing the identity would turn a reload, which fixes this, into
+   * a lost seat, which nothing fixes.
+   */
+  it('keeps the stored seat, because a reload is meant to return to it', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p2', token: 'tok', name: 'Sam' }),
+    );
+    const f = fakeConnection();
+    renderRoom(f.connection);
+
+    f.sendRejected({ code: 'versionMismatch', message: 'This client speaks protocol 0' });
+
+    expect(loadIdentity('ABC123')).toEqual({ playerId: 'p2', token: 'tok', name: 'Sam' });
+  });
+});
+
+/**
  * A refresh, as closely as jsdom can hold one.
  *
  * **This is a remount, not a reload**, and the difference is worth stating

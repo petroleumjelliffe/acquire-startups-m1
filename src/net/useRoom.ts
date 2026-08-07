@@ -4,7 +4,16 @@ import { getConnection, type Connection, type ConnectionStatus } from './connect
 import { createNetworkSession, type NetworkSession } from './NetworkSession';
 import { clearIdentity, loadIdentity, rememberName, rememberedName, saveIdentity } from './identity';
 
-export type RoomPhase = 'connecting' | 'joining' | 'needName' | 'lobby' | 'playing' | 'error' | 'gone';
+export type RoomPhase =
+  | 'connecting'
+  | 'joining'
+  | 'needName'
+  | 'lobby'
+  | 'playing'
+  | 'error'
+  | 'gone'
+  /** This client and this server do not speak the same protocol. */
+  | 'stale';
 
 export interface Room {
   phase: RoomPhase;
@@ -34,6 +43,7 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [gone, setGone] = useState(false);
+  const [stale, setStale] = useState(false);
   /**
    * Whether this mount is going to join by itself, without asking anyone.
    *
@@ -143,6 +153,25 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
         return;
       }
 
+      // Terminal for the same reason `noSuchRoom` is: a mid-game player holds
+      // a `session`, and `playing` outranks everything in the phase
+      // expression below, so a branch added there could never win. Nothing
+      // this client sends will be accepted until it is reloaded, and a
+      // live-looking board whose every click is refused is precisely the bug
+      // Phase 4 shipped and the final review caught.
+      //
+      // Unlike `noSuchRoom`, the stored identity is **kept**. The room is
+      // fine and the seat is still theirs — it is this client that cannot
+      // talk. Clearing it would turn a reload, which fixes this, into a lost
+      // seat, which nothing fixes.
+      if (msg.code === 'versionMismatch') {
+        setStale(true);
+        sessionRef.current?.dispose();
+        sessionRef.current = null;
+        setSession(null);
+        return;
+      }
+
       // Once a game is running, a rejection belongs to the session, which
       // shows it in the panel. Surfacing it here as well would replace the
       // board with an error screen over a refused click.
@@ -233,17 +262,21 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   // `gone`, so by the time this expression runs, `session` is already null
   // and `playing` no longer applies.
   const phase: RoomPhase =
-    session !== null ? 'playing'
-      : gone ? 'gone'
-        : roster !== null ? 'lobby'
-          : message !== null ? 'error'
-            : status !== 'open' ? 'connecting'
+    // Ahead of `playing` as well as `gone`: both terminal states already tear
+    // the session down, so this ordering is belt-and-braces rather than the
+    // mechanism. The mechanism is the teardown — see the rejection handler.
+    stale ? 'stale'
+      : session !== null ? 'playing'
+        : gone ? 'gone'
+          : roster !== null ? 'lobby'
+            : message !== null ? 'error'
+              : status !== 'open' ? 'connecting'
               // `autoJoins` alongside `joining`: one means the join has been
               // sent, the other that it is certain to be, in an effect that
               // has not run yet. Both should look the same to a player, and
               // neither is a reason to show a form.
-              : (joining || autoJoins) ? 'joining'
-                : 'needName';
+                : (joining || autoJoins) ? 'joining'
+                  : 'needName';
 
   return { phase, status, roster, playerId, session, message, join, begin };
 }
