@@ -4,10 +4,12 @@
 
 import express from 'express';
 import cors from 'cors';
+import { join } from 'node:path';
 import { createServer as createHttpServer, type Server as HttpServer } from 'node:http';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import { project } from './projection.js';
 import { createRoomRegistry, type RoomRegistry, type Seat } from './rooms.js';
+import { createFileStore, createNullStore, type RoomStore } from './store.js';
 import type { Delivery, GameRoom } from './room.js';
 import {
   CLIENT_EVENTS,
@@ -36,14 +38,19 @@ export interface ServerHandle {
   rooms: RoomRegistry;
 }
 
-export function createServer(): ServerHandle {
+export interface ServerOptions {
+  /** Defaults to the null store, so every test that boots a bare server keeps working. */
+  store?: RoomStore;
+}
+
+export function createServer(options: ServerOptions = {}): ServerHandle {
   const app = express();
   app.use(cors());
   app.get('/health', (_req, res) => { res.json({ ok: true }); });
 
   const httpServer = createHttpServer(app);
   const io = new SocketServer(httpServer, { cors: { origin: '*' } });
-  const rooms = createRoomRegistry();
+  const rooms = createRoomRegistry(options.store ?? createNullStore());
   const bindings = new Map<string, Binding>();
 
   function socketsFor(roomId: string, playerId: string): Socket[] {
@@ -59,15 +66,22 @@ export function createServer(): ServerHandle {
     // `reset` follows a rejection, and a rejection can be addressed to someone
     // who is *not* the actor — an out-of-turn intent, or an undo from the
     // wrong player. Sending them the draft hands over the actor's uncommitted
-    // board, cash and log, which is the leak this phase exists to prevent.
+    // board, cash and log, which is the leak this rule exists to prevent.
     // They get the committed state: it is what they already had, which is what
     // "reset" should mean for them.
+    //
+    // `resume` rides the same rule, and that is the point of it being a
+    // separate reason: a reconnecting actor is by definition the player the
+    // game is waiting on, so they get their own open draft back, and every
+    // other reconnecting player gets the committed state — the same privacy
+    // boundary, applied to a new arrival rather than a rejection.
     const ownsDraft = reason !== 'commit' && playerId === room.actorId();
     const source = ownsDraft ? room.draft() : room.committed();
     const message: StateMessage = {
       state: project(source, playerId),
       reason,
       segmentStart: room.segmentStart(),
+      previousSegmentStart: room.previousSegmentStart(),
     };
     for (const socket of socketsFor(room.id, playerId)) {
       socket.emit(SERVER_EVENTS.state, message);
@@ -162,6 +176,15 @@ export function createServer(): ServerHandle {
         return;
       }
 
+      const target = rooms.get(msg.roomId);
+      if (!target) {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'noSuchRoom',
+          message: `Room ${msg.roomId} is no longer available`,
+        });
+        return;
+      }
+
       // One socket holds one seat per room.
       //
       // A `joinRoom` with no `playerId`/`token` seats a *new* player — that is
@@ -179,21 +202,21 @@ export function createServer(): ServerHandle {
       let seat: Seat | null = null;
       const bound = bindings.get(socket.id);
       if (bound && bound.roomId === msg.roomId) {
-        const room = rooms.get(bound.roomId);
-        const player = room?.players.find((p) => p.id === bound.playerId);
-        if (room && player) seat = { room, player };
+        const player = target.players.find((p) => p.id === bound.playerId);
+        if (player) seat = { room: target, player };
       }
 
       seat ??= rooms.join(msg.roomId, msg.name, msg.playerId, msg.token);
-      if (seat) seat.player.connected = true;
 
       if (!seat) {
         socket.emit(SERVER_EVENTS.rejected, {
-          code: 'unknownIntent',
-          message: `cannot join ${msg.roomId}`,
+          code: 'seatRefused',
+          message: `That seat in ${msg.roomId} is no longer yours — join again to take a new one`,
         });
         return;
       }
+
+      seat.player.connected = true;
 
       bindings.set(socket.id, { roomId: seat.room.id, playerId: seat.player.id });
       void socket.join(seat.room.id);
@@ -206,7 +229,9 @@ export function createServer(): ServerHandle {
       socket.emit(SERVER_EVENTS.joined, joined);
       io.to(seat.room.id).emit(SERVER_EVENTS.roster, roster(seat.room));
 
-      if (seat.room.lifecycle() !== 'lobby') sendState(seat.room, seat.player.id, 'commit');
+      // `resume`, not `commit`: this socket may belong to the player the game
+      // is waiting on, mid-segment, with work the server still holds.
+      if (seat.room.lifecycle() !== 'lobby') sendState(seat.room, seat.player.id, 'resume');
     });
 
     socket.on(CLIENT_EVENTS.beginGame, () => {
@@ -326,7 +351,29 @@ function randomSeed(): string {
 
 // Started only when run directly, so tests can boot their own on port 0.
 if (process.argv[1]?.endsWith('index.ts')) {
-  const { httpServer } = createServer();
+  const store = createFileStore(join(process.cwd(), 'server', 'games'));
+  const { httpServer, rooms } = createServer({ store });
   const port = Number(process.env.PORT ?? 3001);
-  httpServer.listen(port, () => console.log(`✓ Server listening on ${port}`));
+
+  // Before `listen`, not after: a client that connects into a half-restored
+  // registry would be told its room does not exist and would clear the very
+  // identity that was about to work.
+  //
+  // `listen` runs whichever way `restore()` settles — inside `.then` on
+  // success, inside `.catch` on rejection — so a restore failure can never
+  // keep the process from booting. `restore()` already guards each *record*
+  // (see `rooms.ts`), but the store read underneath it (`loadAll`, or a
+  // future store implementation) is not guarded the same way, and an
+  // ungated `.then` here would mean the one unhandled rejection of a boot
+  // takes the whole server down with no `listen` and no log line.
+  void rooms.restore()
+    .then((count) => {
+      if (count > 0) console.log(`✓ Restored ${count} room(s)`);
+    })
+    .catch((e: unknown) => {
+      console.warn('! Restore failed, starting with no rooms:', e);
+    })
+    .finally(() => {
+      httpServer.listen(port, () => console.log(`✓ Server listening on ${port}`));
+    });
 }

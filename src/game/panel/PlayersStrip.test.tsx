@@ -74,4 +74,39 @@ describe('PlayersStrip', () => {
       expect(other.className).toMatch(/flex-1/);
     }
   });
+
+  describe('presence', () => {
+    it('marks a seat whose player is not connected', () => {
+      render(
+        <PlayersStrip
+          players={[
+            { id: 'p1', emoji: '🦊', name: 'Alex', cash: 6000, active: true },
+            { id: 'p2', emoji: '🐸', name: 'Sam', cash: 6000, connected: false },
+          ]}
+        />,
+      );
+
+      const sam = document.querySelector('[data-seat="p2"]')!;
+      expect(sam.querySelector('[data-presence="away"]')).not.toBeNull();
+      // Scoped to the seat, not the document: an away marker rendered on the
+      // wrong seat would otherwise pass.
+      const alex = document.querySelector('[data-seat="p1"]')!;
+      expect(alex.querySelector('[data-presence="away"]')).toBeNull();
+    });
+
+    it('leaves every seat unmarked when presence is not passed at all', () => {
+      // Pass-and-play passes no presence: everyone is at the same device by
+      // definition, and an away dot there would be a lie.
+      render(
+        <PlayersStrip
+          players={[
+            { id: 'p1', emoji: '🦊', name: 'Alex', cash: 6000, active: true },
+            { id: 'p2', emoji: '🐸', name: 'Sam', cash: 6000 },
+          ]}
+        />,
+      );
+
+      expect(document.querySelectorAll('[data-presence="away"]')).toHaveLength(0);
+    });
+  });
 });

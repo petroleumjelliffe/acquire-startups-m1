@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { GameScreen } from '../game/GameScreen';
 import { RoomLobby } from '../game/online/RoomLobby';
+import { RoomGone } from '../game/online/RoomGone';
 import { ConnectionStrip } from '../game/online/ConnectionStrip';
 import { JoinForm } from '../game/online/JoinForm';
 import { useRoom } from '../net/useRoom';
@@ -24,6 +25,13 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
     navigate('/');
   };
 
+  // The roster is the only thing that knows who is connected — the engine
+  // state has no idea a socket exists. Undefined until one arrives, which
+  // reads as "everyone present" rather than "everyone away".
+  const presence = room.roster
+    ? Object.fromEntries(room.roster.players.map((p) => [p.id, p.connected]))
+    : undefined;
+
   if (room.phase === 'playing' && room.session && room.playerId) {
     return (
       <>
@@ -36,8 +44,18 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
           session={room.session}
           viewerId={room.playerId}
           connected={room.status === 'open'}
+          presence={presence}
           onExit={leave}
         />
+      </>
+    );
+  }
+
+  if (room.phase === 'gone') {
+    return (
+      <>
+        <ConnectionStrip status={room.status} />
+        <RoomGone roomId={roomId} onExit={leave} />
       </>
     );
   }

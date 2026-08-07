@@ -6,6 +6,7 @@ import type { Connection, ConnectionStatus } from '../net/connection';
 import type { JoinedMessage, RejectedMessage, RosterMessage, StateMessage } from '../../session/protocol';
 import { buildFixture } from '../../engine/golden/fixtures';
 import { loadIdentity } from '../net/identity';
+import { useRoom, type RoomPhase } from '../net/useRoom';
 
 function fakeConnection() {
   let joined: ((m: JoinedMessage) => void) | null = null;
@@ -115,6 +116,53 @@ describe('arriving at a room without a seat', () => {
     fireEvent.click(screen.getByRole('button', { name: /join/i }));
 
     expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam' }]);
+  });
+});
+
+/**
+ * Every phase this hook passed through, in order, across every render.
+ *
+ * A settled-DOM assertion cannot see a one-frame flash: `render` wraps its
+ * effects in `act`, so by the time any `expect` runs the effect has already
+ * corrected the phase and the offending frame is gone from the DOM. What a
+ * player sees, though, is frames. Recording them is the only way to assert
+ * one never happened.
+ */
+function phasesSeen(connection: Connection, roomId = 'ABC123'): RoomPhase[] {
+  const phases: RoomPhase[] = [];
+  function Probe() {
+    phases.push(useRoom(roomId, () => connection).phase);
+    return null;
+  }
+  render(<Probe />);
+  return phases;
+}
+
+describe('a returning player is never shown a form they will not fill in', () => {
+  it('goes straight to joining, with no needName frame, when a seat is stored', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p2', token: 'tok', name: 'Sam' }),
+    );
+    const f = fakeConnection();
+
+    const phases = phasesSeen(f.connection);
+
+    // The join is sent from an effect, which runs *after* the render where
+    // the socket first reads as open. That render used to fall through to
+    // `needName` and paint a join form at someone already holding a seat —
+    // seen on a phone reloading mid-game: menu, then a join form, then the
+    // board.
+    expect(phases).not.toContain('needName');
+    expect(phases.at(-1)).toBe('joining');
+  });
+
+  it('still asks a genuine stranger for a name', () => {
+    // Nothing stored, and no remembered name: this is the one case the form
+    // exists for, and suppressing it here would strand the player.
+    const phases = phasesSeen(fakeConnection().connection);
+
+    expect(phases).toContain('needName');
   });
 });
 
@@ -313,6 +361,57 @@ describe('a dropped connection', () => {
   });
 });
 
+describe('a player who has dropped', () => {
+  it('is named in the toast when the game is waiting on them', () => {
+    const f = fakeConnection();
+    renderRoom(f.connection);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+
+    // Alex is up, and Alex has dropped. Without this the panel shows a turn
+    // that never advances and nothing on screen says why.
+    f.sendRoster({
+      roomId: 'ABC123',
+      lifecycle: 'playing',
+      players: [
+        { id: 'p1', name: 'Alex', isHost: true, connected: false },
+        { id: 'p2', name: 'Sam', isHost: false, connected: true },
+      ],
+    });
+
+    expect(screen.getByTestId('turn-toast')).toHaveTextContent(/disconnected/i);
+    // Not just the toast: the seat itself carries the marker too, so the
+    // strip does not silently hardcode everyone present.
+    expect(document.querySelector('[data-seat="p1"] [data-presence="away"]')).not.toBeNull();
+  });
+
+  it('says nothing about disconnection while everyone is present', () => {
+    const f = seated('Sam', false);
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+
+    expect(screen.getByTestId('turn-toast')).not.toHaveTextContent(/disconnected/i);
+  });
+});
+
 describe('a stale identity, refused', () => {
   it('is cleared, so a later visit gets a clean join instead of repeating the same refusal', () => {
     localStorage.setItem(
@@ -324,7 +423,7 @@ describe('a stale identity, refused', () => {
 
     expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Ghost', playerId: 'p9', token: 'stale' }]);
 
-    f.sendRejected({ code: 'unknownIntent', message: 'cannot join ABC123' });
+    f.sendRejected({ code: 'seatRefused', message: 'That seat in ABC123 is no longer yours' });
 
     expect(loadIdentity('ABC123')).toBeNull();
   });
@@ -337,5 +436,157 @@ describe('a stale identity, refused', () => {
     f.sendRejected({ code: 'notYourTurn', message: 'only the host may begin the game' });
 
     expect(loadIdentity('ABC123')).toEqual({ playerId: 'p2', token: 'tok', name: 'Sam' });
+  });
+});
+
+describe('a room that is gone', () => {
+  it('reads as an ending, with a way back, rather than a join form', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p2', token: 'tok', name: 'Sam' }),
+    );
+    const f = fakeConnection();
+    renderRoom(f.connection);
+
+    f.sendRejected({ code: 'noSuchRoom', message: 'Room ABC123 is no longer available' });
+
+    expect(screen.getByText(/no longer available/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /lobby/i })).toBeInTheDocument();
+    // Not a join form: there is nothing to join, and offering one invites a
+    // player to keep trying a room the server will keep refusing.
+    expect(screen.queryByLabelText(/your name/i)).toBeNull();
+  });
+
+  it('sends a refused seat to the join form instead, because that one is fixable', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p9', token: 'stale', name: 'Ghost' }),
+    );
+    const f = fakeConnection();
+    renderRoom(f.connection);
+
+    f.sendRejected({ code: 'seatRefused', message: 'That seat in ABC123 is no longer yours' });
+
+    // The room is still there. The identity was stale and has been cleared,
+    // so joining fresh is exactly the remedy.
+    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no longer available/i)).toBeNull();
+  });
+
+  it('replaces a live board with the ending screen, not a dead one, when it disappears mid-game', () => {
+    // The exact path a server restart takes: a mid-game player already holds
+    // a session (the board is on screen) when the reconnect's stored-identity
+    // join comes back `noSuchRoom`. Before this fix, `session !== null`
+    // outranked `gone` in the phase ternary, so the board never left the
+    // screen — it just went dead, `status` back to `'open'` and every click
+    // dropped silently by the server.
+    const f = fakeConnection();
+    renderRoom(f.connection);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+    expect(screen.getByTestId('game-surface')).toBeInTheDocument();
+    expect(loadIdentity('ABC123')).toEqual({ playerId: 'p2', token: 'tok', name: 'Sam' });
+
+    f.sendRejected({ code: 'noSuchRoom', message: 'Room ABC123 is no longer available' });
+
+    expect(screen.getByTestId('room-gone')).toBeInTheDocument();
+    expect(screen.queryByTestId('game-surface')).toBeNull();
+    expect(loadIdentity('ABC123')).toBeNull();
+  });
+});
+
+/**
+ * A refresh, as closely as jsdom can hold one.
+ *
+ * **This is a remount, not a reload**, and the difference is worth stating
+ * where it can be read next to the assertions rather than in a document
+ * nobody opens. A real `F5` destroys the module-level socket `getConnection()`
+ * holds, every listener on it, and all React state, then rebuilds from
+ * whatever `localStorage` kept. What this reproduces: the component tree is
+ * destroyed and rebuilt, the connection is a *new* object with no listeners
+ * carried over, and `localStorage` is the only thing that survives — which is
+ * what makes the second mount a rejoin rather than a first visit. What it
+ * cannot reproduce: a real browser's page teardown, module re-evaluation, or
+ * anything about socket.io's own reconnect. The prod by-hand pass covers
+ * those; this covers the identity-and-resume path underneath them.
+ *
+ * `closeConnection()` is deliberately not called: it acts on the module
+ * singleton, which `RoomPage`'s injected `connect` bypasses entirely. A fresh
+ * fake is the honest stand-in.
+ */
+describe('a refresh mid-turn', () => {
+  it('rejoins the same seat and comes back to the open segment, not the start of the turn', () => {
+    const first = fakeConnection();
+    const { unmount } = renderRoom(first.connection);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    first.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    const opening = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+      currentPlayerIndex: 1,
+    });
+    first.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
+
+    // Sam plays their tile. The segment is open and uncommitted: the server
+    // holds a draft, and nothing has been broadcast.
+    fireEvent.click(onBoard('A1'));
+    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+
+    // The refresh.
+    unmount();
+    const second = fakeConnection();
+    renderRoom(second.connection);
+
+    // The stored identity is what makes this the same seat rather than a new
+    // one — the token, not the name.
+    expect(second.joins).toEqual([
+      { roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok' },
+    ]);
+
+    second.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    // What the server sends a reconnecting actor: its own open draft, under
+    // `resume`. Built here the way the server builds it — from the state
+    // after the placement, with the draft's own segmentStart.
+    const drafted = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: [] },
+      ],
+      loners: ['E5', 'A1'],
+      bag: ['I11', 'I12'],
+      currentPlayerIndex: 1,
+      stage: 'buy',
+    });
+    second.sendState({
+      state: drafted,
+      reason: 'resume',
+      segmentStart: opening.nextStepId,
+      previousSegmentStart: 0,
+    });
+
+    // Back on the board, still played. A `commit` carrying the pre-placement
+    // state — which is what a rejoin got before Phase 4 — would put A1 back
+    // in the hand while the server still believed it was played.
+    expect(screen.getByTestId('game-surface')).toBeInTheDocument();
+    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
   });
 });

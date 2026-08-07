@@ -172,3 +172,163 @@ describe('two networked clients reach the same state the server holds', () => {
     expect(deferred).toBeGreaterThanOrEqual(5);
   });
 });
+
+/**
+ * A two-player, `stage: 'play'` fixture built exactly as `server/rooms.test.ts`'s
+ * own `fixture()` (lines 5-14) does: Alex holds `E6`, Sam holds `A1`, and `E5`
+ * sits on the board as a lone tile — so placing `E6` founds a new startup
+ * (`E5`/`E6` are horizontally adjacent) rather than merely extending one,
+ * which is what keeps the segment open through `foundStartup` rather than
+ * closing it outright.
+ *
+ * Unlike `rooms.test.ts`'s fixture, this one starts on Sam's turn
+ * (`currentPlayerIndex: 1`) with Sam's hand empty. That is not part of the
+ * scenario under test — it exists so the room can be driven through one
+ * genuine closed segment (Sam's empty-handed `endTurn`) before the segment
+ * this file actually exercises opens, so `previousSegmentStart` has a real
+ * value to assert on rather than `undefined` on both sides of the wire.
+ */
+function midTurnFixture() {
+  return buildFixture({
+    players: [
+      { name: 'Alex', cash: 6000, hand: ['E6'] },
+      { name: 'Sam', cash: 6000, hand: [] },
+    ],
+    loners: ['E5'],
+    bag: [],
+    currentPlayerIndex: 1,
+  });
+}
+
+/**
+ * Bounded poll for a fact about a *different* socket than the one we can
+ * order against.
+ *
+ * `settleSocket`'s own docstring only promises ordering for messages sent to
+ * the socket it is called on — a round trip through Alex's own channel
+ * proves the server has processed everything sent *to Alex* before it, not
+ * that the server has finished handling a disconnect on Sam's separate
+ * connection. `disconnect` is handled by the server asynchronously, off the
+ * client's own emit, so there is no round trip on any socket that orders
+ * behind it. This is the deterministic substitute — same role
+ * `recovery.test.ts`'s `waitForPersist` plays for a write racing a socket
+ * round trip, applied here to a cross-socket state change instead of a
+ * filesystem write.
+ */
+async function waitFor(check: () => boolean, what: string): Promise<void> {
+  const deadline = Date.now() + 2000;
+  for (;;) {
+    if (check()) return;
+    if (Date.now() > deadline) throw new Error(`timed out waiting for: ${what}`);
+    await new Promise((r) => setTimeout(r, 5));
+  }
+}
+
+describe('a socket that drops mid-segment and comes back', () => {
+  it('returns the actor to their own open draft, not to the start of the turn', async () => {
+    const room = server.rooms.fromState('DROP01', ['Alex', 'Sam'], midTurnFixture());
+    const [alex, sam] = room.players;
+
+    // Closes one real segment before the one under test, via the room's own
+    // synchronous API (no socket involved — the same way
+    // `server/clientOverWire.test.ts`'s "a player id that was never seated"
+    // test dispatches directly). Sam's hand is empty, so `endTurn` is legal
+    // straight from `play` and hands the turn to Alex. Without this,
+    // `room.previousSegmentStart()` would still be `undefined` when the drop
+    // happens below, and the new assertion on it would pass trivially with
+    // both sides `undefined` — exactly the hollow gate this task exists to
+    // close.
+    const preClose = room.dispatch(sam.id, { type: 'endTurn' });
+    expect(preClose).toEqual({ kind: 'commit' });
+    expect(room.actorId()).toBe(alex.id);
+    expect(room.previousSegmentStart()).toBeDefined();
+
+    const a = await connectPlayer(server.port, 'DROP01', 'Alex', alex.id, alex.token);
+    const s = await connectPlayer(server.port, 'DROP01', 'Sam', sam.id, sam.token);
+    // Both sockets are joining a room already `playing`, so each gets an
+    // immediate 'resume' send from the join handler — asynchronously, over
+    // the wire, the same hazard `projectionOverWire.test.ts`'s `openSegment`
+    // tests call out. Settle Sam's own channel before reading its length, or
+    // that join-time send can be misread as a leak below.
+    await settleSocket(s.socket);
+
+    // Alex opens a segment and does not close it.
+    await a.send({ type: 'placeTile', coord: 'E6' });
+    const draftedBoard = room.draft().board;
+    expect(draftedBoard).not.toEqual(room.committed().board);
+    // The placement founds a chain (E5/E6 are adjacent): same actor, segment
+    // still open, now parked on `foundStartup` waiting for a brand choice.
+    expect(room.draft().stage).toBe('foundStartup');
+
+    const seenBySamBefore = s.states.length;
+    const previousSegmentStartBeforeDrop = room.previousSegmentStart();
+
+    // The drop. `settleSocket(s.socket)` would only order behind messages
+    // sent *to Sam's* channel — it says nothing about the server having
+    // finished handling a disconnect on Alex's separate connection, which is
+    // what this assertion is actually about. A bounded poll is the honest
+    // substitute; see `waitFor`'s own comment.
+    a.socket.disconnect();
+    await waitFor(
+      () => room.players.find((p) => p.id === alex.id)!.connected === false,
+      `Alex marked disconnected in room ${room.id}`,
+    );
+    expect(room.players.find((p) => p.id === alex.id)!.connected).toBe(false);
+
+    // The return: a new socket presenting the same token, which is exactly
+    // what `useRoom` sends when the transport comes back.
+    const again = await connectPlayer(server.port, 'DROP01', 'Alex', alex.id, alex.token);
+    // `connectPlayer` only waits for `joined`, not for the 'resume' send that
+    // follows it in the same handler — settle Alex's own new channel before
+    // reading it, the same ordering primitive used everywhere else in this
+    // file.
+    await settleSocket(again.socket);
+
+    const resumed = again.latest()!;
+    expect(resumed.reason).toBe('resume');
+    // The tile Alex placed is still placed. Sending `commit` here — which is
+    // what this did before Phase 4 — handed back the pre-placement board
+    // while the server still held the placement.
+    expect(resumed.state.board).toEqual(draftedBoard);
+    expect(resumed.segmentStart).toBe(room.segmentStart());
+    expect(room.players.find((p) => p.id === alex.id)!.connected).toBe(true);
+
+    // Task 5's coverage-gap requirement: Task 3 put `previousSegmentStart`
+    // on the wire but nothing ever asserted it on a real message. The
+    // pre-close dispatch above is what makes this non-trivial — the segment
+    // that just closed (Sam's) is a real, defined boundary, not `undefined`
+    // on both sides.
+    expect(previousSegmentStartBeforeDrop).toBeDefined();
+    expect(resumed.previousSegmentStart).toBe(previousSegmentStartBeforeDrop);
+    expect(resumed.previousSegmentStart).toBe(room.previousSegmentStart());
+
+    // And the next intent lands on the state Alex can actually see: only the
+    // real draft has `foundStartup`'s pending tile recorded. `endTurn` is not
+    // that intent here — it is illegal until the founding brand is chosen —
+    // so `chooseFoundingBrand` is the one that actually proves the point.
+    // It moves the stage to `buy` but keeps the same actor, so `deliver`
+    // sends nothing (`{ kind: 'none' }`) — closing the segment with a real
+    // `endTurn` right after is what actually produces a broadcast, and it is
+    // what makes the "Sam never received any of it" check below non-vacuous:
+    // without it, `samsNew` stays empty and the loop over it would pass on
+    // zero iterations, no different from asserting nothing at all.
+    await again.send({ type: 'chooseFoundingBrand', startupId: 'Gobble' });
+    expect(again.rejections).toEqual([]);
+    await again.send({ type: 'endTurn' });
+    expect(again.rejections).toEqual([]);
+    expect(room.actorId()).toBe(sam.id);
+
+    // Sam never received any of it. The draft is one player's, and a
+    // reconnection is not an excuse to broadcast one — Sam does get the
+    // `endTurn` commit above (the segment genuinely closed, and the whole
+    // table hears a commit), but nothing carrying Alex's open draft.
+    await settleSocket(s.socket);
+    const samsNew = s.states.slice(seenBySamBefore);
+    expect(samsNew.length).toBeGreaterThan(0);
+    for (const message of samsNew) {
+      expect(message.reason).toBe('commit');
+    }
+
+    a.close(); s.close(); again.close();
+  });
+});

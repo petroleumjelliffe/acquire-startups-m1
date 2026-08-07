@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
-import { CLIENT_EVENTS, SERVER_EVENTS, type JoinedMessage, type RosterMessage } from '../session/protocol.js';
+import {
+  CLIENT_EVENTS,
+  SERVER_EVENTS,
+  type JoinedMessage,
+  type RejectedMessage,
+  type RosterMessage,
+} from '../session/protocol.js';
 import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
 
 let server: TestServer;
@@ -105,5 +111,43 @@ describe('one socket holds one seat per room', () => {
       one.disconnect();
       two.disconnect();
     }
+  });
+});
+
+describe('a join that cannot be honoured', () => {
+  it('says the room does not exist, by name', async () => {
+    const socket = await raw(server.port);
+    const rejections: RejectedMessage[] = [];
+    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+
+    socket.emit(CLIENT_EVENTS.joinRoom, { roomId: 'NOPE12', name: 'Sam' });
+    await settleSocket(socket);
+
+    // The distinction the gone-room screen is built on: nothing the player
+    // can do reaches this room, so it is an ending, not a retry.
+    expect(rejections.map((r) => r.code)).toEqual(['noSuchRoom']);
+
+    socket.disconnect();
+  });
+
+  it('says the seat was refused when the room is there but the token is not', async () => {
+    const { room } = server.rooms.create('Alex');
+    const socket = await raw(server.port);
+    const rejections: RejectedMessage[] = [];
+    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+
+    socket.emit(CLIENT_EVENTS.joinRoom, {
+      roomId: room.id,
+      name: 'Ghost',
+      playerId: 'p1',
+      token: 'not-the-token',
+    });
+    await settleSocket(socket);
+
+    // The room is still there. The remedy is to join it fresh, which is a
+    // different screen from "this game is gone".
+    expect(rejections.map((r) => r.code)).toEqual(['seatRefused']);
+
+    socket.disconnect();
   });
 });

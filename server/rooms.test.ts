@@ -1,6 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildFixture } from '../engine/golden/fixtures.js';
-import { createRoomRegistry } from './rooms.js';
+import { createRoomRegistry, MAX_AGE_MS } from './rooms.js';
+import { createFileStore, SAVE_VERSION, type SavedRoom } from './store.js';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 function fixture() {
   return buildFixture({
@@ -91,5 +95,154 @@ describe('the registry', () => {
     expect(room.lifecycle()).toBe('playing');
     expect(room.actorId()).toBe('p1');
     expect(room.players.map((p) => p.id)).toEqual(['p1', 'p2']);
+  });
+});
+
+describe('restoring rooms at boot', () => {
+  let dir: string;
+
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'acquire-restore-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  /** Saves a room through a live registry, exactly as a commit would. */
+  async function seedSavedRoom(roomId: string): Promise<SavedRoom> {
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    const room = rooms.fromState(roomId, ['Alex', 'Sam'], fixture());
+    await rooms.persist(room);
+    const [saved] = await store.loadAll();
+    return saved;
+  }
+
+  it('seats a saved room again, with its tokens intact', async () => {
+    const saved = await seedSavedRoom('ABC123');
+
+    const rooms = createRoomRegistry(createFileStore(dir));
+    const count = await rooms.restore();
+
+    expect(count).toBe(1);
+    const room = rooms.get('ABC123');
+    expect(room).toBeDefined();
+    expect(room!.lifecycle()).toBe('playing');
+    // The rejoin material survived the process, which is the whole feature.
+    const token = saved.players[1].token;
+    expect(rooms.join('ABC123', 'Sam', 'p2', token)?.player.id).toBe('p2');
+  });
+
+  it('brings every restored seat back disconnected', async () => {
+    await seedSavedRoom('ABC123');
+
+    const rooms = createRoomRegistry(createFileStore(dir));
+    await rooms.restore();
+
+    // Presence is a fact about live sockets. Nothing is connected to a
+    // process that has only just started.
+    expect(rooms.get('ABC123')!.players.every((p) => !p.connected)).toBe(true);
+  });
+
+  it('restores a finished game as over, not as still playing', async () => {
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    const room = rooms.fromState('END123', ['Alex', 'Sam'], { ...fixture(), stage: 'end' });
+    await rooms.persist(room);
+
+    const revived = createRoomRegistry(createFileStore(dir));
+    await revived.restore();
+
+    // `createGameRoom` used to derive lifecycle as `initial ? 'playing' :
+    // 'lobby'`, which would bring a finished game back as one still waiting
+    // for a move nobody can make.
+    expect(revived.get('END123')!.lifecycle()).toBe('over');
+  });
+
+  it('drops and deletes a record older than the age limit', async () => {
+    await seedSavedRoom('OLD123');
+    const store = createFileStore(dir);
+
+    const rooms = createRoomRegistry(store);
+    const count = await rooms.restore(Date.now() + MAX_AGE_MS + 1);
+
+    expect(count).toBe(0);
+    expect(rooms.get('OLD123')).toBeUndefined();
+    // Deleted, not merely skipped — otherwise the directory grows forever
+    // and every boot re-reads records it will never use.
+    expect(await store.loadAll()).toEqual([]);
+  });
+
+  it('is zero, not a crash, with nothing saved', async () => {
+    const rooms = createRoomRegistry(createFileStore(dir));
+    expect(await rooms.restore()).toBe(0);
+  });
+
+  it('skips a record whose state the engine cannot drive, and still seats the good one', async () => {
+    await seedSavedRoom('GOOD01');
+
+    // Passes `isSavedRoom`'s shape guard — it only checks that `state` is a
+    // non-null object — but is not anything `createGameSession` can
+    // actually drive. Written straight to disk rather than through
+    // `SavedRoom`, so the type checker cannot stop us from building the
+    // exact file `isSavedRoom` is too shallow to catch: a `state` this
+    // server itself would never write, but the guard trusts past "is an
+    // object" on the theory that it always came from this server's own
+    // engine.
+    const badRecord = {
+      roomId: 'BAD001',
+      version: SAVE_VERSION,
+      savedAt: Date.now(),
+      players: [
+        { id: 'p1', name: 'Alex', token: 'tok1', isHost: true, connected: false },
+        { id: 'p2', name: 'Sam', token: 'tok2', isHost: false, connected: false },
+      ],
+      state: {},
+    };
+    await writeFile(join(dir, 'BAD001.json'), JSON.stringify(badRecord), 'utf-8');
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rooms = createRoomRegistry(createFileStore(dir));
+    const count = await rooms.restore();
+    warn.mockRestore();
+
+    expect(count).toBe(1);
+    expect(rooms.get('GOOD01')).toBeDefined();
+    expect(rooms.get('BAD001')).toBeUndefined();
+  });
+});
+
+describe('what persist writes to disk', () => {
+  let dir: string;
+
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'acquire-persist-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  it('writes the committed state, not a still-open draft', async () => {
+    // `persist` and a commit run in the same synchronous tick in production,
+    // where `draft()` and `committed()` are the same object — so this is the
+    // one place `rooms.persist` can be called with the two genuinely
+    // different, to prove which one it actually writes. Calling it directly,
+    // mid-segment, is the only way to tell "writes committed" from "writes
+    // draft, which happens to equal committed by the time anyone calls
+    // persist for real" apart.
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    const room = rooms.fromState('X', ['Alex', 'Sam'], buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['I5'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: [],
+    }));
+
+    // I5 is adjacent to nothing on this board — H5, I4 and I6 are all empty,
+    // and the only other tiles in play are E5 and A1 — so placing it neither
+    // founds nor joins a chain. The turn does not pass: the segment stays
+    // open, with the actor still `p1`.
+    room.dispatch('p1', { type: 'placeTile', coord: 'I5' });
+    expect(room.draft().board).not.toEqual(room.committed().board);
+
+    await rooms.persist(room);
+
+    const [saved] = await store.loadAll();
+    expect(saved.state.board).toEqual(room.committed().board);
   });
 });

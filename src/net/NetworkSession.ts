@@ -59,9 +59,10 @@ export function createNetworkSession(
    * The segment before the open one, learned from the messages themselves: a
    * commit carries a new `segmentStart`, and whatever it replaces is where
    * the turn that just finished began. Corrections repeat the current one, so
-   * only a change moves this.
+   * only a change moves this. Seeded from the initial message so a session
+   * rebuilt from a single message after a refresh does not start blind.
    */
-  let previousSegmentStart: number | undefined;
+  let previousSegmentStart: number | undefined = initial.previousSegmentStart;
   let rejection: SessionError | null = null;
   let pending = false;
   /**
@@ -83,7 +84,11 @@ export function createNetworkSession(
 
   const offState = transport.onState((msg) => {
     inner = createGameSession({ state: msg.state });
-    if (msg.segmentStart !== segmentStart) previousSegmentStart = segmentStart;
+    // The server's own answer wins when it has one. The local derivation
+    // below it is the fallback for the only case the server cannot answer —
+    // before any segment has closed, when there is no previous one to name.
+    if (msg.previousSegmentStart !== undefined) previousSegmentStart = msg.previousSegmentStart;
+    else if (msg.segmentStart !== segmentStart) previousSegmentStart = segmentStart;
     segmentStart = msg.segmentStart;
     pending = false;
     // A `reset` is the rollback half of a rejection the player has just been

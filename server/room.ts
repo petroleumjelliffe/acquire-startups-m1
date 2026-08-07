@@ -38,6 +38,8 @@ export interface GameRoom {
   draft(): GameState;
   actorId(): string | null;
   segmentStart(): number;
+  /** Where the segment before the open one began, once one has closed. */
+  previousSegmentStart(): number | undefined;
   begin(seed: string): Delivery;
   dispatch(playerId: string, wire: WireIntent): Delivery;
   undo(playerId: string, stepId: number): Delivery;
@@ -61,9 +63,14 @@ export function createGameRoom(
   players: RoomPlayer[],
   initial?: GameState,
 ): GameRoom {
-  let lifecycle: Lifecycle = initial ? 'playing' : 'lobby';
+  // A restored game that has already ended comes back `over`, not `playing`.
+  // Deriving this from the state rather than from "was I handed one" is what
+  // stops a finished game reviving as one still waiting on a move nobody can
+  // legally make.
+  let lifecycle: Lifecycle = initial ? (initial.stage === 'end' ? 'over' : 'playing') : 'lobby';
   let session: GameSession | null = initial ? createGameSession({ state: initial }) : null;
   let committed: GameState | null = session ? session.getView().state : null;
+  let previousSegmentStart: number | undefined;
 
   function open(): GameSession {
     if (!session) throw new Error(`room ${id} has not begun`);
@@ -89,6 +96,7 @@ export function createGameRoom(
     draft: () => open().getView().state,
     actorId: () => open().getView().actorId,
     segmentStart: () => open().getView().segmentStart,
+    previousSegmentStart: () => previousSegmentStart,
 
     begin(seed) {
       if (lifecycle !== 'lobby') throw new Error(`room ${id} has already begun`);
@@ -112,7 +120,13 @@ export function createGameRoom(
         return { kind: 'rejected', to: playerId, code: view.error.code, message: view.error.message };
       }
 
-      if (view.segmentStart !== opened) return commit(view.state);
+      if (view.segmentStart !== opened) {
+        // `opened` was read before the dispatch, so it is where the segment
+        // that just closed began — recorded here rather than derived later,
+        // because after the commit nothing remembers it.
+        previousSegmentStart = opened;
+        return commit(view.state);
+      }
 
       // The draft advanced and stayed with its author. They computed the same
       // result locally, unless it drew from a bag they do not hold — see

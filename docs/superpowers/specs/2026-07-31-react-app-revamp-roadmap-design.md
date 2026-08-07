@@ -307,6 +307,25 @@ what the async-play goal wanted. Reconnect fetches current state, the current se
 it is your move. Uncommitted local staging is discarded on reconnect; it was never real, which is
 the entire point of the model. Includes Render cold-start handling. No turn timeouts.
 
+> **Built 2026-08-07.** Design:
+> [2026-08-06-phase-4-presence-and-recovery-design.md](./2026-08-06-phase-4-presence-and-recovery-design.md);
+> plan: [2026-08-06-phase-4-presence-and-recovery.md](../plans/2026-08-06-phase-4-presence-and-recovery.md);
+> what it hands on: [2026-08-07-phase-4-carry-forward.md](./2026-08-07-phase-4-carry-forward.md);
+> what a human actually saw: [2026-08-07-phase-4-by-hand-notes.md](./2026-08-07-phase-4-by-hand-notes.md).
+>
+> All three end-to-end tests exist, and all three scenarios were additionally driven by hand in real
+> browsers. 622 tests → **664**. The section below described the state before that work; two of its
+> claims are now wrong and are left standing as the record of what was true.
+>
+> **The bug this phase turned out to exist for was not the one named here.** A socket rejoining
+> mid-turn was sent the state at the *start* of the turn while the server still held the actor's open
+> draft — so a refresh put a placed tile back in your hand while the server believed it was played.
+> `resume` fixes it.
+>
+> **What it did not close:** the by-hand pass was local, not prod, so "the same three by hand on
+> prod" is still owed. On Render free the restart pass is *expected* to end at the gone-room screen
+> — ephemeral disk, an accepted limit — which is a pass, but a predicted one.
+
 **Coverage is part of the phase, not a follow-up** (owner, 2026-08-06). Today each piece is tested
 and no sequence is: `identity.ts` round-trips a rejoin, `rooms.rejoin` honours and refuses tokens,
 `connectionLost()` clears a stuck request, and `RoomPage` resends the stored identity when the

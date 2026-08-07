@@ -4,7 +4,7 @@ import { getConnection, type Connection, type ConnectionStatus } from './connect
 import { createNetworkSession, type NetworkSession } from './NetworkSession';
 import { clearIdentity, loadIdentity, rememberName, rememberedName, saveIdentity } from './identity';
 
-export type RoomPhase = 'connecting' | 'joining' | 'needName' | 'lobby' | 'playing' | 'error';
+export type RoomPhase = 'connecting' | 'joining' | 'needName' | 'lobby' | 'playing' | 'error' | 'gone';
 
 export interface Room {
   phase: RoomPhase;
@@ -33,6 +33,25 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   const [session, setSession] = useState<NetworkSession | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  const [gone, setGone] = useState(false);
+  /**
+   * Whether this mount is going to join by itself, without asking anyone.
+   *
+   * Read once, at mount, from the same two sources the join effect below
+   * consults. It exists because that effect runs *after* the render in which
+   * the socket first opens — so for one frame `joining` is still false and
+   * the phase expression used to fall all the way through to `needName`,
+   * flashing a join form at a player who already holds a seat and is about
+   * to be put straight back into their game. Seen on a phone, reloading
+   * mid-game: menu, then a join form, then the board.
+   *
+   * Deliberately not recomputed. Once a stored identity is refused, the same
+   * handler that clears it sets `message`, which outranks this — so the form
+   * still appears for the case that genuinely needs it.
+   */
+  const [autoJoins] = useState(
+    () => roomId !== '' && (loadIdentity(roomId) !== null || rememberedName() !== null),
+  );
 
   const sessionRef = useRef<NetworkSession | null>(null);
   // Read once, at mount, for whatever `roomId` the hook first saw. A `roomId`
@@ -97,6 +116,33 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
     });
 
     const offRejected = connection.transport.onRejected((msg) => {
+      // Nothing this player can do reaches this room: it has ended, or the
+      // server restarted onto a disk that no longer holds it. A join form
+      // would invite them to keep trying something that cannot work. This is
+      // terminal — handled fully here, not folded into the phase ternary
+      // below — because a mid-game player already holds a `session`, and
+      // `playing` outranks every other phase there. Leaving `session`
+      // non-null would mean `gone` could never win: the board stays on
+      // screen, looking live, while every click it sends is dropped by
+      // `server/index.ts`'s `if (!bound || !room) return`.
+      if (msg.code === 'noSuchRoom') {
+        setGone(true);
+        // Nothing can use a token for a room that is not there, and a
+        // mid-game player is `seated`, so the clearing below would skip
+        // them.
+        clearIdentity(roomId);
+        identityRef.current = null;
+        // Tear the session down, or `playing` outranks `gone` forever and
+        // the player keeps a live-looking board whose every click is
+        // dropped. Nulling the ref first means the `onState` effect's own
+        // cleanup (unmount, or a future `connection` change) sees a null
+        // ref and does not dispose a second time.
+        sessionRef.current?.dispose();
+        sessionRef.current = null;
+        setSession(null);
+        return;
+      }
+
       // Once a game is running, a rejection belongs to the session, which
       // shows it in the panel. Surfacing it here as well would replace the
       // board with an error screen over a refused click.
@@ -176,13 +222,27 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   // afterwards ("only the host may begin") is a note to show *in* the lobby —
   // ranking `message` above `roster` would throw a seated player back to a
   // join form over a button they were not allowed to press.
+  //
+  // `gone` outranks everything below it here, but it sits *below* `playing`
+  // in the chain — and that is fine. A mid-game player already holds a
+  // `session`, so `session !== null` would win regardless of where `gone`
+  // was placed in this chain; reordering the ternary cannot be what makes
+  // `gone` win. What actually makes it win is the `onRejected` handler above
+  // tearing the session down (`setSession(null)`) in the same tick it sets
+  // `gone`, so by the time this expression runs, `session` is already null
+  // and `playing` no longer applies.
   const phase: RoomPhase =
     session !== null ? 'playing'
-      : roster !== null ? 'lobby'
-        : message !== null ? 'error'
-          : status !== 'open' ? 'connecting'
-            : joining ? 'joining'
-              : 'needName';
+      : gone ? 'gone'
+        : roster !== null ? 'lobby'
+          : message !== null ? 'error'
+            : status !== 'open' ? 'connecting'
+              // `autoJoins` alongside `joining`: one means the join has been
+              // sent, the other that it is certain to be, in an effect that
+              // has not run yet. Both should look the same to a player, and
+              // neither is a reason to show a form.
+              : (joining || autoJoins) ? 'joining'
+                : 'needName';
 
   return { phase, status, roster, playerId, session, message, join, begin };
 }

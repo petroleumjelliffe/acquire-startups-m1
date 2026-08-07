@@ -22,10 +22,18 @@ reverse decisions the 3b carry-forward describes as shipped.
 scoring, including a merger whose liquidation queue reaches both players. Every one of those
 twenty-six findings came from a by-hand pass; none came from the suite.
 
-**Phase 4** is presence and recovery: reconnection beyond a page refresh, a dropped socket, and
-surviving a server restart — which today loses every room, since `saveGame` writes and nothing
-reads it back. It owes three end-to-end tests (refresh mid-turn, socket dropped and revived,
-server restart with a game running); every piece is tested today and no sequence is.
+**Phase 4 (2026-08-07) is built** — presence and recovery. A game now survives a page refresh, a
+dropped socket and a server restart, and all three were driven by hand in real browsers as well as
+tested. `server/store.ts` keeps the roster and its rejoin tokens and is read back before `listen`;
+a `resume` state reason hands a reconnecting actor its own **open draft** rather than the state at
+the start of their turn, which is the bug the phase turned out to exist for. A room the server does
+not have says so by name; a dropped player shows on the seat and in the toast. See
+`docs/superpowers/specs/2026-08-07-phase-4-carry-forward.md`, and
+`2026-08-07-phase-4-by-hand-notes.md` for the five findings a human found that 661 tests could not.
+
+**Still owed by Phase 4:** the same three scenarios by hand **on prod** (everything so far is
+local), and a ruling on the cold-start copy, which still says "waking the server" when the real
+condition is online-but-unreachable.
 
 **Dev surfaces:** `/catalog` is every component state; `/scenarios` loads any golden-game state and
 plays on from it, which is how to reach a merger in two clicks rather than several minutes.
@@ -44,7 +52,7 @@ before starting work.
 | `src/game/catalog/` | `/catalog` route — every component state, mostly replayed from golden games. The acceptance surface. Also `/scenarios`: any golden-game state, playable on from that point. Both lazily routed so the golden data stays out of the main chunk. |
 | `session/` | Shared between client and server (Phase 3a). `GameSession` — the local draft/session model — and `protocol.ts`'s wire types (`WireIntent`, `StateMessage`, …). No React, no transport. |
 | `src/net/` | The client's half of the wire (Phase 3b). `NetworkSession` — a `GameSession` whose authority is the server: six intents apply optimistically, three (`endTurn`, `tradeInDeadTiles`, `startGame`) wait on a `correction`. `connection.ts` is the socket.io transport, opened lazily on online routes only. `identity.ts` keeps a per-room `{ playerId, token, name }` in `localStorage` so a refresh rejoins the same seat. |
-| `server/` | Express + Socket.io. Authoritative over intents as of Phase 3a — runs `applyIntent`, projects state per player before broadcast, rejects out-of-turn/illegal intents. No longer headless: `src/net/` speaks its protocol, proven both by `server/clientOverWire.test.ts` (two `NetworkSession`s over real sockets, all seventeen golden games) and a scripted two-browser pass. The XState layer (`gameRoomMachine`, `playerMachine`) is deleted. |
+| `server/` | Express + Socket.io. Authoritative over intents as of Phase 3a — runs `applyIntent`, projects state per player before broadcast, rejects out-of-turn/illegal intents. `store.ts` (Phase 4) persists a room's roster, rejoin tokens and last committed state; `rooms.restore()` seats them at boot, before `listen`, forcing every seat disconnected. `recovery.test.ts` kills a server and reboots it against the same store. The XState layer is deleted. |
 | `prototype/` | The buildless design lab the component layer was ported from. Reference, not a build target. |
 
 ## Commands

@@ -73,6 +73,40 @@ describe('the room commits when the actor changes', () => {
   });
 });
 
+describe('the segment before the open one', () => {
+  it('is undefined until a commit has replaced one', () => {
+    const room = createGameRoom('r1', roster('Alex', 'Sam'), openBoard());
+    expect(room.previousSegmentStart()).toBeUndefined();
+  });
+
+  it('is where the finished segment began, once one commits', () => {
+    // openBoard()'s E6 sits next to the loner at E5, so placing it founds a
+    // chain and parks the room on `foundStartup` rather than closing the
+    // segment — not the shortest path to a boundary here. This fixture's A1
+    // has no adjacent loner or chain, so placing it founds nothing: the tile
+    // just lands, the stage falls through to `buy`, and `endTurn` closes the
+    // segment cleanly.
+    const room = createGameRoom(
+      'r1',
+      roster('Alex', 'Sam'),
+      buildFixture({
+        players: [
+          { name: 'Alex', cash: 6000, hand: ['A1'] },
+          { name: 'Sam', cash: 6000, hand: ['H8'] },
+        ],
+        bag: ['I11'],
+      }),
+    );
+    const opened = room.segmentStart();
+
+    room.dispatch('p1', { type: 'placeTile', coord: 'A1' });
+    room.dispatch('p1', { type: 'endTurn' });
+
+    expect(room.segmentStart()).not.toBe(opened);
+    expect(room.previousSegmentStart()).toBe(opened);
+  });
+});
+
 describe('the room refuses what the engine refuses', () => {
   it('rejects an intent from the player whose turn it is not', () => {
     const room = createGameRoom('r1', roster('Alex', 'Sam'), openBoard());
