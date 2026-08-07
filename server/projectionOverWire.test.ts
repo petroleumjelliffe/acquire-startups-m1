@@ -6,6 +6,7 @@ import { startTestServer, connectPlayer, settleSocket, type TestServer } from '.
 import { project } from './projection.js';
 import {
   CLIENT_EVENTS,
+  PROTOCOL_VERSION,
   SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
@@ -419,12 +420,19 @@ describe('a malformed or absent payload', () => {
     socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
     try {
+      // An absent payload has no version either, and the version check runs
+      // first — deliberately, so a client built before versioning existed is
+      // told it is stale rather than told its payload is malformed. Still a
+      // clean rejection rather than a crash, which is what this test is for.
       socket.emit(CLIENT_EVENTS.createRoom, undefined);
       await settleSocket(socket);
       expect(rejections).toHaveLength(1);
-      expect(rejections[0].code).toBe('unknownIntent');
+      expect(rejections[0].code).toBe('versionMismatch');
 
-      socket.emit(CLIENT_EVENTS.createRoom, { name: 42 });
+      // Carries the right version, so it reaches the shape guard this case
+      // is actually about. Without the version it would never get past the
+      // check above and would silently stop testing what it says.
+      socket.emit(CLIENT_EVENTS.createRoom, { name: 42, protocolVersion: PROTOCOL_VERSION });
       await settleSocket(socket);
       expect(rejections).toHaveLength(2);
       expect(rejections[1].code).toBe('unknownIntent');
@@ -434,7 +442,9 @@ describe('a malformed or absent payload', () => {
       const joined = await new Promise<JoinedMessage>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('never joined')), 4000);
         socket.once(SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
-        socket.emit(CLIENT_EVENTS.createRoom, { name: 'Real Name' });
+        socket.emit(CLIENT_EVENTS.createRoom, {
+          name: 'Real Name', protocolVersion: PROTOCOL_VERSION,
+        });
       });
       expect(joined.roomId).toBeTruthy();
     } finally {
@@ -449,12 +459,17 @@ describe('a malformed or absent payload', () => {
     socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
     try {
+      // See the note in the `createRoom` case above: no payload, so no
+      // version, so the version check answers first.
       socket.emit(CLIENT_EVENTS.joinRoom, undefined);
       await settleSocket(socket);
       expect(rejections).toHaveLength(1);
-      expect(rejections[0].code).toBe('unknownIntent');
+      expect(rejections[0].code).toBe('versionMismatch');
 
-      socket.emit(CLIENT_EVENTS.joinRoom, { roomId: room.id }); // no `name`
+      // Versioned, so this genuinely reaches the missing-`name` guard.
+      socket.emit(CLIENT_EVENTS.joinRoom, {
+        roomId: room.id, protocolVersion: PROTOCOL_VERSION,
+      }); // no `name`
       await settleSocket(socket);
       expect(rejections).toHaveLength(2);
       expect(rejections[1].code).toBe('unknownIntent');
@@ -462,7 +477,9 @@ describe('a malformed or absent payload', () => {
       const joined = await new Promise<JoinedMessage>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('never joined')), 4000);
         socket.once(SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
-        socket.emit(CLIENT_EVENTS.joinRoom, { roomId: room.id, name: 'Guest' });
+        socket.emit(CLIENT_EVENTS.joinRoom, {
+          roomId: room.id, name: 'Guest', protocolVersion: PROTOCOL_VERSION,
+        });
       });
       expect(joined.roomId).toBe(room.id);
     } finally {

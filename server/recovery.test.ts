@@ -18,6 +18,7 @@ import { buildFixture } from '../engine/golden/fixtures.js';
 import { connectPlayer, settleSocket } from './socketHarness.js';
 import {
   CLIENT_EVENTS,
+  PROTOCOL_VERSION,
   SERVER_EVENTS,
   type RejectedMessage,
 } from '../session/protocol.js';
@@ -162,6 +163,7 @@ describe('a server restarted with a game in progress', () => {
 
     socket.emit(CLIENT_EVENTS.joinRoom, {
       roomId: 'LOST01', name: 'Alex', playerId: alex.id, token: alex.token,
+      protocolVersion: PROTOCOL_VERSION,
     });
     await settleSocket(socket);
 

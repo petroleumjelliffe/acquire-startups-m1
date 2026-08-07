@@ -14,6 +14,7 @@ import { registerDevSeed } from './devSeed.js';
 import type { Delivery, GameRoom } from './room.js';
 import {
   CLIENT_EVENTS,
+  PROTOCOL_VERSION,
   SERVER_EVENTS,
   type CreateRoomMessage,
   type JoinRoomMessage,
@@ -147,7 +148,33 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
      */
     socket.on('ping-settle', (ack: () => void) => { if (typeof ack === 'function') ack(); });
 
+    /**
+     * Whether this client speaks our protocol, answering the socket if not.
+     *
+     * Equality, not "at least": the client ships to GitHub Pages and the
+     * server to Render, independently, so the client can perfectly well be
+     * the *newer* side. A `>=` check here would wave that case through and
+     * then fail somewhere deep in a handler, presenting as a game bug.
+     *
+     * Absent is a mismatch. Clients built before this existed send nothing,
+     * and they are precisely what this is for.
+     */
+    function speaksOurProtocol(version: unknown): boolean {
+      if (version === PROTOCOL_VERSION) return true;
+      socket.emit(SERVER_EVENTS.rejected, {
+        code: 'versionMismatch',
+        message:
+          `This client speaks protocol ${String(version)}; this server speaks ${PROTOCOL_VERSION}`,
+      });
+      return false;
+    }
+
     socket.on(CLIENT_EVENTS.createRoom, (msg: CreateRoomMessage) => {
+      // Before the shape check below, and before anything is created: a
+      // client we cannot talk to must not leave a room behind, because an
+      // abandoned room is persisted and restored at the next boot.
+      if (!speaksOurProtocol(msg?.protocolVersion)) return;
+
       // `msg` is whatever the client sent, typed only by wishful thinking —
       // a malformed or missing payload dereferenced below would throw
       // synchronously inside this listener and take the whole process down
@@ -171,6 +198,11 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
     });
 
     socket.on(CLIENT_EVENTS.joinRoom, (msg: JoinRoomMessage) => {
+      // Before the room lookup, so a stale client is told it is stale rather
+      // than told the room does not exist — which would send the player
+      // hunting for a room that is perfectly fine.
+      if (!speaksOurProtocol(msg?.protocolVersion)) return;
+
       // Same shape hazard as `createRoom`, above: this socket has not bound
       // to anything yet either, so a malformed payload here is just as
       // reachable by any connecting client.

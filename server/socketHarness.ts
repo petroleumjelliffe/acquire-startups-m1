@@ -8,6 +8,7 @@ import { io as connect, type Socket } from 'socket.io-client';
 import { createServer } from './index.js';
 import {
   CLIENT_EVENTS,
+  PROTOCOL_VERSION,
   SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
@@ -108,7 +109,9 @@ export async function connectPlayer(
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${name} never joined ${roomId}`)), 4000);
     socket.once(SERVER_EVENTS.joined, (_m: JoinedMessage) => { clearTimeout(timer); resolve(); });
-    socket.emit(CLIENT_EVENTS.joinRoom, { roomId, name, playerId, token });
+    socket.emit(CLIENT_EVENTS.joinRoom, {
+      roomId, name, playerId, token, protocolVersion: PROTOCOL_VERSION,
+    });
   });
 
   const settle = () => settleSocket(socket);
