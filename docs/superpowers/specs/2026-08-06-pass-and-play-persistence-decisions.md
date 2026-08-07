@@ -67,6 +67,24 @@ player row (emoji chip, name, `×`). `Join` is **disabled** until a code is
 entered; with a code present the field shows it in the same letter-spaced style
 as New Room and the button becomes `Join game`. `Leave` below.
 
+> **Amendment, 2026-08-07 — the `×` is not built, on both cards.** The frame
+> remains the copy of record for everything else; this records where the build
+> knowingly departs from it and why.
+>
+> `Leave`, directly below the roster, already vacates your seat, so the `×` on
+> your own row was a second control for one action — and on the host's row it
+> read as "boot yourself", which is what surfaced it in the by-hand pass. Ruled
+> by the owner: dropped from every row, not just the host's, since being first
+> does not make a duplicate less of one. `leaveSeat` on the wire is unchanged.
+>
+> Two further departures, same ruling, both *toward* the frame rather than away
+> from it: the name field on either card is **optional** (an unnamed seat is
+> named `Player N` by the server, since only it knows your seat number), and the
+> Join card's row carries **no emoji chip** — the chip is the seat's, assigned by
+> seat index at `startGame`, and there is no seat until the join lands.
+>
+> See `plans/2026-08-07-lobby-flow-corrections.md`.
+
 ### Pass & Play
 
 **Pass & Play** / *Pass and play on this device*.

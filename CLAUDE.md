@@ -48,13 +48,27 @@ both); and **pass-and-play persists** — one game per device in `localStorage`
 (`src/game/local/localSave.ts`), written at every segment close, resumed from `/pass-and-play`'s
 Continue card, cleared only by End game or a confirmed discard.
 
-**Pending on `revamp/online-lobby-mockup` (pushed, unmerged): protocol v2.** The Lobby Flow
-design implemented in full — Create Room seats you immediately (no name form; `CreateRoomPage` is
-deleted), your own lobby row is editable with a × (`renamePlayer`/`leaveSeat`, lobby-only,
-socket-bound), the board lost its row/column headers, and the buy step gained a Pass gate so a
-turn cannot end over an empty basket by accident. **Prod speaks v1 until this merges; merging
-deploys both halves in one push, and a local v2 client pointed at prod's v1 gets the stale-client
-screen — that is the feature, not a bug.**
+**Pending on `revamp/online-lobby-mockup` (pushed, unmerged): protocol v2.** The board lost its
+row/column headers, the buy step gained a Pass gate so a turn cannot end over an empty basket by
+accident, and the Lobby Flow design landed — in two passes, not one. The first did Create Room
+(seats you immediately, no name form; `CreateRoomPage` deleted) and left **Join Room untouched**,
+still a separate screen with "Room code" and "Your name" inputs. An earlier version of this
+paragraph called that "implemented in full"; it was not, and the owner found it by hand on
+2026-08-07.
+
+The corrections are in
+`plans/2026-08-07-lobby-flow-corrections.md`: **New Room and Join Room are one card**
+(`online/LobbyCard.tsx`) differing only in whether the code block is typed into or read from;
+**no row has a ×** (`Leave` was always the same action — a deliberate deviation from the mockup);
+and **nothing asks for a name anywhere**, so `name` is optional on the wire and the server names
+an unnamed seat `Player N` from its seat index. `needName` and `JoinForm` are gone; a refused
+join gets `RoomRefused` and a retry.
+
+**`PROTOCOL_VERSION` stays 2 through all of that** — v2 has never been deployed, so its shape was
+still free to change. That stops being true the moment this merges.
+
+**Prod speaks v1 until then; merging deploys both halves in one push, and a local v2 client
+pointed at prod's v1 gets the stale-client screen — that is the feature, not a bug.**
 
 **Still open: Stage 3** — the layout gate's flakiness, with a live lead: `verify-layout.mjs`
 drives a *persistent* Chrome profile, so every run depends on run history; Stage 2 tripped over
