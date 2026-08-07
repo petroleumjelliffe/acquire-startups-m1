@@ -179,5 +179,9 @@ describe('the Join Room card', () => {
     for (const face of ['🦊', '🐢', '🦁', '🐙', '🦉', '🐝']) {
       expect(rows[0].textContent).not.toContain(face);
     }
+    // And no presence dot either, for the same reason: presence belongs to a
+    // socket bound to a seat, and this row has neither. Seen in a browser —
+    // it rendered green, reporting a connection that did not exist.
+    expect(screen.queryByTestId('presence-dot')).toBeNull();
   });
 });

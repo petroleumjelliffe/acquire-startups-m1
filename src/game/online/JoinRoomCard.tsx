@@ -51,7 +51,7 @@ export function JoinRoomCard({
       {/* No emoji: the chip is the seat's, and there is no seat yet. Showing
           seat one's face here would be wrong for everyone who does not turn
           out to be first. */}
-      <SeatRow emoji={null} connected isHost={false}>
+      <SeatRow emoji={null} connected={null} isHost={false}>
         <input
           aria-label="Your name"
           value={name}

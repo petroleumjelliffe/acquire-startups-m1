@@ -29,7 +29,15 @@ export function seatEmoji(seat: number | null): string | null {
 
 export interface SeatRowProps {
   emoji: string | null;
-  connected: boolean;
+  /**
+   * Whether this seat's socket is up — or `null` for "there is no seat yet",
+   * which draws no dot at all.
+   *
+   * Presence is a property of a socket bound to a seat, and the Join card's
+   * row has neither. A green dot there reports a connection that does not
+   * exist, which is worse than saying nothing.
+   */
+  connected: boolean | null;
   isHost: boolean;
   /** The name: a plain span in the room, an input on your own row. */
   children: ReactNode;
@@ -42,10 +50,13 @@ export function SeatRow({ emoji, connected, isHost, children }: SeatRowProps) {
   return (
     <li className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
       <span aria-hidden className="flex-none text-base leading-none">{emoji ?? '·'}</span>
-      <span
-        aria-hidden
-        className={`h-2 w-2 flex-none rounded-full ${connected ? 'bg-green-500' : 'bg-gray-300'}`}
-      />
+      {connected !== null && (
+        <span
+          data-testid="presence-dot"
+          aria-hidden
+          className={`h-2 w-2 flex-none rounded-full ${connected ? 'bg-green-500' : 'bg-gray-300'}`}
+        />
+      )}
       {children}
       {isHost && (
         <span className="flex-none text-xs uppercase tracking-wide text-gray-500">host</span>
