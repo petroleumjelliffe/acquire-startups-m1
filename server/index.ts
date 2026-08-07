@@ -193,10 +193,16 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // synchronously inside this listener and take the whole process down
       // for every room, not just this connection. This socket has not even
       // bound to a room yet, so any connecting client can reach this line.
-      if (typeof msg?.name !== 'string') {
+      // An *absent* name is ordinary — no card asks for one before seating
+      // you, and `rooms.create` names you by your seat. A name of the wrong
+      // *type* is still a malformed payload and still refused: this listener
+      // is reachable by any connected socket before it has bound to a room,
+      // so a throw here takes down every room in the process, not just this
+      // connection.
+      if (msg?.name !== undefined && typeof msg.name !== 'string') {
         socket.emit(SERVER_EVENTS.rejected, {
           code: 'unknownIntent',
-          message: 'createRoom requires a name',
+          message: 'createRoom name must be text',
         });
         return;
       }
@@ -219,10 +225,13 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // Same shape hazard as `createRoom`, above: this socket has not bound
       // to anything yet either, so a malformed payload here is just as
       // reachable by any connecting client.
-      if (typeof msg?.roomId !== 'string' || typeof msg?.name !== 'string') {
+      // The roomId is still required — there is nothing to look up without
+      // it. The name is not, for the same reason as `createRoom` above, and
+      // a non-string one is refused for the same reason too.
+      if (typeof msg?.roomId !== 'string' || (msg.name !== undefined && typeof msg.name !== 'string')) {
         socket.emit(SERVER_EVENTS.rejected, {
           code: 'unknownIntent',
-          message: 'joinRoom requires a roomId and a name',
+          message: 'joinRoom requires a roomId, and a name must be text if given',
         });
         return;
       }

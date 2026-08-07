@@ -216,10 +216,21 @@ export interface RosterMessage {
  */
 export const PROTOCOL_VERSION = 2;
 
-export interface CreateRoomMessage { name: string; protocolVersion: number }
+/**
+ * `name` is optional on both, and that is a correction to v2 rather than a v3:
+ * v2 has never been deployed — prod still speaks v1 — so no client in the
+ * world sends the required-name shape. Adding a name later would have cost a
+ * cutover; adding it now costs nothing. Do not read the absent bump as a
+ * missed one.
+ *
+ * An absent name means "you name me": the server seats you and names you by
+ * your seat number, which is the only thing that knows it. See
+ * `server/rooms.ts`'s `seatPlayer`.
+ */
+export interface CreateRoomMessage { name?: string; protocolVersion: number }
 export interface JoinRoomMessage {
   roomId: string;
-  name: string;
+  name?: string;
   playerId?: string;
   token?: string;
   protocolVersion: number;

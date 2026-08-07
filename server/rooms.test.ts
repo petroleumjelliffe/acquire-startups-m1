@@ -42,6 +42,39 @@ describe('the registry', () => {
     expect(sam!.player.isHost).toBe(false);
   });
 
+  /**
+   * Nobody types a name before entering a room any more — both cards seat you
+   * first and let you edit your row afterwards. Only the registry knows your
+   * seat number, so only the registry can name you by it, and `seatPlayer` is
+   * the one place both `create` and `join` pass through.
+   */
+  it('names you by your seat when you do not say who you are', () => {
+    const rooms = createRoomRegistry();
+    const { room, player: host } = rooms.create();
+
+    const guest = rooms.join(room.id);
+
+    expect(host.name).toBe('Player 1');
+    expect(guest?.player.name).toBe('Player 2');
+  });
+
+  it('treats a blank name as no name, rather than seating an empty row', () => {
+    const rooms = createRoomRegistry();
+    const { room, player: host } = rooms.create('   ');
+
+    const guest = rooms.join(room.id, '');
+
+    expect(host.name).toBe('Player 1');
+    expect(guest?.player.name).toBe('Player 2');
+  });
+
+  it('keeps a name you did give, trimmed', () => {
+    const rooms = createRoomRegistry();
+    const { player } = rooms.create('  Alex  ');
+
+    expect(player.name).toBe('Alex');
+  });
+
   it('returns the existing seat when a known player rejoins with their token', () => {
     const rooms = createRoomRegistry();
     const { room } = rooms.create('Alex');

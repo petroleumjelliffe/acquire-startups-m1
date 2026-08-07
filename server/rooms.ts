@@ -10,8 +10,9 @@ export interface Seat {
 }
 
 export interface RoomRegistry {
-  create(hostName: string): Seat;
-  join(roomId: string, name: string, playerId?: string, token?: string): Seat | null;
+  /** Names are optional: an unnamed seat is named by its number. */
+  create(hostName?: string): Seat;
+  join(roomId: string, name?: string, playerId?: string, token?: string): Seat | null;
   get(roomId: string): GameRoom | undefined;
   /** Seats a prepared state directly. Tests use this; no socket event reaches it. */
   fromState(roomId: string, names: string[], state: GameState): GameRoom;
@@ -44,10 +45,22 @@ export interface RoomRegistry {
  */
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-function seatPlayer(seat: number, name: string): RoomPlayer {
+/**
+ * The one place both `create` and `join` seat somebody, and therefore the only
+ * place that can name an unnamed player: the seat number is what the default
+ * is made of, and the client does not know its seat until this has run.
+ *
+ * Nobody types a name before entering a room as of the Lobby Flow corrections
+ * — both cards seat you first and let you edit your own row afterwards — so
+ * an absent name is the ordinary case, not a malformed payload. A blank or
+ * whitespace-only name is treated as absent rather than seating a nameless
+ * row that no roster could render.
+ */
+function seatPlayer(seat: number, name?: string): RoomPlayer {
+  const given = name?.trim();
   return {
     id: `p${seat + 1}`,
-    name,
+    name: given ? given : `Player ${seat + 1}`,
     token: randomUUID(),
     isHost: seat === 0,
     connected: true,

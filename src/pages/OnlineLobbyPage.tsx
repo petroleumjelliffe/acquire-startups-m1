@@ -30,9 +30,16 @@ export function OnlineLobbyPage({ connect = getConnection }: OnlineLobbyPageProp
   const create = () => {
     const c = connection ?? connect();
     setConnection(c);
-    const name = rememberedName() ?? getRandomEmojiName();
-    sentName.current = name;
-    rememberName(name);
+    // Whatever you last called yourself, and nothing invented if you never
+    // have: with no name on the wire the server seats you under `Player N`,
+    // and your own lobby row is where you change it.
+    //
+    // Not `rememberName`d here either — only a name you actually chose is
+    // worth carrying to the next room, and `useRoom`'s `rename` is where
+    // choosing happens. Remembering a seat-derived default would follow you
+    // into a room where you sit in a different seat.
+    const name = rememberedName() ?? undefined;
+    sentName.current = name ?? '';
     setError(null);
     setWaiting(true);
     c.createRoom(name);

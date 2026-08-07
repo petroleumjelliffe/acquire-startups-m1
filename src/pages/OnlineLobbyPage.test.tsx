@@ -13,7 +13,7 @@ import type { JoinedMessage, RejectedMessage } from '../../session/protocol';
 function fakeConnection() {
   let joined: ((m: JoinedMessage) => void) | null = null;
   const rejectedHandlers = new Set<(m: RejectedMessage) => void>();
-  const created: string[] = [];
+  const created: (string | undefined)[] = [];
 
   const connection: Connection = {
     transport: {
@@ -56,17 +56,19 @@ function renderLobby(connection: Connection) {
 beforeEach(() => { localStorage.clear(); });
 
 describe('creating a room, with no name form in the way', () => {
-  it('asks the server for one under a default name, then lands in it', () => {
+  it('sends no name at all, and lets the server seat and name you', () => {
     const f = fakeConnection();
     renderLobby(f.connection);
 
     fireEvent.click(screen.getByRole('button', { name: /create room/i }));
 
-    // A name was sent without any form: remembered from last time, or a
-    // generated placeholder. Which one is not this test's business — that it
-    // was non-empty is, because the server refuses blank names.
-    expect(f.created).toHaveLength(1);
-    expect(f.created[0].trim()).not.toBe('');
+    // Nothing is invented here. The default is made of the seat number, and
+    // this client does not know its seat until it has been given one — so the
+    // name is the server's to choose, and the absent field is how it is asked.
+    expect(f.created).toEqual([undefined]);
+    // And a name nobody chose is not remembered: carrying `Player 1` forward
+    // would name you after a seat you no longer sit in.
+    expect(localStorage.getItem('acquire.name')).toBeNull();
 
     f.sendJoined({ roomId: 'ABC123', playerId: 'p1', token: 'tok' });
 
@@ -76,7 +78,6 @@ describe('creating a room, with no name form in the way', () => {
     const stored = JSON.parse(localStorage.getItem('acquire.room.ABC123')!);
     expect(stored.playerId).toBe('p1');
     expect(stored.token).toBe('tok');
-    expect(stored.name).toBe(f.created[0]);
   });
 
   it('creates under the remembered name when there is one', () => {

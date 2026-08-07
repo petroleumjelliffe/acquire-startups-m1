@@ -45,7 +45,10 @@ async function raw(): Promise<Socket> {
   return socket;
 }
 
-async function seat(action: 'create' | { join: string }, name: string): Promise<Seated> {
+/** `name` is omitted from the payload entirely when not given — not sent as
+ *  undefined — because "the field is absent" is the case the server's guard
+ *  has to tell apart from "the field is the wrong type". */
+async function seat(action: 'create' | { join: string }, name?: string): Promise<Seated> {
   const socket = await raw();
   const rosters: RosterMessage[] = [];
   const rejections: RejectedMessage[] = [];
@@ -53,15 +56,19 @@ async function seat(action: 'create' | { join: string }, name: string): Promise<
   socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
   const joined = new Promise<JoinedMessage>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${name} never seated`)), 4000);
+    const timer = setTimeout(
+      () => reject(new Error(`${name ?? 'the unnamed player'} never seated`)),
+      4000,
+    );
     socket.once(SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
   });
 
+  const said = name === undefined ? {} : { name };
   if (action === 'create') {
-    socket.emit(CLIENT_EVENTS.createRoom, { name, protocolVersion: PROTOCOL_VERSION });
+    socket.emit(CLIENT_EVENTS.createRoom, { ...said, protocolVersion: PROTOCOL_VERSION });
   } else {
     socket.emit(CLIENT_EVENTS.joinRoom, {
-      roomId: action.join, name, protocolVersion: PROTOCOL_VERSION,
+      roomId: action.join, ...said, protocolVersion: PROTOCOL_VERSION,
     });
   }
   const { playerId } = await joined;
@@ -71,6 +78,67 @@ async function seat(action: 'create' | { join: string }, name: string): Promise<
 
   return { socket, playerId, rosters, rejections, close: () => { socket.disconnect(); } };
 }
+
+/**
+ * The Lobby Flow corrections removed every name form in front of a room:
+ * Create Room and Join Room both seat you first, and your own row is where you
+ * say who you are. So a payload with no name is the ordinary case now.
+ *
+ * The guard it relaxes is not decorative — `createRoom` and `joinRoom` are
+ * reachable by any connected socket before it has bound to a room, so a
+ * malformed payload dereferenced there takes down every room in the process.
+ * Absence had to become legal without the wrong *type* becoming legal, which
+ * is why the refusal is tested beside the acceptance.
+ */
+describe('a seat taken without a name', () => {
+  it('is named by its seat number rather than refused', async () => {
+    const host = await seat('create');
+    const roomId = host.rosters[0].roomId;
+    const guest = await seat({ join: roomId });
+
+    try {
+      expect(host.rosters.at(-1)!.players.map((p) => p.name)).toEqual(['Player 1', 'Player 2']);
+      expect(host.rejections).toEqual([]);
+      expect(guest.rejections).toEqual([]);
+    } finally {
+      host.close();
+      guest.close();
+    }
+  });
+
+  it('can still be renamed from the lobby row afterwards', async () => {
+    const host = await seat('create');
+
+    try {
+      host.socket.emit(CLIENT_EVENTS.renamePlayer, { name: 'Alex' });
+      await settleSocket(host.socket);
+
+      expect(host.rosters.at(-1)!.players.map((p) => p.name)).toEqual(['Alex']);
+    } finally {
+      host.close();
+    }
+  });
+
+  it.each([
+    ['createRoom', CLIENT_EVENTS.createRoom, {}],
+    ['joinRoom', CLIENT_EVENTS.joinRoom, { roomId: 'ABC123' }],
+  ])('%s still refuses a name that is not a string', async (_label, event, extra) => {
+    const socket = await raw();
+    const rejections: RejectedMessage[] = [];
+    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+
+    try {
+      // 42 is not a missing name, it is a wrong one — the shape hazard the
+      // guard exists for, which relaxing it must not have let through.
+      socket.emit(event, { ...extra, name: 42, protocolVersion: PROTOCOL_VERSION });
+      await settleSocket(socket);
+
+      expect(rejections.map((r) => r.code)).toEqual(['unknownIntent']);
+    } finally {
+      socket.disconnect();
+    }
+  });
+});
 
 describe('renamePlayer', () => {
   it('renames your own seat and tells the whole room', async () => {

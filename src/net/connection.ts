@@ -53,7 +53,8 @@ export interface Connection {
   status(): ConnectionStatus;
   /** Fires on every status change. Returns an unsubscribe. */
   subscribe(listener: () => void): () => void;
-  createRoom(name: string): void;
+  /** Omit the name to be seated under a seat-derived default. */
+  createRoom(name?: string): void;
   joinRoom(msg: JoinRoomMessage): void;
   beginGame(): void;
   /** Rename your own seat. Lobby-only; the server enforces it. */
@@ -100,7 +101,13 @@ function createConnection(): Connection {
       return () => { listeners.delete(listener); };
     },
     createRoom(name) {
-      const msg: CreateRoomMessage = { name, protocolVersion: PROTOCOL_VERSION };
+      // Sent only when there is one. An absent `name` is what tells the
+      // server to name this seat itself; sending `undefined` explicitly would
+      // serialise to the same thing, but saying it once here keeps the wire
+      // shape and the type in agreement.
+      const msg: CreateRoomMessage = name === undefined
+        ? { protocolVersion: PROTOCOL_VERSION }
+        : { name, protocolVersion: PROTOCOL_VERSION };
       socket.emit(CLIENT_EVENTS.createRoom, msg);
     },
     joinRoom(msg) { socket.emit(CLIENT_EVENTS.joinRoom, msg); },

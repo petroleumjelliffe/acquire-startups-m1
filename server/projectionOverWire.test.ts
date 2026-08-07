@@ -468,10 +468,15 @@ describe('a malformed or absent payload', () => {
       expect(rejections).toHaveLength(1);
       expect(rejections[0].code).toBe('versionMismatch');
 
-      // Versioned, so this genuinely reaches the missing-`name` guard.
+      // Versioned, so this genuinely reaches the shape guard. A name of the
+      // wrong *type*, not an absent one: absence is legal as of the Lobby Flow
+      // corrections (the server names an unnamed seat by its number), so
+      // omitting the field here would seat this socket and quietly stop
+      // testing the guard — and would break the well-formed join below, which
+      // the one-seat-per-socket rule would then refuse.
       socket.emit(CLIENT_EVENTS.joinRoom, {
-        roomId: room.id, protocolVersion: PROTOCOL_VERSION,
-      }); // no `name`
+        roomId: room.id, name: 42, protocolVersion: PROTOCOL_VERSION,
+      });
       await settleSocket(socket);
       expect(rejections).toHaveLength(2);
       expect(rejections[1].code).toBe('unknownIntent');
