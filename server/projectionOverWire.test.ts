@@ -143,6 +143,42 @@ async function bareSocket(): Promise<Socket> {
   return socket;
 }
 
+describe('a resume, as a projection', () => {
+  it('gives a non-actor the committed state with no foreign hand, bag or seed', async () => {
+    // `openSegment` is already the fixture this needs: Alex holds `E6`,
+    // founding a chain on `E5` keeps the segment open exactly as
+    // `server/clientOverWire.test.ts`'s drop test relies on — no new fixture
+    // required here.
+    const room = openSegment('resume-projection');
+    const [alex, sam] = room.players;
+
+    const a = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
+    await a.send({ type: 'placeTile', coord: 'E6' });
+
+    // Sam arrives mid-segment — a rejoin, a refresh, or a first connection
+    // after someone else has already started their turn.
+    const s = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    await settleSocket(s.socket);
+    const resumed = s.latest()!;
+
+    expect(resumed.reason).toBe('resume');
+    // Committed, not Alex's draft: `resume` rides `sendState`'s draft rule,
+    // and Sam is not the actor.
+    expect(resumed.state.board).toEqual(room.committed().board);
+    expect(resumed.state.board['E6'].placed).toBe(false);
+    // The literal privacy shape, asserted here rather than inferred from a
+    // consistency check — `clientOverWire` compares both sides through the
+    // same `project` and would not notice `project` itself leaking. Matches
+    // this file's own established shape above: `seed: ''`, not `undefined`.
+    expect(resumed.state.players.find((p) => p.id === alex.id)!.hand).toEqual([]);
+    expect(resumed.state.bag).toEqual([]);
+    expect(resumed.state.seed).toBe('');
+
+    a.close();
+    s.close();
+  });
+});
+
 describe('what a client receives', () => {
   it('carries no seed, no bag, and no hand but its own', async () => {
     const room = twoSeats('wire-projection');
