@@ -16,7 +16,23 @@ export interface RoomRegistry {
   fromState(roomId: string, names: string[], state: GameState): GameRoom;
   all(): GameRoom[];
   persist(room: GameRoom): Promise<void>;
+  /**
+   * Seats every saved room this store still holds. Returns how many.
+   *
+   * `now` is injectable so the age policy can be tested without waiting a
+   * week; the server never passes it.
+   */
+  restore(now?: number): Promise<number>;
 }
+
+/**
+ * How long a saved room is worth reviving.
+ *
+ * Long enough that a game abandoned over a weekend is still there on Monday;
+ * short enough that the directory does not grow without bound and `restore`
+ * does not delay `listen` behind a boot-time read of every game ever played.
+ */
+export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 function seatPlayer(seat: number, name: string): RoomPlayer {
   return {
@@ -103,6 +119,34 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
         state: room.committed(),
       };
       await store.save(record);
+    },
+
+    async restore(now = Date.now()) {
+      // `loadAll` only ever looks at `*.json`, so a `.tmp` file orphaned by a
+      // crash between `writeFile` and `rename` (see the temp-name comment in
+      // `store.ts`) is invisible here — it is not read, not restored, and not
+      // cleaned up. That is a leftover file on disk, not a restore bug; if it
+      // ever needs reclaiming, boot is the natural place, but no sweep exists
+      // yet and this task does not add one.
+      const saved = await store.loadAll();
+      let seated = 0;
+
+      for (const record of saved) {
+        if (now - record.savedAt > MAX_AGE_MS) {
+          await store.remove(record.roomId);
+          continue;
+        }
+
+        // Never `connected: true`, whatever the record says. A record is a
+        // snapshot of a moment when sockets were open; this process has
+        // none. The roster broadcast that follows each rejoin is what turns
+        // these back on, one seat at a time.
+        const players = record.players.map((p) => ({ ...p, connected: false }));
+        rooms.set(record.roomId, createGameRoom(record.roomId, players, record.state));
+        seated++;
+      }
+
+      return seated;
     },
   };
 }

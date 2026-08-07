@@ -61,7 +61,11 @@ export function createGameRoom(
   players: RoomPlayer[],
   initial?: GameState,
 ): GameRoom {
-  let lifecycle: Lifecycle = initial ? 'playing' : 'lobby';
+  // A restored game that has already ended comes back `over`, not `playing`.
+  // Deriving this from the state rather than from "was I handed one" is what
+  // stops a finished game reviving as one still waiting on a move nobody can
+  // legally make.
+  let lifecycle: Lifecycle = initial ? (initial.stage === 'end' ? 'over' : 'playing') : 'lobby';
   let session: GameSession | null = initial ? createGameSession({ state: initial }) : null;
   let committed: GameState | null = session ? session.getView().state : null;
 

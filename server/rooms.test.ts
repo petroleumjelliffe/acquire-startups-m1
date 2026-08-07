@@ -1,6 +1,10 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildFixture } from '../engine/golden/fixtures.js';
-import { createRoomRegistry } from './rooms.js';
+import { createRoomRegistry, MAX_AGE_MS } from './rooms.js';
+import { createFileStore, SAVE_VERSION, type SavedRoom } from './store.js';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 function fixture() {
   return buildFixture({
@@ -91,5 +95,82 @@ describe('the registry', () => {
     expect(room.lifecycle()).toBe('playing');
     expect(room.actorId()).toBe('p1');
     expect(room.players.map((p) => p.id)).toEqual(['p1', 'p2']);
+  });
+});
+
+describe('restoring rooms at boot', () => {
+  let dir: string;
+
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'acquire-restore-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  /** Saves a room through a live registry, exactly as a commit would. */
+  async function seedSavedRoom(roomId: string): Promise<SavedRoom> {
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    const room = rooms.fromState(roomId, ['Alex', 'Sam'], fixture());
+    await rooms.persist(room);
+    const [saved] = await store.loadAll();
+    return saved;
+  }
+
+  it('seats a saved room again, with its tokens intact', async () => {
+    const saved = await seedSavedRoom('ABC123');
+
+    const rooms = createRoomRegistry(createFileStore(dir));
+    const count = await rooms.restore();
+
+    expect(count).toBe(1);
+    const room = rooms.get('ABC123');
+    expect(room).toBeDefined();
+    expect(room!.lifecycle()).toBe('playing');
+    // The rejoin material survived the process, which is the whole feature.
+    const token = saved.players[1].token;
+    expect(rooms.join('ABC123', 'Sam', 'p2', token)?.player.id).toBe('p2');
+  });
+
+  it('brings every restored seat back disconnected', async () => {
+    await seedSavedRoom('ABC123');
+
+    const rooms = createRoomRegistry(createFileStore(dir));
+    await rooms.restore();
+
+    // Presence is a fact about live sockets. Nothing is connected to a
+    // process that has only just started.
+    expect(rooms.get('ABC123')!.players.every((p) => !p.connected)).toBe(true);
+  });
+
+  it('restores a finished game as over, not as still playing', async () => {
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    const room = rooms.fromState('END123', ['Alex', 'Sam'], { ...fixture(), stage: 'end' });
+    await rooms.persist(room);
+
+    const revived = createRoomRegistry(createFileStore(dir));
+    await revived.restore();
+
+    // `createGameRoom` used to derive lifecycle as `initial ? 'playing' :
+    // 'lobby'`, which would bring a finished game back as one still waiting
+    // for a move nobody can make.
+    expect(revived.get('END123')!.lifecycle()).toBe('over');
+  });
+
+  it('drops and deletes a record older than the age limit', async () => {
+    await seedSavedRoom('OLD123');
+    const store = createFileStore(dir);
+
+    const rooms = createRoomRegistry(store);
+    const count = await rooms.restore(Date.now() + MAX_AGE_MS + 1);
+
+    expect(count).toBe(0);
+    expect(rooms.get('OLD123')).toBeUndefined();
+    // Deleted, not merely skipped — otherwise the directory grows forever
+    // and every boot re-reads records it will never use.
+    expect(await store.loadAll()).toEqual([]);
+  });
+
+  it('is zero, not a crash, with nothing saved', async () => {
+    const rooms = createRoomRegistry(createFileStore(dir));
+    expect(await rooms.restore()).toBe(0);
   });
 });

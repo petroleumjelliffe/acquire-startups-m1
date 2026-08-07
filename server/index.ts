@@ -4,10 +4,12 @@
 
 import express from 'express';
 import cors from 'cors';
+import { join } from 'node:path';
 import { createServer as createHttpServer, type Server as HttpServer } from 'node:http';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import { project } from './projection.js';
 import { createRoomRegistry, type RoomRegistry, type Seat } from './rooms.js';
+import { createFileStore, createNullStore, type RoomStore } from './store.js';
 import type { Delivery, GameRoom } from './room.js';
 import {
   CLIENT_EVENTS,
@@ -36,14 +38,19 @@ export interface ServerHandle {
   rooms: RoomRegistry;
 }
 
-export function createServer(): ServerHandle {
+export interface ServerOptions {
+  /** Defaults to the null store, so every test that boots a bare server keeps working. */
+  store?: RoomStore;
+}
+
+export function createServer(options: ServerOptions = {}): ServerHandle {
   const app = express();
   app.use(cors());
   app.get('/health', (_req, res) => { res.json({ ok: true }); });
 
   const httpServer = createHttpServer(app);
   const io = new SocketServer(httpServer, { cors: { origin: '*' } });
-  const rooms = createRoomRegistry();
+  const rooms = createRoomRegistry(options.store ?? createNullStore());
   const bindings = new Map<string, Binding>();
 
   function socketsFor(roomId: string, playerId: string): Socket[] {
@@ -326,7 +333,15 @@ function randomSeed(): string {
 
 // Started only when run directly, so tests can boot their own on port 0.
 if (process.argv[1]?.endsWith('index.ts')) {
-  const { httpServer } = createServer();
+  const store = createFileStore(join(process.cwd(), 'server', 'games'));
+  const { httpServer, rooms } = createServer({ store });
   const port = Number(process.env.PORT ?? 3001);
-  httpServer.listen(port, () => console.log(`✓ Server listening on ${port}`));
+
+  // Before `listen`, not after: a client that connects into a half-restored
+  // registry would be told its room does not exist and would clear the very
+  // identity that was about to work.
+  void rooms.restore().then((count) => {
+    if (count > 0) console.log(`✓ Restored ${count} room(s)`);
+    httpServer.listen(port, () => console.log(`✓ Server listening on ${port}`));
+  });
 }
