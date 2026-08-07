@@ -9,7 +9,7 @@ import { createServer as createHttpServer, type Server as HttpServer } from 'nod
 import { Server as SocketServer, type Socket } from 'socket.io';
 import { project } from './projection.js';
 import { createRoomRegistry, type RoomRegistry, type Seat } from './rooms.js';
-import { createFileStore, createNullStore, type RoomStore } from './store.js';
+import { createFileStore, createNullStore, SAVE_VERSION, type RoomStore } from './store.js';
 import { registerDevSeed } from './devSeed.js';
 import type { Delivery, GameRoom } from './room.js';
 import {
@@ -48,7 +48,19 @@ export interface ServerOptions {
 export function createServer(options: ServerOptions = {}): ServerHandle {
   const app = express();
   app.use(cors());
-  app.get('/health', (_req, res) => { res.json({ ok: true }); });
+  /**
+   * Alive, and what it speaks.
+   *
+   * The versions are here because a handshake that fails cannot report why:
+   * a client refused with `versionMismatch` knows only its own number. This
+   * endpoint needs no version of its own to answer, so it stays reachable in
+   * exactly the situation you are trying to diagnose — and it makes "what is
+   * deployed" one curl rather than a trip to the hosting dashboard, which is
+   * what it took on 2026-08-07.
+   */
+  app.get('/health', (_req, res) => {
+    res.json({ ok: true, protocolVersion: PROTOCOL_VERSION, saveVersion: SAVE_VERSION });
+  });
 
   const httpServer = createHttpServer(app);
   const io = new SocketServer(httpServer, { cors: { origin: '*' } });

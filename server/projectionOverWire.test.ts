@@ -406,7 +406,9 @@ describe('an intent or undo sent before the game has begun', () => {
       // actually serving requests.
       const health = await fetch(`http://localhost:${server.port}/health`);
       expect(health.ok).toBe(true);
-      expect(await health.json()).toEqual({ ok: true });
+      // Shape asserted in `versioning.test.ts`; here it only has to prove the
+      // process is still serving HTTP after everything above.
+      expect((await health.json()).ok).toBe(true);
     } finally {
       p1.close();
     }
@@ -559,7 +561,9 @@ describe('a malformed or absent payload', () => {
 
       const health = await fetch(`http://localhost:${server.port}/health`);
       expect(health.ok).toBe(true);
-      expect(await health.json()).toEqual({ ok: true });
+      // Shape asserted in `versioning.test.ts`; here it only has to prove the
+      // process is still serving HTTP after everything above.
+      expect((await health.json()).ok).toBe(true);
     } finally {
       buyer.close();
       trader.close();

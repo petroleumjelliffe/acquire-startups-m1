@@ -11,6 +11,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
 import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
+import { SAVE_VERSION } from './store.js';
 import {
   CLIENT_EVENTS,
   SERVER_EVENTS,
@@ -109,6 +110,35 @@ describe('joinRoom refuses a protocol it does not speak', () => {
     } finally {
       client.close();
     }
+  });
+});
+
+/**
+ * Motivated by a real blind spot, on 2026-08-07: with a local client about to
+ * be pointed at the deployed server, there was no way to tell what that server
+ * was running short of opening the Render dashboard. `/health` answered
+ * `{ ok: true }` — alive, and nothing else. A client expecting Phase 4's wire
+ * against a server that predates it would have presented as a game bug.
+ */
+describe('/health says what this server speaks', () => {
+  it('reports both versions', async () => {
+    const res = await fetch(`http://localhost:${server.port}/health`);
+
+    expect(res.status).toBe(200);
+    // Read from the constants, not typed in again: a literal here would go
+    // stale at the first bump and assert that the bump had not happened.
+    expect(await res.json()).toEqual({
+      ok: true,
+      protocolVersion: PROTOCOL_VERSION,
+      saveVersion: SAVE_VERSION,
+    });
+  });
+
+  it('needs no version of its own to answer', async () => {
+    // The point of it: a client that cannot complete the handshake — the
+    // exact case you are debugging — can still ask what the server speaks.
+    const res = await fetch(`http://localhost:${server.port}/health`);
+    expect((await res.json()).protocolVersion).toBe(PROTOCOL_VERSION);
   });
 });
 
