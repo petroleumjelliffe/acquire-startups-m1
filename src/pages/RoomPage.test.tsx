@@ -247,16 +247,34 @@ describe('the lobby', () => {
     expect(f.renames).toEqual([]);
   });
 
-  it('the × gives up the seat and forgets it', () => {
+  it('Leave gives up the seat and forgets it', () => {
     const f = seated('Sam', false);
     expect(loadIdentity('ABC123')).not.toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: /leave your seat/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^leave$/i }));
 
     expect(f.seatLeaves).toHaveLength(1);
     // The token is dead with the seat — keeping it would make the next visit
     // attempt a rejoin the server must refuse.
     expect(loadIdentity('ABC123')).toBeNull();
+  });
+
+  /**
+   * The mockup draws a × on your own row in both cards. It was dropped
+   * (owner, 2026-08-07): `Leave` directly below the roster already vacates
+   * your seat, so the × was a second control for one action — and on the
+   * host's row it read as "boot yourself", which is not a thing anyone needs.
+   * See ../../docs/superpowers/plans/2026-08-07-lobby-flow-corrections.md.
+   */
+  it('gives no row a × of its own — Leave is the only way out', () => {
+    seated('Sam', false);
+
+    expect(screen.queryByRole('button', { name: /leave your seat/i })).toBeNull();
+    // Enumerated rather than counted, so the check cannot pass merely because
+    // the × was relabelled. Sam is not the host, so `Leave` is the whole set.
+    expect(
+      screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent),
+    ).toEqual(['Leave']);
   });
 });
 

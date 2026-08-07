@@ -210,9 +210,9 @@ export interface RosterMessage {
  * the moment a service worker makes an old client durable, which is the reason
  * this landed before the PWA rather than inside it.
  *
- * 2 (2026-08-07): `renamePlayer` and `leaveSeat` — the lobby's own-row edit
- * and ×, from the Lobby Flow design. The first bump this constant ever took,
- * hours after it landed.
+ * 2 (2026-08-07): `renamePlayer` and `leaveSeat` — the lobby's own-row edit,
+ * and giving your seat up, from the Lobby Flow design. The first bump this
+ * constant ever took, hours after it landed.
  */
 export const PROTOCOL_VERSION = 2;
 
@@ -241,9 +241,10 @@ export const CLIENT_EVENTS = {
    */
   renamePlayer: 'renamePlayer',
   /**
-   * Vacate your own seat, in the lobby only. The design's ×, on your own row
-   * and nobody else's. Distinct from a disconnect, which keeps the seat and
-   * marks it away: this one gives it up.
+   * Vacate your own seat, in the lobby only — your own and nobody else's,
+   * since identity comes from the socket binding. Sent by the lobby's `Leave`.
+   * Distinct from a disconnect, which keeps the seat and marks it away: this
+   * one gives it up.
    */
   leaveSeat: 'leaveSeat',
 } as const;

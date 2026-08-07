@@ -28,7 +28,7 @@ export interface Room {
   /** Rename your own seat, lobby-only. The roster broadcast is the answer. */
   rename(name: string): void;
   /**
-   * Give up your own seat, lobby-only — the design's ×. Clears the stored
+   * Give up your own seat, lobby-only — the lobby's `Leave`. Clears the stored
    * identity too: the seat is gone, so the token is dead, and keeping it
    * would make the next visit attempt a rejoin the server must refuse.
    */
