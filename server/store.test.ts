@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import { createFileStore, createNullStore, SAVE_VERSION, type SavedRoom } from './store.js';
+import { PROTOCOL_VERSION } from '../session/protocol.js';
 import type { RoomPlayer } from './room.js';
 
 // `spy: true` auto-mocks every export but calls through to the real
@@ -37,6 +38,7 @@ function record(overrides: Partial<SavedRoom> = {}): SavedRoom {
   return {
     roomId: 'ABC123',
     version: SAVE_VERSION,
+    protocolVersion: PROTOCOL_VERSION,
     savedAt: 1_000,
     players: players(),
     state: buildFixture({
@@ -158,6 +160,57 @@ describe('the null store', () => {
     const store = createNullStore();
     await store.save(record());
     await store.remove('ABC123');
+    expect(await store.loadAll()).toEqual([]);
+  });
+});
+
+describe('the record carries what a resumed room needs', () => {
+  it('round-trips the protocol version and the previous segment start', async () => {
+    const store = createFileStore(dir);
+    await store.save(record({ protocolVersion: PROTOCOL_VERSION, previousSegmentStart: 7 }));
+
+    const [loaded] = await store.loadAll();
+
+    expect(loaded.protocolVersion).toBe(PROTOCOL_VERSION);
+    // Without this the step stack's "previous turn" is blank after a restart —
+    // the exact gap the field was added to close, left open for the restart
+    // case until now.
+    expect(loaded.previousSegmentStart).toBe(7);
+  });
+
+  it('accepts a record from before any segment had closed', async () => {
+    // `previousSegmentStart` is genuinely absent until a first segment closes,
+    // so undefined has to survive the round trip as undefined rather than
+    // failing the shape guard.
+    const store = createFileStore(dir);
+    await store.save(record({ protocolVersion: PROTOCOL_VERSION }));
+
+    const [loaded] = await store.loadAll();
+
+    expect(loaded.previousSegmentStart).toBeUndefined();
+    expect(loaded.roomId).toBe('ABC123');
+  });
+
+  it('refuses a record with no protocol version at all', async () => {
+    const store = createFileStore(dir);
+    // Written by hand rather than through `save`: this is what a file left by
+    // an older server looks like, and nothing in this process can produce one.
+    const { protocolVersion, ...older } = record({ protocolVersion: PROTOCOL_VERSION });
+    await writeFile(join(dir, 'game-older.json'), JSON.stringify(older), 'utf8');
+
+    expect(await store.loadAll()).toEqual([]);
+  });
+
+  it('refuses the previous save format outright', async () => {
+    const store = createFileStore(dir);
+    await writeFile(
+      join(dir, 'game-v4.json'),
+      JSON.stringify(record({ version: SAVE_VERSION - 1, protocolVersion: PROTOCOL_VERSION })),
+      'utf8',
+    );
+
+    // A version-4 record has no `protocolVersion` and no `previousSegmentStart`
+    // — it is not upgradable, only discardable.
     expect(await store.loadAll()).toEqual([]);
   });
 });

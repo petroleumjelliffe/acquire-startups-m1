@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import { createRoomRegistry, MAX_AGE_MS } from './rooms.js';
 import { createFileStore, SAVE_VERSION, type SavedRoom } from './store.js';
+import { PROTOCOL_VERSION } from '../session/protocol.js';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -155,6 +156,67 @@ describe('restoring rooms at boot', () => {
     expect(revived.get('END123')!.lifecycle()).toBe('over');
   });
 
+  /**
+   * The sweep item this stage closes: `previousSegmentStart` was not on
+   * `SavedRoom`, so a client resuming a restored room got `undefined` and the
+   * step stack's previous turn stayed blank until the next commit — the exact
+   * gap the field was added to close, unclosed for the restart case.
+   *
+   * End to end on purpose: driven through a real segment close, persisted,
+   * restored, and read back off the *room*, not the record. A store-level
+   * round trip alone would pass with the registry still dropping the value on
+   * the floor.
+   */
+  it('hands a restored room its previous segment start back', async () => {
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    // Not this file's shared `fixture()`: there A1 belongs to *Sam*, so a
+    // 'p1' placement is refused and no segment ever closes — the guard below
+    // caught exactly that on the first run. Here Alex holds A1, which touches
+    // nothing, so the placement founds no chain and `endTurn` closes cleanly.
+    const room = rooms.fromState('SEG123', ['Alex', 'Sam'], buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['A1'] },
+        { name: 'Sam', cash: 6000, hand: ['H8'] },
+      ],
+      bag: ['I11'],
+    }));
+    room.dispatch('p1', { type: 'placeTile', coord: 'A1' });
+    room.dispatch('p1', { type: 'endTurn' });
+    const closed = room.previousSegmentStart();
+    expect(closed, 'no segment ever closed — the test proves nothing').toBeDefined();
+    await rooms.persist(room);
+
+    const revived = createRoomRegistry(createFileStore(dir));
+    await revived.restore();
+
+    expect(revived.get('SEG123')!.previousSegmentStart()).toBe(closed);
+  });
+
+  it('skips a record written by a different protocol, and still seats the good one', async () => {
+    await seedSavedRoom('GOOD01');
+    const store = createFileStore(dir);
+    const [good] = await store.loadAll();
+    // What a file written by last week's server looks like after a protocol
+    // bump: valid in every respect except the wire its state speaks.
+    await writeFile(
+      join(dir, 'game-oldwire.json'),
+      JSON.stringify({ ...good, roomId: 'STALE1', protocolVersion: good.protocolVersion + 1 }),
+      'utf8',
+    );
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const revived = createRoomRegistry(createFileStore(dir));
+    const count = await revived.restore();
+
+    // One room, not zero and not two: the mismatch costs exactly the room
+    // that cannot be trusted, and says so rather than dropping it silently.
+    expect(count).toBe(1);
+    expect(revived.get('GOOD01')).toBeDefined();
+    expect(revived.get('STALE1')).toBeUndefined();
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('STALE1'))).toBe(true);
+  });
+
   it('drops and deletes a record older than the age limit', async () => {
     await seedSavedRoom('OLD123');
     const store = createFileStore(dir);
@@ -244,5 +306,14 @@ describe('what persist writes to disk', () => {
 
     const [saved] = await store.loadAll();
     expect(saved.state.board).toEqual(room.committed().board);
+  });
+
+  it('stamps the record with the wire it was written by', async () => {
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    await rooms.persist(rooms.fromState('X', ['Alex', 'Sam'], fixture()));
+
+    const [saved] = await store.loadAll();
+    expect(saved.protocolVersion).toBe(PROTOCOL_VERSION);
   });
 });

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { GameState } from '../engine/gameTypes.js';
 import { createGameRoom, type GameRoom, type RoomPlayer } from './room.js';
 import { createNullStore, SAVE_VERSION, type RoomStore, type SavedRoom } from './store.js';
+import { PROTOCOL_VERSION } from '../session/protocol.js';
 
 export interface Seat {
   room: GameRoom;
@@ -118,6 +119,10 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
       const record: SavedRoom = {
         roomId: room.id,
         version: SAVE_VERSION,
+        // The wire this state was written by. A room now outlives a deploy,
+        // so a record from an older server is the same skew a stale socket
+        // brings, arriving from storage — `restore` checks it below.
+        protocolVersion: PROTOCOL_VERSION,
         savedAt: Date.now(),
         // Copied, not referenced: `connected` mutates under a live socket and
         // a record is a snapshot. The value written is irrelevant — `restore`
@@ -125,6 +130,9 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
         // after it was handed over is a trap for the next reader.
         players: room.players.map((p) => ({ ...p })),
         state: room.committed(),
+        // So a client resuming a restored room still sees the previous turn
+        // in its step stack, rather than a blank until the next commit.
+        previousSegmentStart: room.previousSegmentStart(),
       };
       await store.save(record);
     },
@@ -145,13 +153,28 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
           continue;
         }
 
+        // A record written by a different wire is the same skew a stale
+        // socket brings, arriving from storage. Skipped rather than deleted:
+        // the file is not damaged, merely untrusted, and eviction will clear
+        // it by age if no matching server ever comes back for it.
+        if (record.protocolVersion !== PROTOCOL_VERSION) {
+          console.warn(
+            `! Not restoring ${record.roomId}: written by protocol ` +
+              `${record.protocolVersion}, this server speaks ${PROTOCOL_VERSION}`,
+          );
+          continue;
+        }
+
         try {
           // Never `connected: true`, whatever the record says. A record is a
           // snapshot of a moment when sockets were open; this process has
           // none. The roster broadcast that follows each rejoin is what turns
           // these back on, one seat at a time.
           const players = record.players.map((p) => ({ ...p, connected: false }));
-          rooms.set(record.roomId, createGameRoom(record.roomId, players, record.state));
+          rooms.set(
+            record.roomId,
+            createGameRoom(record.roomId, players, record.state, record.previousSegmentStart),
+          );
           seated++;
         } catch (e) {
           // `isSavedRoom` only checks that `state` is *an object* — it trusts

@@ -62,6 +62,14 @@ export function createGameRoom(
   id: string,
   players: RoomPlayer[],
   initial?: GameState,
+  /**
+   * Where the segment before the open one began, for a *restored* room.
+   *
+   * Only `restore` passes this. A live room computes it as segments close; a
+   * restored one lost that memory with its process, and without it the step
+   * stack's previous turn is blank until the next commit.
+   */
+  initialPreviousSegmentStart?: number,
 ): GameRoom {
   // A restored game that has already ended comes back `over`, not `playing`.
   // Deriving this from the state rather than from "was I handed one" is what
@@ -70,7 +78,7 @@ export function createGameRoom(
   let lifecycle: Lifecycle = initial ? (initial.stage === 'end' ? 'over' : 'playing') : 'lobby';
   let session: GameSession | null = initial ? createGameSession({ state: initial }) : null;
   let committed: GameState | null = session ? session.getView().state : null;
-  let previousSegmentStart: number | undefined;
+  let previousSegmentStart: number | undefined = initialPreviousSegmentStart;
 
   function open(): GameSession {
     if (!session) throw new Error(`room ${id} has not begun`);

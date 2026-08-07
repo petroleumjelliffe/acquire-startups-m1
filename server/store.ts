@@ -17,22 +17,45 @@ import type { GameState } from '../engine/gameTypes.js';
 import type { RoomPlayer } from './room.js';
 
 /**
- * Bumped to 4 for Phase 4: a record now carries the roster and its rejoin
- * tokens, which version 3 did not. Version 3's own header said why that
- * mattered — a game restored without them is one nobody can rejoin — so a
- * version-3 file is not upgradable, only discardable.
+ * Bumped to 5 for Stage 1: a record now carries `protocolVersion` and
+ * `previousSegmentStart`. Neither can be invented for an older file — one is
+ * unknowable and the other was never recorded — so a version-4 file is not
+ * upgradable, only discardable, exactly as version 3 was before it.
+ *
+ * This is the *record format*, not the wire. The two move independently: a
+ * change to how a room is stored need not touch the protocol, and a protocol
+ * bump does not necessarily change the file's shape.
  */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 export interface SavedRoom {
   roomId: string;
   version: number;
+  /**
+   * The wire this record's `state` was written by.
+   *
+   * Rooms outlive a deploy now, so a room written by an older server is the
+   * same version skew a stale socket brings, arriving from storage instead.
+   * The *policy* — what to do about a mismatch — is the registry's, in
+   * keeping with this file's division: the store hands back anything it can
+   * parse and decides nothing.
+   */
+  protocolVersion: number;
   /** Epoch ms. The registry's eviction policy reads this; the store does not. */
   savedAt: number;
   /** Including `token`, which is the whole reason a restored room is rejoinable. */
   players: RoomPlayer[];
   /** Committed only. A draft is never written — it was never real. */
   state: GameState;
+  /**
+   * Where the segment before the open one began, if one has closed.
+   *
+   * Genuinely absent until a first segment closes, so `undefined` is a real
+   * value here rather than a missing field. Without it a client resuming a
+   * restored room gets a blank previous turn in the step stack — the gap the
+   * field was added to close, left open for the restart case until Stage 1.
+   */
+  previousSegmentStart?: number;
 }
 
 export interface RoomStore {
@@ -61,6 +84,12 @@ function isRoomPlayer(value: unknown): value is RoomPlayer {
  * "is an object": it came from this server's own engine, and re-validating a
  * whole `GameState` here would be a second copy of the engine's types that
  * could drift from the first.
+ *
+ * Neither `SAVE_VERSION` nor `protocolVersion` closes that hole. Both are
+ * bumped by hand, so a `GameState` change that lands without one is still
+ * uncaught here and surfaces as a throw inside `createGameRoom` — which is
+ * why `restore` treats one bad record as costing one room, never the boot.
+ * Phase 4's boot-fragility bug came through exactly this gap.
  */
 function isSavedRoom(value: unknown): value is SavedRoom {
   if (typeof value !== 'object' || value === null) return false;
@@ -68,11 +97,16 @@ function isSavedRoom(value: unknown): value is SavedRoom {
   return (
     typeof r.roomId === 'string' &&
     r.version === SAVE_VERSION &&
+    typeof r.protocolVersion === 'number' &&
     typeof r.savedAt === 'number' &&
     Array.isArray(r.players) &&
     r.players.every(isRoomPlayer) &&
     typeof r.state === 'object' &&
-    r.state !== null
+    r.state !== null &&
+    // Optional, but not any shape: absent is a record from before the first
+    // segment closed, a number is a real position, and anything else is a
+    // file that has been edited.
+    (r.previousSegmentStart === undefined || typeof r.previousSegmentStart === 'number')
   );
 }
 
