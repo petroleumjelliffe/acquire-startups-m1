@@ -202,24 +202,35 @@ while the file store is ephemeral on Render.
 
 ## Verification
 
-### Zeroth: a pristine baseline
+### Zeroth: a pristine baseline — already clear
 
-`npx vitest run` has printed `ExperimentalWarning: localStorage is not available…` on every run
-since 3b Task 4. `src/test/setup.ts:24`'s `if (!globalThis.localStorage)` fires it by *reading* the
-getter, and it leaks into the `node` project too. Phase 4 starts by probing with
-`Object.getOwnPropertyDescriptor` instead, so the phase's own claims are made against a clean run.
+The 3b carry-forward handed Phase 4 an unresolved `ExperimentalWarning: localStorage is not
+available…` on every `npx vitest run`, and this design was written expecting to clear it first.
+**Checked before planning: it is already fixed.** `src/test/setup.ts` now installs the shim with an
+unconditional `Object.defineProperty` — never reading the getter that fired the warning — and loads
+for the jsdom project only. The fix landed after `cbe4a8d`, during Phase 5.
 
-**Done when:** `npx vitest run` emits no warning line.
+Measured on this tree, 2026-08-06: `npx vitest run` → **622 tests in 60 files, all passing, no
+warning line**. `npx vitest run --project node engine/startups.test.ts`, the carry-forward's own
+minimal reproduction, is also clean.
+
+Phase 4 therefore starts from the pristine baseline the project's standard expects, and owes no
+work here. The figure above is this phase's before-count.
 
 ### Test 1 — refresh mid-turn (jsdom)
 
-Render `RoomPage`, play a placement into an open segment, unmount, **`closeConnection()`**, remount.
+Render `RoomPage`, reach an open segment, unmount, and remount **against a freshly built fake
+connection** — not the same instance.
 
-That middle call is load-bearing: without it, `getConnection()`'s module-level socket survives the
-"reload" and the test models something a real `F5` never does.
+That last part is load-bearing. A real `F5` destroys the module-level socket `getConnection()`
+holds, so a remount that reuses the same connection object models something a reload never does:
+listeners already registered, status already `open`, no rejoin needed. (`closeConnection()` is not
+the lever here — it acts on the module singleton, which `RoomPage`'s injected `connect` bypasses in
+tests.) A fresh fake is the faithful stand-in, and `localStorage` surviving across the two mounts is
+what makes it a rejoin rather than a first visit.
 
-Assert the remount re-sends the stored identity, and that the restored view carries the placed tile
-and the same `segmentStart`.
+Assert the remount re-sends the stored identity, and that a `resume` carrying the draft restores
+the open segment — the placed tile on the board, and the draft's `segmentStart`.
 
 **Stated limit, in the test file:** a remount is not a reload. This is the one place harness A
 approximates rather than reproduces, and the prod by-hand pass is what covers it.
@@ -289,5 +300,5 @@ pass proves is the honest ending, not durability.
 - A room the server does not have says so, by name, with a way back to the lobby.
 - A dropped player is visible on the seat and named in the toast when the game is waiting on them.
 - A cold start says what it is doing.
-- `npx vitest run` is clean, and each of the three recovery tests has been shown to fail against a
-  named break.
+- `npx vitest run` is still clean — it already is, at 622 tests in 60 files — and each of the three
+  recovery tests has been shown to fail against a named break.
