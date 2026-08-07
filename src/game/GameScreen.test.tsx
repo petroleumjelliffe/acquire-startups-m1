@@ -66,7 +66,9 @@ describe('GameScreen', () => {
 
     fireEvent.click(onBoard('E6'));
     fireEvent.click(screen.getByRole('button', { name: /^messla$/i }));
-    // One button ends the buy step: "Skip" with nothing staged.
+    // Buying nothing is said once — Pass arms End turn, the same way staging
+    // a share would. The turn cannot end over an empty basket by accident.
+    fireEvent.click(screen.getByRole('button', { name: /^pass$/i }));
     fireEvent.click(screen.getByRole('button', { name: /^end turn$/i }));
 
     expect(screen.getByText(/pass to sam/i)).toBeInTheDocument();

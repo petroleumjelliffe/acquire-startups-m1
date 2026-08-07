@@ -51,8 +51,9 @@ describe('Board', () => {
     expect(screen.queryByText('1-1')).not.toBeInTheDocument();
   });
 
-  // The initial is `Z` rather than `A` on purpose: the row headers render the
-  // letters A–I, so a bare getByText('A') matches the header as well as the
+  // The initial is `Z` rather than `A` on purpose, a habit from when row
+  // headers rendered A–I beside the grid (removed 2026-08-07) — and `Z` still
+  // cannot collide with any coordinate letter, so it stays the safer probe. It matches the
   // badge and throws on the duplicate. Scoping to the cell pins what the test
   // is actually about — the badge is an initial, and it is on that tile.
   it('badges the last-placed tile with an initial, not a full name', () => {
@@ -114,7 +115,7 @@ describe('Board', () => {
     expect(hq).toHaveAttribute('title', 'E3');
   });
 
-  it('renders 108 cells plus headers', () => {
+  it('renders 108 cells and nothing else — the headers are gone', () => {
     const { container } = render(<Board board={createEmptyBoard()} />);
     expect(container.querySelectorAll('[title]').length).toBe(108);
   });

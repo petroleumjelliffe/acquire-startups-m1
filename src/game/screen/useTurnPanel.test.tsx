@@ -328,14 +328,63 @@ describe('useTurnPanel — buying', () => {
     expect(buy).toBeDisabled();
   });
 
-  it('ends the turn without buying, through the one button', () => {
+  /**
+   * Ending without buying is one press from a mistake that cannot be undone —
+   * `endTurn` closes the segment, which is the undo floor. Found by hand
+   * (owner, 2026-08-07): "it's easy to press continue without buying, and
+   * too late to undo." So an empty basket asks the player to *say* they are
+   * passing before End turn arms, the same way staging a share arms it.
+   */
+  it('will not end the turn over an empty basket until the player passes', () => {
     const dispatch = vi.fn();
     render(<Harness session={atBuy()} dispatch={dispatch} />);
-    // One button, not two: an empty basket reads as "End turn" — the outcome
-    // of the press — rather than "Confirm purchase" with nothing to confirm.
-    expect(screen.getAllByRole('button', { name: /end turn|confirm purchase/i })).toHaveLength(1);
+
+    const endTurn = screen.getByRole('button', { name: /^end turn$/i });
+    expect(endTurn).toBeDisabled();
+
+    fireEvent.click(endTurn);
+    expect(dispatch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /^pass$/i }));
+    expect(endTurn).toBeEnabled();
+
+    fireEvent.click(endTurn);
+    expect(dispatch).toHaveBeenCalledWith({ type: 'endTurn', playerId: 'p1' });
+  });
+
+  it('starts with Pass already pressed when there is nothing to buy', () => {
+    // One founded chain, sold out — every path to a purchase is closed, so
+    // making the player press Pass would be asking them to confirm an
+    // omission they had no way to avoid.
+    const nothingToBuy = buildFixture({
+      stage: 'buy',
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['H8'], shares: { Messla: 13 } },
+        { name: 'Sam', cash: 6000, hand: ['A1'], shares: { Messla: 12 } },
+      ],
+      chains: [{ id: 'Messla', coords: ['E5', 'E6'] }],
+      bag: ['I11', 'I12'],
+    });
+    expect(nothingToBuy.startups.Messla.availableShares, 'fixture not sold out').toBe(0);
+    const dispatch = vi.fn();
+
+    render(<Harness session={createGameSession({ state: nothingToBuy })} dispatch={dispatch} />);
+
+    expect(screen.getByRole('button', { name: /^pass$/i })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: /^end turn$/i }));
     expect(dispatch).toHaveBeenCalledWith({ type: 'endTurn', playerId: 'p1' });
+  });
+
+  it('swaps the pass pair for Confirm purchase once a share is staged', () => {
+    render(<Harness session={atBuy()} dispatch={() => {}} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /buy one messla/i }));
+
+    // Staging a share arms the turn-ending press by itself; the pass
+    // question no longer applies and its buttons leave.
+    expect(screen.getByRole('button', { name: /confirm purchase/i })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /^pass$/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^end turn$/i })).toBeNull();
   });
 
   /**

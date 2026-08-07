@@ -7,7 +7,7 @@ describe('layout', () => {
   it('keeps the board on a fixed aspect ratio so it never needs to scroll', () => {
     const { container } = render(<Board board={createEmptyBoard()} />);
     const grid = container.querySelector('[data-board="grid"]')!;
-    expect(grid.className).toMatch(/aspect-\[13\/10\]/);
+    expect(grid.className).toMatch(/aspect-\[12\/9\]/);
     expect(grid.className).toMatch(/\[container-type:inline-size\]/);
   });
 

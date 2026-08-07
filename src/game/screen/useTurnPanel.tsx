@@ -62,9 +62,16 @@ interface Staged {
   picks: StartupId[];
   sell: number;
   trade: number;
+  /**
+   * The buy step's "I mean to buy nothing." `endTurn` closes the segment —
+   * the undo floor — so ending over an empty basket must be said once, the
+   * same way staging a share says it. Reset with the rest of the staging
+   * whenever the actor or stage moves.
+   */
+  passed: boolean;
 }
 
-const NOTHING_STAGED: Staged = { picks: [], sell: 0, trade: 0 };
+const NOTHING_STAGED: Staged = { picks: [], sell: 0, trade: 0, passed: false };
 
 /**
  * How big the chain being founded will be: the placed tile plus every
@@ -498,6 +505,25 @@ export function useTurnPanel(
     // what everyone else has been spending on. A row that quietly gets shorter
     // says none of that.
     const founded = Object.values(state.startups).filter((s) => s.isFounded);
+
+    // Whether any purchase is possible at all: something founded, with shares
+    // left past what is already staged, at a price the remaining cash covers,
+    // inside the per-turn limit. When it is not, the pass below starts
+    // pressed — asking a player to confirm an omission they had no way to
+    // avoid is a dead end wearing a safety feature's clothes.
+    const canBuySomething =
+      remaining > 0 &&
+      founded.some((s) => {
+        const id = s.id;
+        if (!isStartupId(id)) return false;
+        const alreadyStaged = staged.picks.filter((p) => p === id).length;
+        return (
+          s.availableShares - alreadyStaged > 0 &&
+          getSharePrice(state, id) <= (player?.cash ?? 0) - spent
+        );
+      });
+    const passed = staged.passed || !canBuySomething;
+
     const basket = Object.entries(
       staged.picks.reduce<Record<string, number>>(
         (acc, id) => ({ ...acc, [id]: (acc[id] ?? 0) + 1 }),
@@ -609,35 +635,55 @@ export function useTurnPanel(
               />
             ) : null,
           )}
-          action={!canAct ? undefined : (
+          action={!canAct ? undefined : staged.picks.length === 0 ? (
             /*
-              One button, because the buy step has exactly two outcomes and
-              they are the same move: you take what you staged and your turn is
-              over. A separate "End turn" beside it asked the player to say
-              twice what they had already said once, and reading "Confirm
-              purchase" with an empty basket is the same dead end from the
-              other side — hence "End turn" with an empty basket, which is all
-              that press actually does. It says the outcome rather than the
-              omission: "Skip" invited the question "skip what?".
+              An empty basket does not arm the turn-ending press by itself.
+              `endTurn` closes the segment — the undo floor — and "one button
+              that always works" shipped exactly the mistake it invited: an
+              accidental press past the buy, with nothing to undo (owner,
+              2026-08-07). Passing is now said once, the way staging a share
+              is said once; when no purchase is possible at all, Pass starts
+              pressed, because confirming an unavoidable omission is a dead
+              end wearing a safety feature's clothes. Two buttons in one row,
+              so the action zone's height never moves.
             */
+            <div className="flex w-full gap-2">
+              <button
+                type="button"
+                aria-pressed={passed}
+                disabled={!canBuySomething}
+                onClick={() => setStaged({ ...staged, passed: !staged.passed })}
+                className={
+                  passed
+                    ? 'm-0 flex-1 rounded-lg border border-blue-600 bg-blue-50 px-3 text-sm font-semibold text-blue-700'
+                    : 'm-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50'
+                }
+              >
+                Pass
+              </button>
+              <button
+                type="button"
+                disabled={!passed}
+                onClick={() => {
+                  dispatch({ type: 'endTurn', playerId: actorId });
+                  setStaged(NOTHING_STAGED);
+                }}
+                className="m-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
+              >
+                End turn
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
               onClick={() => {
-                if (staged.picks.length > 0) {
-                  dispatch({ type: 'buyShares', playerId: actorId, picks: staged.picks });
-                }
+                dispatch({ type: 'buyShares', playerId: actorId, picks: staged.picks });
                 dispatch({ type: 'endTurn', playerId: actorId });
                 setStaged(NOTHING_STAGED);
               }}
-              className={
-                staged.picks.length === 0
-                  // Ending without buying is not the thing you came here to
-                  // do, so it does not wear the primary treatment.
-                  ? 'm-0 w-full rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50'
-                  : 'm-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700'
-              }
+              className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
             >
-              {staged.picks.length === 0 ? 'End turn' : 'Confirm purchase'}
+              {'Confirm purchase'}
             </button>
           )}
         />

@@ -56,18 +56,15 @@ export function Board({
   onCellClick,
 }: BoardProps) {
   return (
+    // No row or column headers (owner, 2026-08-07): they spent a column and a
+    // row of space repeating what every tile already carries — each cell is
+    // labelled with its own A1-style coordinate — and helped nobody. The
+    // aspect follows the grid: 12×9 cells now, not 13×10 tracks.
     <div
       data-board="grid"
       style={GRID_VARS}
-      className="grid h-full max-w-full grid-cols-[22px_repeat(12,1fr)] gap-[5px] rounded-xl bg-gray-200 p-2 aspect-[13/10] [container-type:inline-size]"
+      className="grid h-full max-w-full grid-cols-[repeat(12,1fr)] gap-[5px] rounded-xl bg-gray-200 p-2 aspect-[12/9] [container-type:inline-size]"
     >
-      <div />
-      {COLS.map((c) => (
-        <div key={`col-${c}`} className="flex items-center justify-center text-[11px] text-gray-600">
-          {c}
-        </div>
-      ))}
-
       {ROWS.map((r) => (
         <RowCells
           key={r}
@@ -99,7 +96,6 @@ function RowCells({
 }: Required<Omit<BoardProps, 'onCellClick'>> & { row: (typeof ROWS)[number]; onCellClick?: (c: Coord) => void }) {
   return (
     <>
-      <div className="flex items-center justify-center text-[11px] text-gray-600">{row}</div>
       {COLS.map((c) => {
         const id = toCoord(row, c);
         const cell: TileCell = board[id] ?? { placed: false };
