@@ -34,6 +34,24 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [gone, setGone] = useState(false);
+  /**
+   * Whether this mount is going to join by itself, without asking anyone.
+   *
+   * Read once, at mount, from the same two sources the join effect below
+   * consults. It exists because that effect runs *after* the render in which
+   * the socket first opens — so for one frame `joining` is still false and
+   * the phase expression used to fall all the way through to `needName`,
+   * flashing a join form at a player who already holds a seat and is about
+   * to be put straight back into their game. Seen on a phone, reloading
+   * mid-game: menu, then a join form, then the board.
+   *
+   * Deliberately not recomputed. Once a stored identity is refused, the same
+   * handler that clears it sets `message`, which outranks this — so the form
+   * still appears for the case that genuinely needs it.
+   */
+  const [autoJoins] = useState(
+    () => roomId !== '' && (loadIdentity(roomId) !== null || rememberedName() !== null),
+  );
 
   const sessionRef = useRef<NetworkSession | null>(null);
   // Read once, at mount, for whatever `roomId` the hook first saw. A `roomId`
@@ -193,7 +211,11 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
         : roster !== null ? 'lobby'
           : message !== null ? 'error'
             : status !== 'open' ? 'connecting'
-              : joining ? 'joining'
+              // `autoJoins` alongside `joining`: one means the join has been
+              // sent, the other that it is certain to be, in an effect that
+              // has not run yet. Both should look the same to a player, and
+              // neither is a reason to show a form.
+              : (joining || autoJoins) ? 'joining'
                 : 'needName';
 
   return { phase, status, roster, playerId, session, message, join, begin };

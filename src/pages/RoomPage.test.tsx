@@ -6,6 +6,7 @@ import type { Connection, ConnectionStatus } from '../net/connection';
 import type { JoinedMessage, RejectedMessage, RosterMessage, StateMessage } from '../../session/protocol';
 import { buildFixture } from '../../engine/golden/fixtures';
 import { loadIdentity } from '../net/identity';
+import { useRoom, type RoomPhase } from '../net/useRoom';
 
 function fakeConnection() {
   let joined: ((m: JoinedMessage) => void) | null = null;
@@ -115,6 +116,53 @@ describe('arriving at a room without a seat', () => {
     fireEvent.click(screen.getByRole('button', { name: /join/i }));
 
     expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam' }]);
+  });
+});
+
+/**
+ * Every phase this hook passed through, in order, across every render.
+ *
+ * A settled-DOM assertion cannot see a one-frame flash: `render` wraps its
+ * effects in `act`, so by the time any `expect` runs the effect has already
+ * corrected the phase and the offending frame is gone from the DOM. What a
+ * player sees, though, is frames. Recording them is the only way to assert
+ * one never happened.
+ */
+function phasesSeen(connection: Connection, roomId = 'ABC123'): RoomPhase[] {
+  const phases: RoomPhase[] = [];
+  function Probe() {
+    phases.push(useRoom(roomId, () => connection).phase);
+    return null;
+  }
+  render(<Probe />);
+  return phases;
+}
+
+describe('a returning player is never shown a form they will not fill in', () => {
+  it('goes straight to joining, with no needName frame, when a seat is stored', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p2', token: 'tok', name: 'Sam' }),
+    );
+    const f = fakeConnection();
+
+    const phases = phasesSeen(f.connection);
+
+    // The join is sent from an effect, which runs *after* the render where
+    // the socket first reads as open. That render used to fall through to
+    // `needName` and paint a join form at someone already holding a seat —
+    // seen on a phone reloading mid-game: menu, then a join form, then the
+    // board.
+    expect(phases).not.toContain('needName');
+    expect(phases.at(-1)).toBe('joining');
+  });
+
+  it('still asks a genuine stranger for a name', () => {
+    // Nothing stored, and no remembered name: this is the one case the form
+    // exists for, and suppressing it here would strand the player.
+    const phases = phasesSeen(fakeConnection().connection);
+
+    expect(phases).toContain('needName');
   });
 });
 
