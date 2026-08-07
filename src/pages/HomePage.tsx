@@ -22,7 +22,7 @@ export function HomePage() {
             <div className="flex items-start gap-4">
               <span className="text-3xl">🌐</span>
               <div className="flex-1">
-                <div className="font-bold text-xl mb-1">Online Multiplayer</div>
+                <div className="font-bold text-xl mb-1">Online</div>
                 <div className="text-blue-100 text-sm">
                   Each player joins from their own device. Share a room link to play together remotely.
                 </div>
@@ -48,7 +48,7 @@ export function HomePage() {
         </div>
 
         <div className="mt-8 text-center text-xs text-gray-400">
-          Both modes support 2-6 players
+          Both modes support 2–6 players
         </div>
       </div>
     </div>

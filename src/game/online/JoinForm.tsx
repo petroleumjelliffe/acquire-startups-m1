@@ -5,6 +5,8 @@ export interface JoinFormProps {
   /** Fixed when the room is already known (a shared link); editable otherwise. */
   roomId?: string;
   title: string;
+  /** The line under the title. The mockup gives every card one. */
+  subtitle?: string;
   submitLabel: string;
   /**
    * A submission is outstanding: disables the button (alongside the existing
@@ -20,7 +22,7 @@ export interface JoinFormProps {
   onSubmit(name: string, roomId: string): void;
 }
 
-export function JoinForm({ roomId, title, submitLabel, busy = false, busyLabel, error, onSubmit }: JoinFormProps) {
+export function JoinForm({ roomId, title, subtitle, submitLabel, busy = false, busyLabel, error, onSubmit }: JoinFormProps) {
   const [name, setName] = useState(getRandomEmojiName);
   const [code, setCode] = useState(roomId ?? '');
 
@@ -35,7 +37,8 @@ export function JoinForm({ roomId, title, submitLabel, busy = false, busyLabel, 
           if (ready && !busy) onSubmit(name.trim(), code.trim().toUpperCase());
         }}
       >
-        <h1 className="mb-6 text-center text-2xl font-bold">{title}</h1>
+        <h1 className={`text-center text-2xl font-bold ${subtitle ? 'mb-1' : 'mb-6'}`}>{title}</h1>
+        {subtitle && <p className="mb-6 text-center text-sm text-gray-600">{subtitle}</p>}
 
         {roomId === undefined && (
           <label className="mb-4 block">
@@ -68,7 +71,15 @@ export function JoinForm({ roomId, title, submitLabel, busy = false, busyLabel, 
           disabled={!ready || busy}
           className="m-0 w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          {busy ? (busyLabel ?? submitLabel) : submitLabel}
+          {/* The mockup's empty state says `Join`, the ready state `Join
+              game` — the shorter word on the button that cannot be pressed
+              yet. Only when the code field is this form's own: a caller that
+              fixed the room (RoomPage) keeps its label throughout. */}
+          {busy
+            ? (busyLabel ?? submitLabel)
+            : roomId === undefined && code.trim() === ''
+              ? 'Join'
+              : submitLabel}
         </button>
       </form>
     </div>

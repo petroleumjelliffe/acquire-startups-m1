@@ -33,8 +33,9 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
 
   return (
     <JoinForm
-      title="Join a room"
-      submitLabel="Join room"
+      title="Join Room"
+      subtitle="Enter or paste code below"
+      submitLabel="Join game"
       busy={waiting}
       busyLabel="Joining…"
       error={error}

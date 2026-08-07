@@ -64,7 +64,7 @@ describe('joining a room', () => {
 
     fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
     fireEvent.change(screen.getByLabelText(/room code/i), { target: { value: 'abc123' } });
-    fireEvent.click(screen.getByRole('button', { name: /join room/i }));
+    fireEvent.click(screen.getByRole('button', { name: /join game/i }));
 
     expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION }]);
 
@@ -82,7 +82,7 @@ describe('joining a room', () => {
 
     fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
     fireEvent.change(screen.getByLabelText(/room code/i), { target: { value: 'WRONG1' } });
-    fireEvent.click(screen.getByRole('button', { name: /join room/i }));
+    fireEvent.click(screen.getByRole('button', { name: /join game/i }));
 
     f.sendRejected({ code: 'unknownIntent', message: 'cannot join WRONG1' });
 
@@ -90,7 +90,7 @@ describe('joining a room', () => {
 
     // Not stuck: correcting the code and submitting again actually sends.
     fireEvent.change(screen.getByLabelText(/room code/i), { target: { value: 'ABC123' } });
-    fireEvent.click(screen.getByRole('button', { name: /join room/i }));
+    fireEvent.click(screen.getByRole('button', { name: /join game/i }));
 
     expect(f.joins).toEqual([
       { roomId: 'WRONG1', name: 'Sam', protocolVersion: PROTOCOL_VERSION },
