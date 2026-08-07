@@ -37,11 +37,20 @@ local), and a ruling on the cold-start copy, which still says "waking the server
 condition is online-but-unreachable.
 
 **The next round is sequenced in `specs/2026-08-07-next-round-sequencing.md`** — read it before
-starting anything. Four stages: the by-hand full game first (Stage 0, planned in
-`plans/2026-08-07-by-hand-full-game.md`), then protocol/save versioning, then pass-and-play
-persistence, then diagnosing the layout gate. The PWA is staged after all of it, gated on
-pass-and-play persistence and on a **protocol version in `session/protocol.ts`**, which has none.
-A spectator seat and a panel-only phone view are wanted together, and are their own design pass.
+starting anything. **Stages 0–2 are built and deployed** (2026-08-07): the two-browser full game
+was driven by hand (a dev-only seeding route, `POST /dev/rooms`, now makes any golden-game state
+two clicks away in a browser); the wire and the save record carry versions
+(`PROTOCOL_VERSION` in `session/protocol.ts`, `SAVE_VERSION` 5, skew refused with its own
+`versionMismatch` code and screen, `/health` reports both); and **pass-and-play persists** — one
+game per device in `localStorage` (`src/game/local/localSave.ts`), written at every segment close,
+resumed from `/pass-and-play`'s Continue card, cleared only by End game or a confirmed discard.
+
+**Still open: Stage 3** — the layout gate's flakiness, with a live lead: `verify-layout.mjs`
+drives a *persistent* Chrome profile, so every run depends on run history; Stage 2 tripped over
+exactly that when the gate's own saved game broke its next run. The PWA's two stated gates
+(persistence, protocol version) both now exist. A spectator seat and a panel-only phone view are
+wanted together, and are their own design pass. Presence still has two open findings from Stage 0:
+the away dot rides a roster row designed to clip, and final scoring has no presence at all.
 
 **Dev surfaces:** `/catalog` is every component state; `/scenarios` loads any golden-game state and
 plays on from it, which is how to reach a merger in two clicks rather than several minutes.

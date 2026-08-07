@@ -89,6 +89,20 @@ rather than twice.
 
 ## Stage 2 — Pass-and-play persistence
 
+> **Built and verified by hand, 2026-08-07** — `205f5b1..98c8fb1` on
+> `revamp/stage-2-pass-and-play-persistence`, Tasks 1–4, 734 tests; the owner drove the by-hand
+> pass locally and reported it clean. Two things the build itself surfaced: the exported mockup
+> settles that the nothing-saved card has **no New Game button at all** (the decisions doc's
+> transcription said otherwise — the frame is the copy of record), which makes "confirm only when
+> a game exists" structural; and the layout gate broke against its own persistent Chrome profile —
+> the game the gate plays is now *saved*, so its previous run seeded a Continue card its next run
+> tripped over. Fixed by clearing storage in the script, and **recorded as a Stage 3 lead: a
+> persistent profile makes every run depend on run history**, which is a live candidate mechanism
+> for the gate's long-unexplained flakiness.
+>
+> **The PWA's two stated gates now both exist:** pass-and-play persistence (this stage) and a
+> protocol version (Stage 1). Its remaining prerequisite is nobody's ruling but the owner's go.
+>
 > **Designed and planned, 2026-08-07:**
 > [2026-08-07-stage-2-pass-and-play-persistence-design.md](./2026-08-07-stage-2-pass-and-play-persistence-design.md)
 > and [../plans/2026-08-07-stage-2-pass-and-play-persistence.md](../plans/2026-08-07-stage-2-pass-and-play-persistence.md).
