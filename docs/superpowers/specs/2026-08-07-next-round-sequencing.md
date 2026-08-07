@@ -129,3 +129,9 @@ Small carried items, each riding whichever stage touches its file rather than be
 - **A library of finished games.** Out of scope, but Stage 2's format ruling keeps it possible.
 - **The prod by-hand pass.** Still owed from Phase 4. It is a separate errand from Stage 0 and
   should not be folded into it — Stage 0 needs a dev-only seeding route that must never reach prod.
+- **Dependency upgrades, and the outstanding `npm audit` advisories** (owner, 2026-08-07). Several
+  packages have major versions available and an `npm audit fix` was run and reverted during Stage 0:
+  it rewrote 885/1156 lockfile lines and added `baseline-browser-mapping` to `devDependencies`,
+  which `browserslist` already declares itself. **Frozen until after Stage 2.** A dependency upgrade
+  and a protocol change landing in one debugging window is a bad trade, and the revert showed how
+  much `audit fix` moves unasked. Its own pass, with a full gate run after.
