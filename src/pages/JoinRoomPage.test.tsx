@@ -119,3 +119,65 @@ describe('joining a room', () => {
     expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION }]);
   });
 });
+
+/**
+ * The design's own words: "with a code present the field shows it in the same
+ * letter-spaced style as New Room". Join Room and New Room are one card in two
+ * states, and this is the state you type into — which is what the branch
+ * originally missed, shipping two labelled inputs instead.
+ */
+describe('the Join Room card', () => {
+  it('takes the code in the same block New Room reads it from', () => {
+    const f = fakeConnection();
+    renderJoin(f.connection);
+
+    // Same hook the New Room card hangs its read-only block on, so the two
+    // states cannot drift into different elements again without this failing.
+    const box = screen.getByTestId('room-code');
+    expect(box.tagName).toBe('INPUT');
+    expect(box).toHaveClass('tracking-[0.3em]');
+  });
+
+  it('says Join and refuses to submit until a code is entered', () => {
+    const f = fakeConnection();
+    renderJoin(f.connection);
+
+    expect(screen.getByRole('button', { name: /^join$/i })).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId('room-code'), { target: { value: 'ABC123' } });
+
+    // The label changes with the state, per the mockup: the shorter word sits
+    // on the button that cannot be pressed yet.
+    expect(screen.queryByRole('button', { name: /^join$/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /join game/i })).not.toBeDisabled();
+    expect(f.joins).toEqual([]);
+  });
+
+  it('joins with no name at all, leaving the seat for the server to name', () => {
+    const f = fakeConnection();
+    renderJoin(f.connection);
+
+    fireEvent.change(screen.getByTestId('room-code'), { target: { value: 'abc123' } });
+    fireEvent.click(screen.getByRole('button', { name: /join game/i }));
+
+    // No `name` key on the wire at all — absence is what asks to be named, and
+    // a blank string would only mean the same by the server's leniency.
+    expect(f.joins).toEqual([{ roomId: 'ABC123', protocolVersion: PROTOCOL_VERSION }]);
+    expect(localStorage.getItem('acquire.name')).toBeNull();
+  });
+
+  it('shows your own row before you are seated, with no seat emoji on it', () => {
+    const f = fakeConnection();
+    renderJoin(f.connection);
+
+    // One row, and it is yours: the list fills with the others once the join
+    // lands. The chip is blank because the emoji belongs to a seat and there
+    // is no seat yet — seat one's face would be wrong for anyone not first.
+    const rows = screen.getAllByRole('listitem');
+    expect(rows).toHaveLength(1);
+    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
+    for (const face of ['🦊', '🐢', '🦁', '🐙', '🦉', '🐝']) {
+      expect(rows[0].textContent).not.toContain(face);
+    }
+  });
+});

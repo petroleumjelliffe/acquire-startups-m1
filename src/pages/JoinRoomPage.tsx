@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { JoinForm } from '../game/online/JoinForm';
+import { JoinRoomCard } from '../game/online/JoinRoomCard';
 import { getConnection, type Connection } from '../net/connection';
-import { rememberName, saveIdentity } from '../net/identity';
+import { rememberName, rememberedName, saveIdentity } from '../net/identity';
 import { PROTOCOL_VERSION } from '../../session/protocol';
 
 export interface JoinRoomPageProps {
@@ -13,10 +13,14 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
   const navigate = useNavigate();
   const connection = connect();
   const [error, setError] = useState<string | null>(null);
-  // Disables `JoinForm`'s button and blocks a second submit while a request
-  // is outstanding. Cleared on rejection too — a mistyped code should be
+  // Disables the submit and blocks a second one while a request is
+  // outstanding. Cleared on rejection too — a mistyped code should be
   // correctable, not stuck.
   const [waiting, setWaiting] = useState(false);
+  const [code, setCode] = useState('');
+  // Prefilled with whatever you last called yourself, and empty if you never
+  // have. Empty is a legal join: the server names the seat it gives you.
+  const [name, setName] = useState(() => rememberedName() ?? '');
   const sentName = useRef('');
 
   useEffect(() => {
@@ -32,19 +36,29 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
   }, [connection, navigate]);
 
   return (
-    <JoinForm
-      title="Join Room"
-      subtitle="Enter or paste code below"
-      submitLabel="Join game"
+    <JoinRoomCard
+      code={code}
+      onCodeChange={setCode}
+      name={name}
+      onNameChange={setName}
       busy={waiting}
-      busyLabel="Joining…"
       error={error}
-      onSubmit={(name, roomId) => {
-        sentName.current = name;
-        rememberName(name);
+      onLeave={() => navigate('/online')}
+      onSubmit={() => {
+        const chosen = name.trim();
+        sentName.current = chosen;
+        // Only a name you actually typed is worth carrying to the next room.
+        if (chosen !== '') rememberName(chosen);
         setError(null);
         setWaiting(true);
-        connection.joinRoom({ roomId, name, protocolVersion: PROTOCOL_VERSION });
+        connection.joinRoom({
+          roomId: code.trim().toUpperCase(),
+          // Omitted rather than sent blank: absence is what asks the server to
+          // name the seat, and a blank string would mean the same thing only
+          // by the server's leniency rather than by the wire's shape.
+          ...(chosen === '' ? {} : { name: chosen }),
+          protocolVersion: PROTOCOL_VERSION,
+        });
       }}
     />
   );
