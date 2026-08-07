@@ -377,6 +377,34 @@ though not scheduled. Two halves that only make sense together:
 Both are their own design pass. Recorded here so the roadmap stops saying
 spectator mode is unwanted.
 
+**PWA support — install the client and treat it like an app** (owner, 2026-08-07).
+Wanted, not scheduled. Today the client has none of it: `index.html` carries no
+manifest, no icons, no `theme-color` and no `apple-mobile-web-app-*` tags,
+`public/` holds only the GitHub Pages `404.html`, and there is no service worker
+or Vite PWA plugin. The pieces, and the one that is not routine:
+
+- **A manifest and icons** — name, `standalone` display, theme and background
+  colours, and a maskable icon set. Tokens already carry the palette, so the
+  colours should come from `tokens.ts` rather than being typed twice.
+- **A service worker for the shell.** Precaching the built assets is the
+  ordinary part, and it makes the Render cold start Phase 4's Task 8 warns
+  about less visible — the shell paints while the socket is still waking.
+- **Offline is the hard question, and it is a design decision, not a
+  technique.** The server is the authority as of Phase 3a, so an installed
+  client with no network can do nothing online. Pass-and-play is genuinely
+  local and could work fully offline once
+  `2026-08-06-pass-and-play-persistence-decisions.md` lands — which makes the
+  honest first target "pass-and-play works offline, online tells you it is
+  offline", not "the app works offline".
+- **A stale-shell trap worth naming now.** A cached shell served against a
+  server whose protocol has moved on is a version-skew bug that looks like a
+  game bug. Whatever ships needs an update path, and `protocol.ts` is where the
+  skew would show.
+
+It depends on the phone view above for the part that matters — installing a
+laptop-sized layout onto a phone home screen is the wrong deliverable — so
+these two should be planned together, after Phase 4.
+
 ### Deliberately not ported from the prototype
 
 Listed so these read as decisions rather than omissions.
