@@ -89,6 +89,14 @@ rather than twice.
 
 ## Stage 2 — Pass-and-play persistence
 
+> **Designed and planned, 2026-08-07:**
+> [2026-08-07-stage-2-pass-and-play-persistence-design.md](./2026-08-07-stage-2-pass-and-play-persistence-design.md)
+> and [../plans/2026-08-07-stage-2-pass-and-play-persistence.md](../plans/2026-08-07-stage-2-pass-and-play-persistence.md).
+> The design answers the decisions doc's open questions: `LOCAL_SAVE_VERSION` is its own constant
+> (importing `server/store.ts` into `src/` is the wrong direction on the one policed boundary); a
+> stale save is *reported* in the lobby, kept until `New Game` overwrites it — never silently
+> absent; and the discard confirmation is inline on the card, confirming only when a game exists.
+
 The real project of this round, and the one with a mockup already attached. Most of it is ruled in
 [2026-08-06-pass-and-play-persistence-decisions.md](./2026-08-06-pass-and-play-persistence-decisions.md);
 the format ruling above closes the last open design question, so this stage can now have a design
@@ -141,6 +149,13 @@ Small carried items, each riding whichever stage touches its file rather than be
 - **A library of finished games.** Out of scope, but Stage 2's format ruling keeps it possible.
 - **The prod by-hand pass.** Still owed from Phase 4. It is a separate errand from Stage 0 and
   should not be folded into it — Stage 0 needs a dev-only seeding route that must never reach prod.
+- **A durable `RoomStore` backend** — newly *feasible*, still not scheduled. The prod smoke check
+  (2026-08-07, post-Stage-1) re-confirmed the accepted limit: a Render restart still loses every
+  room, because persistence writes to a disk that resets. The Render MCP connector is now set up,
+  so provisioning a Render Key Value store or Postgres and writing the second `RoomStore`
+  implementation is a session's work against the seam built for it. A decision for the owner, not
+  a default: it converts the gone-room ending from the normal prod case into a rarity, which
+  changes what the ending's copy and the eviction policy are for.
 - **Dependency upgrades, and the outstanding `npm audit` advisories** (owner, 2026-08-07). Several
   packages have major versions available and an `npm audit fix` was run and reverted during Stage 0:
   it rewrote 885/1156 lockfile lines and added `baseline-browser-mapping` to `devDependencies`,
