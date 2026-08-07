@@ -48,6 +48,18 @@ below.
 
 ## Stage 1 — Versioning
 
+> **Built, 2026-08-07** — `d78d141..27f9f51` on `revamp/stage-0-by-hand-setup`, all eight tasks,
+> 710 tests. Plan: [../plans/2026-08-07-stage-1-versioning.md](../plans/2026-08-07-stage-1-versioning.md).
+> Both open decisions were ruled as recommended: `versionMismatch` mid-game tears the session down
+> (keeping the stored seat, unlike `noSuchRoom`), and the pill now says
+> `Can’t reach the server — retrying`. The section below is the plan as it stood; deviations are
+> recorded in the commits — chiefly that the client screen is **not** in `/catalog`, which carries
+> no online components at all, and that Task 4 merged into Task 1 when the required field made the
+> compiler enumerate all five send sites. **Not deployed:** Render still speaks the pre-version
+> wire, observable as `/health` answering `{ok:true}` with no version fields. On deploy, every
+> already-open client is refused as stale until reloaded — expected, and the reason the refusal has
+> its own screen.
+
 **Scope:** a protocol version, and the save-side skew that now exists because rooms outlive a
 deploy. The roadmap's PWA section already specifies the shape; this stage builds it ahead of the
 PWA rather than inside it.
