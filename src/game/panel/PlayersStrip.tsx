@@ -7,6 +7,12 @@ export interface PlayersStripPlayer {
   name: string;
   cash: number;
   active?: boolean;
+  /**
+   * Omitted means present. Pass-and-play passes nothing — everyone is at the
+   * same device, and an away dot there would be a lie about a person sitting
+   * in the room.
+   */
+  connected?: boolean;
 }
 
 export interface PlayersStripProps {
@@ -55,6 +61,15 @@ export function PlayersStrip({ players }: PlayersStripProps) {
           }`}
         >
           <span className="flex-none text-base leading-none">{p.emoji || '•'}</span>
+          {p.connected === false && (
+            // A dot, not a word: the strip is one clipped row and a seat that
+            // grew by a label would push the seat that matters off the end.
+            <span
+              data-presence="away"
+              aria-label={`${p.name} is disconnected`}
+              className="h-1.5 w-1.5 flex-none rounded-full bg-gray-400"
+            />
+          )}
           <span className="min-w-0 truncate font-semibold">{p.name}</span>
           <span className="ml-auto flex-none">
             <Cash amount={p.cash} />

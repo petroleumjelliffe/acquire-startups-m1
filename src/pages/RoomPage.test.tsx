@@ -313,6 +313,57 @@ describe('a dropped connection', () => {
   });
 });
 
+describe('a player who has dropped', () => {
+  it('is named in the toast when the game is waiting on them', () => {
+    const f = fakeConnection();
+    renderRoom(f.connection);
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
+
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+
+    // Alex is up, and Alex has dropped. Without this the panel shows a turn
+    // that never advances and nothing on screen says why.
+    f.sendRoster({
+      roomId: 'ABC123',
+      lifecycle: 'playing',
+      players: [
+        { id: 'p1', name: 'Alex', isHost: true, connected: false },
+        { id: 'p2', name: 'Sam', isHost: false, connected: true },
+      ],
+    });
+
+    expect(screen.getByTestId('turn-toast')).toHaveTextContent(/disconnected/i);
+    // Not just the toast: the seat itself carries the marker too, so the
+    // strip does not silently hardcode everyone present.
+    expect(document.querySelector('[data-seat="p1"] [data-presence="away"]')).not.toBeNull();
+  });
+
+  it('says nothing about disconnection while everyone is present', () => {
+    const f = seated('Sam', false);
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: ['I11', 'I12'],
+    });
+    f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
+
+    expect(screen.getByTestId('turn-toast')).not.toHaveTextContent(/disconnected/i);
+  });
+});
+
 describe('a stale identity, refused', () => {
   it('is cleared, so a later visit gets a clean join instead of repeating the same refusal', () => {
     localStorage.setItem(

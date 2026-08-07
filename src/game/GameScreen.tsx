@@ -48,13 +48,18 @@ export interface GameScreenProps {
    * panel inert rather than leaving stale controls live over a dead socket.
    */
   connected?: boolean;
+  /**
+   * Who has a live socket, by player id. Omitted — pass-and-play — means
+   * everyone: there is no transport for anyone to be missing from.
+   */
+  presence?: Record<string, boolean>;
   /** Start over from setup. Omitted when nothing is hosting the screen. */
   onNewGame?: () => void;
   /** Leave the game entirely. Omitted when nothing is hosting the screen. */
   onExit?: () => void;
 }
 
-export function GameScreen({ session, viewerId, connected = true, onNewGame, onExit }: GameScreenProps) {
+export function GameScreen({ session, viewerId, connected = true, presence, onNewGame, onExit }: GameScreenProps) {
   const view = useGameSession(session);
   const { state, actorId, awaitingReveal, undoableSteps, pending } = view;
 
@@ -196,6 +201,7 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
               name: p.name,
               cash: p.cash,
               active: turnKnown && p.id === actorId,
+              connected: presence?.[p.id] ?? true,
             }))}
           />
         }
@@ -215,6 +221,7 @@ export function GameScreen({ session, viewerId, connected = true, onNewGame, onE
           name={actor.name}
           emoji={actor.emoji}
           mine={actorId === viewerId}
+          disconnected={actorId !== null && presence?.[actorId] === false}
         />
       )}
 

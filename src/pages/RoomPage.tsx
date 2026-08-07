@@ -24,6 +24,13 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
     navigate('/');
   };
 
+  // The roster is the only thing that knows who is connected — the engine
+  // state has no idea a socket exists. Undefined until one arrives, which
+  // reads as "everyone present" rather than "everyone away".
+  const presence = room.roster
+    ? Object.fromEntries(room.roster.players.map((p) => [p.id, p.connected]))
+    : undefined;
+
   if (room.phase === 'playing' && room.session && room.playerId) {
     return (
       <>
@@ -36,6 +43,7 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
           session={room.session}
           viewerId={room.playerId}
           connected={room.status === 'open'}
+          presence={presence}
           onExit={leave}
         />
       </>

@@ -32,6 +32,14 @@ export interface TurnToastProps {
   emoji?: string;
   /** True when that player is the one at this device. */
   mine?: boolean;
+  /**
+   * True when the player being waited on has no live socket.
+   *
+   * The unexplained stall is the actual complaint: the game waits
+   * indefinitely by design (no turn timeouts), so the only thing missing is
+   * saying why nothing is happening.
+   */
+  disconnected?: boolean;
 }
 
 /**
@@ -43,7 +51,7 @@ export interface TurnToastProps {
  */
 const ANNOUNCEMENT_MS = 2600;
 
-export function TurnToast({ name, emoji, mine = false }: TurnToastProps) {
+export function TurnToast({ name, emoji, mine = false, disconnected = false }: TurnToastProps) {
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -69,7 +77,7 @@ export function TurnToast({ name, emoji, mine = false }: TurnToastProps) {
       }
     >
       <span aria-hidden className="text-base leading-none">{emoji || '•'}</span>
-      <span>{mine ? 'Your turn' : `${name} is up`}</span>
+      <span>{mine ? 'Your turn' : `${name} is up${disconnected ? ' — disconnected' : ''}`}</span>
     </div>
   );
 }
