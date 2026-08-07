@@ -390,3 +390,38 @@ describe('a stale identity, refused', () => {
     expect(loadIdentity('ABC123')).toEqual({ playerId: 'p2', token: 'tok', name: 'Sam' });
   });
 });
+
+describe('a room that is gone', () => {
+  it('reads as an ending, with a way back, rather than a join form', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p2', token: 'tok', name: 'Sam' }),
+    );
+    const f = fakeConnection();
+    renderRoom(f.connection);
+
+    f.sendRejected({ code: 'noSuchRoom', message: 'Room ABC123 is no longer available' });
+
+    expect(screen.getByText(/no longer available/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /lobby/i })).toBeInTheDocument();
+    // Not a join form: there is nothing to join, and offering one invites a
+    // player to keep trying a room the server will keep refusing.
+    expect(screen.queryByLabelText(/your name/i)).toBeNull();
+  });
+
+  it('sends a refused seat to the join form instead, because that one is fixable', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p9', token: 'stale', name: 'Ghost' }),
+    );
+    const f = fakeConnection();
+    renderRoom(f.connection);
+
+    f.sendRejected({ code: 'seatRefused', message: 'That seat in ABC123 is no longer yours' });
+
+    // The room is still there. The identity was stale and has been cleared,
+    // so joining fresh is exactly the remedy.
+    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no longer available/i)).toBeNull();
+  });
+});

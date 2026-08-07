@@ -4,7 +4,7 @@ import { getConnection, type Connection, type ConnectionStatus } from './connect
 import { createNetworkSession, type NetworkSession } from './NetworkSession';
 import { clearIdentity, loadIdentity, rememberName, rememberedName, saveIdentity } from './identity';
 
-export type RoomPhase = 'connecting' | 'joining' | 'needName' | 'lobby' | 'playing' | 'error';
+export type RoomPhase = 'connecting' | 'joining' | 'needName' | 'lobby' | 'playing' | 'error' | 'gone';
 
 export interface Room {
   phase: RoomPhase;
@@ -33,6 +33,7 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   const [session, setSession] = useState<NetworkSession | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  const [gone, setGone] = useState(false);
 
   const sessionRef = useRef<NetworkSession | null>(null);
   // Read once, at mount, for whatever `roomId` the hook first saw. A `roomId`
@@ -101,6 +102,11 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
       // shows it in the panel. Surfacing it here as well would replace the
       // board with an error screen over a refused click.
       if (sessionRef.current === null) setMessage(msg.message);
+
+      // Nothing this player can do reaches this room: it has ended, or the
+      // server restarted onto a disk that no longer holds it. A join form
+      // would invite them to keep trying something that cannot work.
+      if (msg.code === 'noSuchRoom') setGone(true);
 
       // A rejection that arrives before we have ever been seated can only be
       // the join itself being refused — and if it was attempted with a
@@ -176,13 +182,19 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   // afterwards ("only the host may begin") is a note to show *in* the lobby —
   // ranking `message` above `roster` would throw a seated player back to a
   // join form over a button they were not allowed to press.
+  //
+  // `gone` outranks all of those and yields only to `playing`: a room that
+  // does not exist cannot be joined, listed or corrected, so no earlier
+  // screen has anything useful to offer. It sits below `playing` because a
+  // running session means we are in a room that plainly does exist.
   const phase: RoomPhase =
     session !== null ? 'playing'
-      : roster !== null ? 'lobby'
-        : message !== null ? 'error'
-          : status !== 'open' ? 'connecting'
-            : joining ? 'joining'
-              : 'needName';
+      : gone ? 'gone'
+        : roster !== null ? 'lobby'
+          : message !== null ? 'error'
+            : status !== 'open' ? 'connecting'
+              : joining ? 'joining'
+                : 'needName';
 
   return { phase, status, roster, playerId, session, message, join, begin };
 }

@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { GameScreen } from '../game/GameScreen';
 import { RoomLobby } from '../game/online/RoomLobby';
+import { RoomGone } from '../game/online/RoomGone';
 import { ConnectionStrip } from '../game/online/ConnectionStrip';
 import { JoinForm } from '../game/online/JoinForm';
 import { useRoom } from '../net/useRoom';
@@ -46,6 +47,15 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
           presence={presence}
           onExit={leave}
         />
+      </>
+    );
+  }
+
+  if (room.phase === 'gone') {
+    return (
+      <>
+        <ConnectionStrip status={room.status} />
+        <RoomGone roomId={roomId} onExit={leave} />
       </>
     );
   }
