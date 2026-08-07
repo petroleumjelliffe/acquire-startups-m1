@@ -35,7 +35,20 @@ export interface Connection {
 }
 
 function createConnection(): Connection {
-  const socket: Socket = io(SERVER_URL, { transports: ['websocket'] });
+  const socket: Socket = io(SERVER_URL, {
+    transports: ['websocket'],
+    // Stated rather than inherited, because this deployment's worst case is
+    // longer than the default connect timeout. A sleeping Render free
+    // instance takes ~30s to wake, so the *first* attempt times out at 20s
+    // and it is the retry that actually lands. Relying on a default for the
+    // behaviour that makes cold starts work at all is how it silently stops
+    // working when a dependency changes its mind.
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 5000,
+    timeout: 20000,
+  });
   const listeners = new Set<() => void>();
   let status: ConnectionStatus = 'connecting';
 
