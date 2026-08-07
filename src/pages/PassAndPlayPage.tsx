@@ -1,40 +1,42 @@
 // src/pages/PassAndPlayPage.tsx
-// Pass-and-play on the Phase 2a stack.
+// The lobby half of the pass-and-play route split.
 //
-// `Game.tsx`, `SetupScreen` and the modal family are deliberately left in
-// place: `RoomPage` still serves online play from them, so they cannot be
-// deleted until Phase 3/5 replaces the online screen. This route simply
-// stops using them.
+// This page owns the decision the design gives it: nothing saved → setup;
+// save present → setup plus the Continue card; save stale → setup plus one
+// line saying so. The game itself lives at /pass-and-play/game, which mounts
+// from the save — so starting a game here means writing the initial state and
+// navigating, and "new game" and "resumed game" arrive at the board the same
+// way. That initial write is also what makes a refresh during the *first*
+// turn return to the deal rather than to a dead route.
 
-import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LocalSetupScreen } from '../game/setup/LocalSetupScreen';
-import { GameScreen } from '../game/GameScreen';
 import { createGameSession } from '../../session/GameSession';
+import { load, loadFailure, save } from '../game/local/localSave';
+
+/** `Last played: 2 days ago` — the Continue card's line, from `savedAt`. */
+function lastPlayed(savedAt: number): string {
+  const minutes = Math.max(0, Math.round((Date.now() - savedAt) / 60_000));
+  if (minutes < 1) return 'Last played: just now';
+  if (minutes < 60) return `Last played: ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Last played: ${hours} hour${hours === 1 ? '' : 's'} ago`;
+  const days = Math.round(hours / 24);
+  return `Last played: ${days} day${days === 1 ? '' : 's'} ago`;
+}
 
 export function PassAndPlayPage() {
   const navigate = useNavigate();
-  const [config, setConfig] = useState<{ seed: string; names: string[] } | null>(null);
+  const saved = load();
+  const failure = loadFailure();
 
-  // One session per game. Recreating it on every render would throw the
-  // snapshot store away, taking undo with it.
-  const session = useMemo(
-    () => (config ? createGameSession({ seed: config.seed, names: config.names }) : null),
-    [config],
-  );
-
-  if (session) {
-    return (
-      <GameScreen
-        session={session}
-        // Dropping the config drops the session and its snapshot store with
-        // it — a genuine fresh game rather than a rewound one. Replaying a
-        // seed is what the setup screen's Advanced field is for.
-        onNewGame={() => setConfig(null)}
-        onExit={() => navigate('/')}
-      />
-    );
-  }
+  const start = (config: { seed: string; names: string[] }) => {
+    // The session is built only to deal the opening state; the game route
+    // rebuilds its own from the save. One mount path over there is worth one
+    // throwaway construction here.
+    save(createGameSession(config).getView().state);
+    navigate('game');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -46,7 +48,34 @@ export function PassAndPlayPage() {
         >
           ← Back
         </button>
-        <LocalSetupScreen onStart={setConfig} />
+
+        {failure === 'stale' && (
+          // Named, not silent: the failure mode being designed out is a save
+          // that quietly vanished, indistinguishable from never having
+          // existed. The bytes stay until New Game overwrites them.
+          <p data-testid="stale-save" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            A saved game from an older version can&rsquo;t be continued.
+          </p>
+        )}
+
+        {saved && (
+          <section data-testid="continue-card" className="mb-4 rounded-xl bg-white p-4 shadow">
+            <h2 className="font-bold">Game in progress</h2>
+            <p className="text-sm text-gray-600">
+              {saved.state.players.map((p) => `${p.emoji} ${p.name}`).join(', ')}
+            </p>
+            <p className="text-xs text-gray-500">{lastPlayed(saved.savedAt)}</p>
+            <button
+              type="button"
+              onClick={() => navigate('game')}
+              className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+            >
+              Continue
+            </button>
+          </section>
+        )}
+
+        <LocalSetupScreen onStart={start} />
       </div>
     </div>
   );

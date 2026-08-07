@@ -5,6 +5,7 @@ import { OnlineLobbyPage } from "./pages/OnlineLobbyPage";
 import { CreateRoomPage } from "./pages/CreateRoomPage";
 import { JoinRoomPage } from "./pages/JoinRoomPage";
 import { PassAndPlayPage } from "./pages/PassAndPlayPage";
+import { PassAndPlayGamePage } from "./pages/PassAndPlayGamePage";
 import { RoomPage } from "./pages/RoomPage";
 
 // Lazy on purpose: both pull in the golden games and replay them, and none of
@@ -23,8 +24,11 @@ export default function App() {
       <Route path="/online/create" element={<CreateRoomPage />} />
       <Route path="/online/join" element={<JoinRoomPage />} />
 
-      {/* Pass and play */}
+      {/* Pass and play: the lobby, then the board. Split so the back button
+          leaves the game rather than destroying it — the game route mounts
+          from the save, and this route is where it is continued or replaced. */}
       <Route path="/pass-and-play" element={<PassAndPlayPage />} />
+      <Route path="/pass-and-play/game" element={<PassAndPlayGamePage />} />
 
       {/* Room page - for both host and joining players */}
       <Route path="/room/:roomId" element={<RoomPage />} />
