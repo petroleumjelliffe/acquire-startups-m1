@@ -21,6 +21,14 @@ export interface RoomRegistry {
    *
    * `now` is injectable so the age policy can be tested without waiting a
    * week; the server never passes it.
+   *
+   * Boot-only. `rooms.set` here is unconditional — it replaces whatever is
+   * already in the registry for a given id with no check that nothing is
+   * live there — which is safe only because the one production caller
+   * (`server/index.ts`) runs this before `listen`, while no socket has
+   * bound to anything yet. Calling it once the server is serving traffic
+   * would silently swap out a room's object out from under socket bindings
+   * that still point at the old one.
    */
   restore(now?: number): Promise<number>;
 }
@@ -137,13 +145,26 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
           continue;
         }
 
-        // Never `connected: true`, whatever the record says. A record is a
-        // snapshot of a moment when sockets were open; this process has
-        // none. The roster broadcast that follows each rejoin is what turns
-        // these back on, one seat at a time.
-        const players = record.players.map((p) => ({ ...p, connected: false }));
-        rooms.set(record.roomId, createGameRoom(record.roomId, players, record.state));
-        seated++;
+        try {
+          // Never `connected: true`, whatever the record says. A record is a
+          // snapshot of a moment when sockets were open; this process has
+          // none. The roster broadcast that follows each rejoin is what turns
+          // these back on, one seat at a time.
+          const players = record.players.map((p) => ({ ...p, connected: false }));
+          rooms.set(record.roomId, createGameRoom(record.roomId, players, record.state));
+          seated++;
+        } catch (e) {
+          // `isSavedRoom` only checks that `state` is *an object* — it trusts
+          // the shape past that, on the theory that it came from this
+          // server's own engine. A record that parses and passes that guard
+          // but carries a `state` the engine cannot actually drive (a stale
+          // shape from before the next `GameState` change, disk corruption
+          // that survived JSON.parse) throws inside `createGameRoom`. One bad
+          // record must cost one room, not the boot: this matches `loadAll`'s
+          // own posture of warning and skipping rather than letting a single
+          // rotten file take the rest down with it.
+          console.warn(`! Could not restore room ${record.roomId}, skipping:`, e);
+        }
       }
 
       return seated;

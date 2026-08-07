@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import { createRoomRegistry, MAX_AGE_MS } from './rooms.js';
 import { createFileStore, SAVE_VERSION, type SavedRoom } from './store.js';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -172,5 +172,77 @@ describe('restoring rooms at boot', () => {
   it('is zero, not a crash, with nothing saved', async () => {
     const rooms = createRoomRegistry(createFileStore(dir));
     expect(await rooms.restore()).toBe(0);
+  });
+
+  it('skips a record whose state the engine cannot drive, and still seats the good one', async () => {
+    await seedSavedRoom('GOOD01');
+
+    // Passes `isSavedRoom`'s shape guard — it only checks that `state` is a
+    // non-null object — but is not anything `createGameSession` can
+    // actually drive. Written straight to disk rather than through
+    // `SavedRoom`, so the type checker cannot stop us from building the
+    // exact file `isSavedRoom` is too shallow to catch: a `state` this
+    // server itself would never write, but the guard trusts past "is an
+    // object" on the theory that it always came from this server's own
+    // engine.
+    const badRecord = {
+      roomId: 'BAD001',
+      version: SAVE_VERSION,
+      savedAt: Date.now(),
+      players: [
+        { id: 'p1', name: 'Alex', token: 'tok1', isHost: true, connected: false },
+        { id: 'p2', name: 'Sam', token: 'tok2', isHost: false, connected: false },
+      ],
+      state: {},
+    };
+    await writeFile(join(dir, 'BAD001.json'), JSON.stringify(badRecord), 'utf-8');
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const rooms = createRoomRegistry(createFileStore(dir));
+    const count = await rooms.restore();
+    warn.mockRestore();
+
+    expect(count).toBe(1);
+    expect(rooms.get('GOOD01')).toBeDefined();
+    expect(rooms.get('BAD001')).toBeUndefined();
+  });
+});
+
+describe('what persist writes to disk', () => {
+  let dir: string;
+
+  beforeEach(async () => { dir = await mkdtemp(join(tmpdir(), 'acquire-persist-')); });
+  afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
+
+  it('writes the committed state, not a still-open draft', async () => {
+    // `persist` and a commit run in the same synchronous tick in production,
+    // where `draft()` and `committed()` are the same object — so this is the
+    // one place `rooms.persist` can be called with the two genuinely
+    // different, to prove which one it actually writes. Calling it directly,
+    // mid-segment, is the only way to tell "writes committed" from "writes
+    // draft, which happens to equal committed by the time anyone calls
+    // persist for real" apart.
+    const store = createFileStore(dir);
+    const rooms = createRoomRegistry(store);
+    const room = rooms.fromState('X', ['Alex', 'Sam'], buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['I5'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+      bag: [],
+    }));
+
+    // I5 is adjacent to nothing on this board — H5, I4 and I6 are all empty,
+    // and the only other tiles in play are E5 and A1 — so placing it neither
+    // founds nor joins a chain. The turn does not pass: the segment stays
+    // open, with the actor still `p1`.
+    room.dispatch('p1', { type: 'placeTile', coord: 'I5' });
+    expect(room.draft().board).not.toEqual(room.committed().board);
+
+    await rooms.persist(room);
+
+    const [saved] = await store.loadAll();
+    expect(saved.state.board).toEqual(room.committed().board);
   });
 });

@@ -358,8 +358,22 @@ if (process.argv[1]?.endsWith('index.ts')) {
   // Before `listen`, not after: a client that connects into a half-restored
   // registry would be told its room does not exist and would clear the very
   // identity that was about to work.
-  void rooms.restore().then((count) => {
-    if (count > 0) console.log(`✓ Restored ${count} room(s)`);
-    httpServer.listen(port, () => console.log(`✓ Server listening on ${port}`));
-  });
+  //
+  // `listen` runs whichever way `restore()` settles — inside `.then` on
+  // success, inside `.catch` on rejection — so a restore failure can never
+  // keep the process from booting. `restore()` already guards each *record*
+  // (see `rooms.ts`), but the store read underneath it (`loadAll`, or a
+  // future store implementation) is not guarded the same way, and an
+  // ungated `.then` here would mean the one unhandled rejection of a boot
+  // takes the whole server down with no `listen` and no log line.
+  void rooms.restore()
+    .then((count) => {
+      if (count > 0) console.log(`✓ Restored ${count} room(s)`);
+    })
+    .catch((e: unknown) => {
+      console.warn('! Restore failed, starting with no rooms:', e);
+    })
+    .finally(() => {
+      httpServer.listen(port, () => console.log(`✓ Server listening on ${port}`));
+    });
 }
