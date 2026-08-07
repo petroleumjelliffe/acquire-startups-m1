@@ -1,0 +1,129 @@
+# The round after Phase 4 — sequencing and rulings
+
+**Date:** 2026-08-07
+**Status:** sequencing decided; two of the four stages still need their own design pass
+**Predecessor:** [2026-08-07-phase-4-carry-forward.md](./2026-08-07-phase-4-carry-forward.md)
+
+Every phase on the roadmap is built. This records what the next round is, in what order, and the
+three rulings made on 2026-08-07 that were blocking it.
+
+## The rulings
+
+| Question | Ruling |
+|---|---|
+| What comes first | **The by-hand full game**, before any of the planned fixes. It is owed since Phase 3b, it is cheap, and every by-hand pass this project has run has changed the fix list that followed it. |
+| Pass-and-play save format | **The whole `GameState`, with a version.** Not seed-plus-intent-log. Closes the last open design question in [the persistence decisions](./2026-08-06-pass-and-play-persistence-decisions.md). |
+| `verify:layout` flakiness | **In scope.** It is cited as evidence across two phases and nobody can explain it. |
+
+**Why whole state rather than the intent log.** The log is smaller and self-verifying, and the replay
+machinery already exists. But under a changed rule an old log replays into a *plausible but
+different* game — it loads, it looks fine, and it is wrong. A versioned state blob refuses loudly
+instead. It also matches what `server/store.ts` already does, so the project has one persistence
+model rather than two, and it keeps the final state, which the "library of finished games" TODO
+needs. The failure mode being avoided is this project's signature one: a thing that looks like it
+worked and was never checked.
+
+## Stage 0 — The by-hand full game
+
+A full two-browser game to final scoring, through a merger whose liquidation queue reaches **both**
+players. Plan: [../plans/2026-08-07-by-hand-full-game.md](../plans/2026-08-07-by-hand-full-game.md).
+
+**Why it is first, stated as evidence rather than principle:** Phase 5 produced twenty-six findings
+from a by-hand pass and none from the suite. Phase 4 produced five, none of which 661 tests could
+have produced. Planning versioning and persistence in detail against a fix list that has not been
+validated by the one pass nobody has run is how this project has been surprised before.
+
+**The finding that reframes the stage.** There is no way to put a browser into a mid-game room. The
+server has `rooms.fromState(roomId, names, state)`, and every socket-level test uses it, but
+[socketHarness.ts:85](../../../server/socketHarness.ts#L85) records the reason it stops there:
+*"there is deliberately no socket event that installs a prepared state."* The only HTTP route is
+`/health`. So reaching a two-player liquidation queue in a browser today means playing a real game
+until one happens by chance — non-deterministic, several minutes per attempt, and not guaranteed to
+produce a queue that reaches both players at all.
+
+**That is very likely why this pass has never been run,** through three consecutive carry-forwards.
+So the stage opens by building the setup: a dev-only seeding route, after which the pass is two
+clicks and is repeatable — which matters, because it will need re-running after each of the stages
+below.
+
+## Stage 1 — Versioning
+
+**Scope:** a protocol version, and the save-side skew that now exists because rooms outlive a
+deploy. The roadmap's PWA section already specifies the shape; this stage builds it ahead of the
+PWA rather than inside it.
+
+`session/protocol.ts` has **no version field of any kind** — verified, zero matches. Three parts:
+
+- **A constant in `protocol.ts`**, bumped when the wire shape changes. That file owns `WireIntent`,
+  `StateMessage`, `CLIENT_EVENTS` and `SERVER_EVENTS`, so it is the only place that knows what
+  "changed" means.
+- **Checked at the handshake that already exists** — the client sends it on `joinRoom`, the server
+  answers on `joined` or refuses. **A mismatch needs its own `RejectionCode`.** The list today is
+  `illegal… | undoOutOfSegment | notConnected | noSuchRoom | seatRefused`; refusing skew as
+  `noSuchRoom` sends a player hunting a room that is fine.
+- **Server side too.** A room restored from disk was written by whichever server wrote it, so a
+  resumed room carries a version as well — the same skew arriving from storage instead of a socket.
+  Note that `SAVE_VERSION` does not already cover this: `isSavedRoom` deliberately trusts `state`
+  past "is an object", which is the hole Phase 4's boot-fragility bug came through.
+
+**Urgency, stated honestly:** this is not urgent *today*. A stale client fixes itself on the next
+reload. It becomes urgent the moment a service worker makes an old client durable, and it is much
+cheaper to add before there are two versions in the wild than after.
+
+**Still to decide:** what the client does with the refusal. For an installed app the answer is
+prompt-to-update and reload past the service worker; before the PWA exists there is no service
+worker to reload past, so the first version of this may be a plain message. Worth deciding once
+rather than twice.
+
+## Stage 2 — Pass-and-play persistence
+
+The real project of this round, and the one with a mockup already attached. Most of it is ruled in
+[2026-08-06-pass-and-play-persistence-decisions.md](./2026-08-06-pass-and-play-persistence-decisions.md);
+the format ruling above closes the last open design question, so this stage can now have a design
+doc written.
+
+Today [PassAndPlayPage.tsx](../../../src/pages/PassAndPlayPage.tsx) is 53 lines holding the game
+config in `useState`. There is nothing to build on — a refresh or a back-button press destroys the
+game. The work is the route split, save-on-commit, the reveal curtain on load, the lobby's Continue
+card, `End game`, and `New Game` discarding with a confirmation the mockup does not have.
+
+**What its design pass still owes:** the storage key and what happens to a save that predates a
+rules change; and whether the new storage module reuses `src/net/identity.ts`'s conventions or says
+why not.
+
+## Stage 3 — The layout gate
+
+`npm run verify:layout` is intermittently flaky, project-wide and pre-existing. This is not a
+feature bug and that is the point: in a repo that has caught eleven hollow gates by insisting on
+real evidence, a gate nobody can explain is the same defect one level up. Every "five gates green"
+claim in the last two phases is weaker than it reads until this is understood.
+
+Diagnose before fixing. A flake with an understood cause may be acceptable; a flake with an
+unknown cause cannot be cited as evidence either way.
+
+## The sweep
+
+Small carried items, each riding whichever stage touches its file rather than becoming a stage:
+
+| Item | Rides with | Size |
+|---|---|---|
+| `previousSegmentStart` is not on `SavedRoom`, so a resumed restored room shows a blank previous turn — the exact gap the field was added to close | Stage 1 | one field |
+| Cold-start copy asserts a cause it cannot know; the honest repair blames nothing: `Can't reach the server — retrying` | Stage 1 | a product ruling, then one string |
+| Unreadable saves warn on every boot forever — eviction deletes *old* records, not unparseable ones | Stage 1 | needs a quarantine decision, not a reflex delete |
+| `restore()` is boot-only and only a docstring says so | Stage 1 | enforce it |
+| The away dot has never been rendered on a measured page; `/catalog` has no away state | Stage 3 | catalog gap |
+| `Board.tsx` renders a read-only cell as a `<button>`, putting it in keyboard tab order | Stage 0's fallout | small |
+| Seat names truncate hard at 768px | Stage 3 | small |
+| `sections.tsx` builds every fixture at module load | Stage 3 | small |
+| `LiqQueue` has no design review — a Phase 1b finding restated in 2a, 2b, 3a, 3b and 4 | Stage 0 will put it on a screen for the first time | a design pass |
+
+## Deliberately not in this round
+
+- **The PWA itself.** Staged after pass-and-play persistence, because offline pass-and-play is the
+  only offline story that works while the server is the authority. Stage 1 is its prerequisite, not
+  its start.
+- **The spectator seat and the panel-only phone view.** Wanted together, since the phone view
+  depends on the spectator seat. Their own design pass.
+- **A library of finished games.** Out of scope, but Stage 2's format ruling keeps it possible.
+- **The prod by-hand pass.** Still owed from Phase 4. It is a separate errand from Stage 0 and
+  should not be folded into it — Stage 0 needs a dev-only seeding route that must never reach prod.

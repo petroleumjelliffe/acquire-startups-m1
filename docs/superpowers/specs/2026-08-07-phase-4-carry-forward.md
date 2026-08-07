@@ -119,8 +119,21 @@ that could never fail. Worth treating it as one.
   a phone on cellular reaching for a LAN address, a captive portal, a wrong `VITE_SERVER_URL` — it
   still says the server is waking. `navigator.onLine` cannot tell these apart, and the honest repair
   is copy that blames nothing: `Can't reach the server — retrying`. Not done; it is a product call.
-- **The prod by-hand pass.** Three scenarios, on Render, with the gone-room ending expected on the
-  third.
+- **The prod by-hand pass.** Three scenarios, on Render. **The third is no longer a prediction**
+  (owner, 2026-08-07): restarting the Render service does delete every room, and a player who was
+  mid-game lands on the gone-room screen. That is the accepted-limit pass this document forecast,
+  and it is also the first confirmation *in production* of the fix the final review caught — the
+  mid-game gone room, where `playing` used to outrank `gone` and leave a live-looking board whose
+  every click the server dropped.
+
+  **With a measurement trap worth recording.** Render takes a while to confirm the restart, and the
+  old process keeps serving during that window — so **the first reloads after a restart look like
+  the room survived**. The gone-room screen only appeared about 15 seconds in. Anyone checking
+  persistence on Render immediately after a restart would record "rooms survive a restart on prod",
+  which is false. Same shape as this phase's 98ms near-miss: the observation was real, the moment it
+  was taken at was not the moment being reasoned about.
+
+  Still owed on prod: refresh mid-turn and the dropped socket.
 - **The away dot has never been rendered on a measured page.** The final review traced the geometry
   and ruled it does not block merge — the strip is `overflow-hidden`, the active seat is `flex-none`
   at index 0, every other seat shrinks to zero — but nobody has looked at it. It also redirected the

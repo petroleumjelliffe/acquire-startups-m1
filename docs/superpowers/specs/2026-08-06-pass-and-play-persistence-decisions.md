@@ -141,12 +141,17 @@ arriving as `text/event-stream` (strip the `data: ` prefix).
 
 ## Open questions the design must still answer
 
-- What is written: the whole `GameState` and `segmentStart`, or the seed plus
-  the intent log replayed on load? The second is smaller and self-verifying, the
-  first is simpler and survives a rules change badly. This is the real design
-  decision and has not been made. Either way the save carries a **last-played
-  timestamp** — and no name: the Continue card's title is fixed copy, and the
-  players it lists come from the state itself.
+- ~~What is written: the whole `GameState` and `segmentStart`, or the seed plus
+  the intent log replayed on load?~~ **Ruled 2026-08-07: the whole `GameState`,
+  with a version.** The log is smaller and self-verifying and the replay
+  machinery already exists, but under a changed rule an old log replays into a
+  *plausible but different* game — it loads, it looks right, and it is wrong. A
+  versioned blob refuses loudly instead. It also matches what `server/store.ts`
+  already does, so there is one persistence model rather than two, and it keeps
+  the final state that the library-of-finished-games TODO above needs. The save
+  still carries a **last-played timestamp** — and no name: the Continue card's
+  title is fixed copy, and the players it lists come from the state itself.
+  Recorded in [2026-08-07-next-round-sequencing.md](./2026-08-07-next-round-sequencing.md).
 - Storage key and versioning — one key per device, and what happens when a save
   predates a rules change and no longer replays or loads cleanly.
 - ~~Whether the lobby's "continue" needs to show anything about the saved game~~
