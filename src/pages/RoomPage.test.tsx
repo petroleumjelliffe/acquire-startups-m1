@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { RoomPage } from './RoomPage';
 import type { Connection, ConnectionStatus } from '../net/connection';
 import type { JoinedMessage, RejectedMessage, RosterMessage, StateMessage } from '../../session/protocol';
@@ -77,6 +77,12 @@ function renderRoom(connection: Connection) {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+/** Renders the current query string, so a test can assert what the URL still carries. */
+function LocationProbe() {
+  const location = useLocation();
+  return <span data-testid="location-search">{location.search}</span>;
 }
 
 /** Joins as `name`, gets seated, and lands in the lobby with a second player already in it. */
@@ -588,5 +594,71 @@ describe('a refresh mid-turn', () => {
     // in the hand while the server still believed it was played.
     expect(screen.getByTestId('game-surface')).toBeInTheDocument();
     expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+  });
+});
+
+/**
+ * The dev-only seeded seat.
+ *
+ * `server/devSeed.ts` seats a golden game and hands back one URL per seat,
+ * because there is no other way to put a browser into a mid-game room — which
+ * is what the two-browser merger pass has been waiting on. This is the client
+ * half: take the seat the URL names, then get the credentials out of the URL.
+ */
+describe('a seat handed over in the URL, in dev', () => {
+  function renderSeeded(entry: string, connection: Connection) {
+    return render(
+      <MemoryRouter initialEntries={[entry]}>
+        <Routes>
+          <Route
+            path="/room/:roomId"
+            element={
+              <>
+                <RoomPage connect={() => connection} />
+                <LocationProbe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it('joins as the named seat instead of asking who you are', () => {
+    const f = fakeConnection();
+    renderSeeded('/room/DEVG2?devSeat=p2&devToken=tok-2&devName=Sam', f.connection);
+
+    // The join must carry the seeded seat's own id and token. A join without
+    // them is a stranger arriving at a room whose game has started, which the
+    // server refuses — the failure this hook exists to prevent.
+    expect(f.joins).toEqual([
+      { roomId: 'DEVG2', name: 'Sam', playerId: 'p2', token: 'tok-2' },
+    ]);
+    expect(screen.queryByLabelText(/your name/i)).not.toBeInTheDocument();
+  });
+
+  it('stores the identity, so a refresh rejoins the same seat without the URL', () => {
+    const f = fakeConnection();
+    renderSeeded('/room/DEVG2?devSeat=p1&devToken=tok-1&devName=Alex', f.connection);
+
+    expect(loadIdentity('DEVG2')).toEqual({ playerId: 'p1', token: 'tok-1', name: 'Alex' });
+  });
+
+  it('strips the credentials from the URL once they are stored', () => {
+    const f = fakeConnection();
+    renderSeeded('/room/DEVG2?devSeat=p1&devToken=tok-1&devName=Alex', f.connection);
+
+    // Otherwise the back button walks into a URL carrying a token, and every
+    // screenshot of a by-hand run has a live credential in the address bar.
+    expect(screen.getByTestId('location-search')).toHaveTextContent('');
+  });
+
+  it('leaves an ordinary arrival completely alone', () => {
+    const f = fakeConnection();
+    renderSeeded('/room/ABC123', f.connection);
+
+    expect(loadIdentity('ABC123')).toBeNull();
+    expect(f.joins).toEqual([]);
+    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
   });
 });

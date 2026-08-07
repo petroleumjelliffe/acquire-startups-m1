@@ -5,6 +5,7 @@ import { RoomGone } from '../game/online/RoomGone';
 import { ConnectionStrip } from '../game/online/ConnectionStrip';
 import { JoinForm } from '../game/online/JoinForm';
 import { useRoom } from '../net/useRoom';
+import { useDevSeat } from '../net/devSeat';
 import { getConnection, closeConnection, type Connection } from '../net/connection';
 
 export interface RoomPageProps {
@@ -15,6 +16,10 @@ export interface RoomPageProps {
 export function RoomPage({ connect = getConnection }: RoomPageProps) {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  // Above `useRoom`, and that ordering is load-bearing: `useRoom` reads the
+  // stored identity during its own first render, so a seat handed over in the
+  // URL has to be stored before this line. Dev only, compiled out otherwise.
+  useDevSeat(roomId ?? '');
   const room = useRoom(roomId ?? '', connect);
 
   // Leaving is a real disconnect, not just a route change: the socket this
