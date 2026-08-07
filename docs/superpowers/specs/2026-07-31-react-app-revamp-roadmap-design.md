@@ -396,14 +396,31 @@ or Vite PWA plugin. The pieces, and the one that is not routine:
   `2026-08-06-pass-and-play-persistence-decisions.md` lands — which makes the
   honest first target "pass-and-play works offline, online tells you it is
   offline", not "the app works offline".
-- **A stale-shell trap worth naming now.** A cached shell served against a
-  server whose protocol has moved on is a version-skew bug that looks like a
-  game bug. Whatever ships needs an update path, and `protocol.ts` is where the
-  skew would show.
+- **A protocol version, and it is a prerequisite rather than a detail**
+  (owner, 2026-08-07). A cached shell served against a server whose protocol has
+  moved on is version skew that presents as a game bug, and caching is what
+  makes an old client *durable* — today a deploy fixes itself on the next
+  reload, and after a service worker it does not. `session/protocol.ts` carries
+  no version field at all right now. What it needs:
+  - **A constant in `protocol.ts`**, bumped when the wire shape changes — the
+    file already owns `WireIntent`, `StateMessage`, `CLIENT_EVENTS` and
+    `SERVER_EVENTS`, so it is the one place that knows what "changed" means.
+  - **Checked at the handshake**, which already exists: the client sends it on
+    `joinRoom`, the server answers on `joined` or refuses with a
+    `RejectionCode`. A mismatch must be its *own* code — a stale client told
+    "room not found" sends the player hunting a room that is fine.
+  - **A refusal the player can act on**, which for an installed app means
+    prompting to update and reloading past the service worker, not a dead end.
+  - **Server-side too.** Rooms outlive a deploy once Phase 4's persistence
+    reads them back, so a resumed room carries a version as well; a room
+    written by an older server is the same skew, arriving from storage instead
+    of from a socket.
 
-It depends on the phone view above for the part that matters — installing a
-laptop-sized layout onto a phone home screen is the wrong deliverable — so
-these two should be planned together, after Phase 4.
+**Sequencing** (owner, 2026-08-07): staged **after pass-and-play persistence**,
+not merely after Phase 4 — offline pass-and-play is the only offline story that
+works while the server is the authority, and it does not exist until persistence
+lands. Plan it together with the phone view above, since installing a
+laptop-sized layout onto a phone home screen is the wrong deliverable.
 
 ### Deliberately not ported from the prototype
 
