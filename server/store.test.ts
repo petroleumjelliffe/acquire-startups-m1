@@ -73,14 +73,24 @@ describe('the file store', () => {
       'utf-8',
     );
 
+    // A stale-version file is real behaviour, not silence: loadAll promises to
+    // ignore what it cannot use, and warns which file it skipped. Spying keeps
+    // that promise honest without printing it during the test run.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     expect(await createFileStore(dir).loadAll()).toEqual([]);
+    expect(warn).toHaveBeenCalledWith('✗ Ignoring unreadable save OLD123.json');
   });
 
   it('ignores a file that is not a record at all', async () => {
     await writeFile(join(dir, 'JUNK01.json'), '{ this is not json', 'utf-8');
     await writeFile(join(dir, 'HALF02.json'), JSON.stringify({ roomId: 'HALF02' }), 'utf-8');
 
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
     expect(await createFileStore(dir).loadAll()).toEqual([]);
+    expect(warn).toHaveBeenCalledWith('✗ Ignoring unreadable save JUNK01.json');
+    expect(warn).toHaveBeenCalledWith('✗ Ignoring unreadable save HALF02.json');
   });
 
   it('is empty, not broken, when the directory does not exist yet', async () => {
