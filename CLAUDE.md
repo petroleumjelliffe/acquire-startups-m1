@@ -36,14 +36,25 @@ not have says so by name; a dropped player shows on the seat and in the toast. S
 local), and a ruling on the cold-start copy, which still says "waking the server" when the real
 condition is online-but-unreachable.
 
-**The next round is sequenced in `specs/2026-08-07-next-round-sequencing.md`** — read it before
-starting anything. **Stages 0–2 are built and deployed** (2026-08-07): the two-browser full game
-was driven by hand (a dev-only seeding route, `POST /dev/rooms`, now makes any golden-game state
-two clicks away in a browser); the wire and the save record carry versions
-(`PROTOCOL_VERSION` in `session/protocol.ts`, `SAVE_VERSION` 5, skew refused with its own
-`versionMismatch` code and screen, `/health` reports both); and **pass-and-play persists** — one
-game per device in `localStorage` (`src/game/local/localSave.ts`), written at every segment close,
-resumed from `/pass-and-play`'s Continue card, cleared only by End game or a confirmed discard.
+**Continuing from another machine? Start at `plans/2026-08-07-continuation.md`** — it holds the
+verify-merge-deploy steps for the pending branch, the machine-setup gotchas, and the queue.
+
+**The next round is sequenced in `specs/2026-08-07-next-round-sequencing.md`.** **Stages 0–2 are
+built and deployed** (2026-08-07): the two-browser full game was driven by hand (a dev-only
+seeding route, `POST /dev/rooms`, makes any golden-game state two clicks away in a browser); the
+wire and the save record carry versions (`PROTOCOL_VERSION` in `session/protocol.ts`,
+`SAVE_VERSION` 5, skew refused with its own `versionMismatch` code and screen, `/health` reports
+both); and **pass-and-play persists** — one game per device in `localStorage`
+(`src/game/local/localSave.ts`), written at every segment close, resumed from `/pass-and-play`'s
+Continue card, cleared only by End game or a confirmed discard.
+
+**Pending on `revamp/online-lobby-mockup` (pushed, unmerged): protocol v2.** The Lobby Flow
+design implemented in full — Create Room seats you immediately (no name form; `CreateRoomPage` is
+deleted), your own lobby row is editable with a × (`renamePlayer`/`leaveSeat`, lobby-only,
+socket-bound), the board lost its row/column headers, and the buy step gained a Pass gate so a
+turn cannot end over an empty basket by accident. **Prod speaks v1 until this merges; merging
+deploys both halves in one push, and a local v2 client pointed at prod's v1 gets the stale-client
+screen — that is the feature, not a bug.**
 
 **Still open: Stage 3** — the layout gate's flakiness, with a live lead: `verify-layout.mjs`
 drives a *persistent* Chrome profile, so every run depends on run history; Stage 2 tripped over
