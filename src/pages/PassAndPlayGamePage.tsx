@@ -55,9 +55,10 @@ export function PassAndPlayGamePage() {
   return (
     <GameScreen
       session={session}
-      // A genuine fresh game: the save this page mounted from is discarded
-      // and the lobby offers setup rather than Continue.
-      onNewGame={() => {
+      // The one sanctioned clear besides the lobby's confirmed discard: the
+      // game is fully over, and the lobby then offers a new game rather than
+      // a continue. Only renders on final scoring — see GameScreen.
+      onEndGame={() => {
         clear();
         navigate('/pass-and-play');
       }}

@@ -43,8 +43,8 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
       <>
         <ConnectionStrip status={room.status} />
         {/*
-          No `onNewGame`: this room belongs to everyone in it, and starting
-          over is not one player's to do. Leaving is.
+          No `onEndGame`: this room belongs to everyone in it, and ending
+          the game is not one player's to do. Leaving is.
         */}
         <GameScreen
           session={room.session}

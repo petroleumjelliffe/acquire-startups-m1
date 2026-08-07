@@ -223,13 +223,13 @@ describe('GameScreen at the end of a game', () => {
     expect(within(overlay).getByText(/reached 41 tiles/i)).toBeInTheDocument();
   });
 
-  it('offers a new game and a way out when the page supplies them', () => {
-    const onNewGame = vi.fn();
+  it('offers to end the game and a way out when the page supplies them', () => {
+    const onEndGame = vi.fn();
     const onExit = vi.fn();
-    render(<GameScreen session={ended()} onNewGame={onNewGame} onExit={onExit} />);
+    render(<GameScreen session={ended()} onEndGame={onEndGame} onExit={onExit} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /new game/i }));
-    expect(onNewGame).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /end game/i }));
+    expect(onEndGame).toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /back to menu/i }));
     expect(onExit).toHaveBeenCalled();
   });
@@ -244,17 +244,17 @@ describe('GameScreen at the end of a game', () => {
     // apart, because the buttons are "present in the document" either way —
     // it has to be scoped to the card itself.
     const { container } = render(
-      <GameScreen session={ended()} onNewGame={() => {}} onExit={() => {}} />,
+      <GameScreen session={ended()} onEndGame={() => {}} onExit={() => {}} />,
     );
     const card = container.querySelector('[data-testid="final-overlay"] .rounded-2xl');
     expect(card).not.toBeNull();
-    expect(within(card as HTMLElement).getByRole('button', { name: /new game/i })).toBeInTheDocument();
+    expect(within(card as HTMLElement).getByRole('button', { name: /end game/i })).toBeInTheDocument();
     expect(within(card as HTMLElement).getByRole('button', { name: /back to menu/i })).toBeInTheDocument();
   });
 
   it('omits the buttons the page did not supply', () => {
     render(<GameScreen session={ended()} />);
-    expect(screen.queryByRole('button', { name: /new game/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /end game/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /back to menu/i })).toBeNull();
   });
 

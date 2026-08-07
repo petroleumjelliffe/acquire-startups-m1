@@ -53,13 +53,18 @@ export interface GameScreenProps {
    * everyone: there is no transport for anyone to be missing from.
    */
   presence?: Record<string, boolean>;
-  /** Start over from setup. Omitted when nothing is hosting the screen. */
-  onNewGame?: () => void;
+  /**
+   * Finish the game for good — final scoring's own action, never shown
+   * mid-game. Pass-and-play clears its save here; online never passes it,
+   * because a room belongs to everyone in it and ending is not one player's
+   * to do.
+   */
+  onEndGame?: () => void;
   /** Leave the game entirely. Omitted when nothing is hosting the screen. */
   onExit?: () => void;
 }
 
-export function GameScreen({ session, viewerId, connected = true, presence, onNewGame, onExit }: GameScreenProps) {
+export function GameScreen({ session, viewerId, connected = true, presence, onEndGame, onExit }: GameScreenProps) {
   const view = useGameSession(session);
   const { state, actorId, awaitingReveal, undoableSteps, pending } = view;
 
@@ -256,15 +261,15 @@ export function GameScreen({ session, viewerId, connected = true, presence, onNe
           <FinalScoring
             {...finalScore(state)}
             actions={
-              (onNewGame || onExit) && (
+              (onEndGame || onExit) && (
                 <>
-                  {onNewGame && (
+                  {onEndGame && (
                     <button
                       type="button"
-                      onClick={onNewGame}
+                      onClick={onEndGame}
                       className="m-0 rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
                     >
-                      New game
+                      End game
                     </button>
                   )}
                   {onExit && (

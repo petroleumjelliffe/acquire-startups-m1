@@ -62,6 +62,31 @@ describe('the game route, resumed from the save', () => {
   });
 });
 
+describe('End game', () => {
+  it('clears the save and returns to a lobby with nothing to continue', () => {
+    save({ ...midGame(), stage: 'end' });
+    renderAt('/pass-and-play/game');
+
+    fireEvent.click(screen.getByRole('button', { name: /end game/i }));
+
+    // The ruling: End game marks the game fully over, and the lobby then
+    // offers a new game rather than a continue. Nothing else clears the save.
+    expect(load()).toBeNull();
+    expect(screen.queryByTestId('continue-card')).toBeNull();
+    expect(screen.getByRole('button', { name: /start game/i })).toBeInTheDocument();
+  });
+
+  it('is not offered while the game is still going', () => {
+    save(midGame());
+    renderAt('/pass-and-play/game');
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
+
+    // Mid-game there is nothing to end: abandoning goes through the lobby's
+    // New Game, which confirms. This button exists only on final scoring.
+    expect(screen.queryByRole('button', { name: /end game/i })).toBeNull();
+  });
+});
+
 describe('when a save is written', () => {
   it('writes on segment close, and not before', () => {
     const initial = midGame();
