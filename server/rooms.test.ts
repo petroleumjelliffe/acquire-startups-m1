@@ -243,6 +243,26 @@ describe('restoring rooms at boot', () => {
     expect(await readdir(dir)).toContain('game-rotten.json.bad');
   });
 
+  /**
+   * Boot-only, enforced rather than documented. `rooms.set` in `restore` is
+   * unconditional — it replaces whatever object holds a room id, with no
+   * check that sockets are bound to the old one. Safe before `listen`,
+   * silently catastrophic after: every bound socket keeps dispatching into a
+   * room object the registry no longer serves. Until now only a docstring
+   * said so.
+   */
+  it('refuses to restore twice, because the second call would strand live sockets', async () => {
+    await seedSavedRoom('ABC123');
+    const rooms = createRoomRegistry(createFileStore(dir));
+
+    await rooms.restore();
+
+    await expect(rooms.restore()).rejects.toThrow(/boot/i);
+    // The first restore's work is intact — the guard protects it rather than
+    // tearing anything down.
+    expect(rooms.get('ABC123')).toBeDefined();
+  });
+
   it('drops and deletes a record older than the age limit', async () => {
     await seedSavedRoom('OLD123');
     const store = createFileStore(dir);

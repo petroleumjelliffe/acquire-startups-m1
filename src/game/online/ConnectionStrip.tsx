@@ -56,34 +56,27 @@ function useOnline(): boolean {
  * disconnected from. A centred pill rather than a full-width bar, because the
  * board underneath it is the thing the player is trying to read.
  *
- * Three things it can say. What prompted the split: found by hand, on a
- * phone whose wifi was switched off but whose cellular data was on — so
- * `navigator.onLine` correctly read `true`, and the pill still said "waking
- * the server" while sitting on a network that in fact could not reach it (an
- * address only resolvable over the wifi it no longer had). That specific
- * case — online by every signal this component has, but unable to reach the
- * server — is **not** what the split below fixes, and is still open. What it
- * does fix is the case where the device is provably offline outright.
+ * Three things it can say:
  *
  * - **No network.** `navigator.onLine` is `false`. Nothing else can be said
  *   honestly, because no claim about the server has been tested.
- * - **The server may be waking.** We are on a network and the connect is
- *   taking longer than an ordinary blip. The free Render tier sleeps after
- *   fifteen minutes and takes about thirty seconds to wake (DEPLOYMENT.md),
- *   which is the case worth naming — a player who knows that waits, and a
- *   player watching "Connecting…" for half a minute assumes it is broken.
- *   This is also what shows for the phone-on-cellular case above, which is
- *   the honest gap: the copy names a specific cause ("waking") this
- *   component cannot actually tell apart from "reachable network, unreachable
- *   server for some other reason." The accurate repair is copy that asserts
- *   no cause at all — something like "Can't reach the server — retrying" —
- *   but that is a product decision on user-visible text, not made here.
+ * - **A long wait, cause unstated.** We are on a network and the connect is
+ *   taking longer than an ordinary blip. The copy deliberately asserts no
+ *   cause (ruled 2026-08-07, closing Phase 4's Finding 2): from here, a
+ *   sleeping Render instance, a phone on cellular holding a LAN address, a
+ *   captive portal and a wrong `VITE_SERVER_URL` are all indistinguishable —
+ *   and the previous copy, "Waking the server — this can take up to 30
+ *   seconds", named the first for all four. It was found doing exactly that
+ *   by hand, on a phone whose wifi was off but whose cellular was on:
+ *   `navigator.onLine` correctly read `true`, and the pill blamed a server
+ *   the network could not even route to. What the change costs is the
+ *   30-second reassurance, which was genuinely true and useful in the one
+ *   case (Render free's cold start) out of the four.
  * - **Connecting / reconnecting.** The ordinary short wait.
  *
  * Saying "waking the server" while the device has no network *at all* was
  * the original bug this file fixed: it asserted a cause that had not been
- * established, about a server the device had not even tried to reach. The
- * `navigator.onLine`-false case above is what that fix actually covers.
+ * established, about a server the device had not even tried to reach.
  */
 export function ConnectionStrip({ status }: { status: ConnectionStatus }) {
   const [slow, setSlow] = useState(false);
@@ -106,7 +99,7 @@ export function ConnectionStrip({ status }: { status: ConnectionStatus }) {
   const message = !online
     ? 'No network — waiting for this device to reconnect'
     : slow
-      ? 'Waking the server — this can take up to 30 seconds'
+      ? 'Can’t reach the server — retrying'
       : status === 'connecting' ? 'Connecting…' : 'Disconnected — reconnecting…';
 
   return (

@@ -23,13 +23,14 @@ export interface RoomRegistry {
    * `now` is injectable so the age policy can be tested without waiting a
    * week; the server never passes it.
    *
-   * Boot-only. `rooms.set` here is unconditional — it replaces whatever is
-   * already in the registry for a given id with no check that nothing is
-   * live there — which is safe only because the one production caller
-   * (`server/index.ts`) runs this before `listen`, while no socket has
-   * bound to anything yet. Calling it once the server is serving traffic
-   * would silently swap out a room's object out from under socket bindings
-   * that still point at the old one.
+   * Boot-only, and enforced: a second call throws. `rooms.set` here is
+   * unconditional — it replaces whatever is already in the registry for a
+   * given id with no check that nothing is live there — which is safe only
+   * because the one production caller (`server/index.ts`) runs this before
+   * `listen`, while no socket has bound to anything yet. Called again once
+   * the server is serving traffic, it would silently swap a room's object
+   * out from under socket bindings that still point at the old one; a loud
+   * throw at the call site beats that being discovered from a dead game.
    */
   restore(now?: number): Promise<number>;
 }
@@ -63,6 +64,7 @@ function roomCode(): string {
 
 export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRegistry {
   const rooms = new Map<string, GameRoom>();
+  let restored = false;
 
   return {
     create(hostName) {
@@ -138,6 +140,14 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
     },
 
     async restore(now = Date.now()) {
+      if (restored) {
+        throw new Error(
+          'restore() is boot-only: calling it on a serving registry would swap ' +
+            'live room objects out from under their socket bindings',
+        );
+      }
+      restored = true;
+
       // `loadAll` only ever looks at `*.json`, so a `.tmp` file orphaned by a
       // crash between `writeFile` and `rename` (see the temp-name comment in
       // `store.ts`) is invisible here — it is not read, not restored, and not

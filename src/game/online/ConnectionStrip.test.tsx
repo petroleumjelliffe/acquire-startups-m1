@@ -33,10 +33,13 @@ describe('the connection strip', () => {
 
     act(() => { vi.advanceTimersByTime(3000); });
 
-    // A 30-second wake and a two-second blip look identical for the first
-    // few seconds. After that they should not.
+    // A long outage and a two-second blip look identical for the first few
+    // seconds. After that the pill owns up to the wait — but blames nothing:
+    // this component cannot tell a sleeping server from a reachable network
+    // that cannot reach it (a phone on cellular holding a LAN address, a
+    // captive portal), and the old copy asserted 'waking' for all of them.
     expect(screen.getByTestId('connection-strip'))
-      .toHaveTextContent('Waking the server — this can take up to 30 seconds');
+      .toHaveTextContent('Can’t reach the server — retrying');
   });
 
   it('drops back to the short form when the connection recovers and drops again', () => {
@@ -64,14 +67,12 @@ describe('a device with no network of its own', () => {
 
     // The bug this guards: `navigator.onLine` false, `status` not `open` —
     // the device itself has no network, so nothing about the server can be
-    // claimed. This is the outright-offline case, not the case actually
-    // found by hand (a phone on cellular data with its wifi off, where
-    // `navigator.onLine` read `true` and the pill still wrongly said "waking
-    // the server" for an address only reachable over wifi) — that case is
-    // still open; see `ConnectionStrip`'s own docstring.
+    // claimed. (The related case found by hand — a phone on cellular whose
+    // `navigator.onLine` read `true` while the pill blamed a server its
+    // network could not route to — is closed by the cause-free copy above.)
     const strip = screen.getByTestId('connection-strip');
     expect(strip).toHaveTextContent('No network — waiting for this device to reconnect');
-    expect(strip).not.toHaveTextContent('Waking the server');
+    expect(strip).not.toHaveTextContent('reach the server');
   });
 
   it('goes back to blaming the server once the network returns', () => {
@@ -83,10 +84,10 @@ describe('a device with no network of its own', () => {
     setOnline(true);
     act(() => { window.dispatchEvent(new Event('online')); });
 
-    // The wait was already long, and now it is a wait we can attribute: the
-    // device is on a network and the server still has not answered.
+    // The wait was already long, and the device is now on a network — but
+    // which side is at fault is still unknowable, so the copy stays cause-free.
     expect(screen.getByTestId('connection-strip'))
-      .toHaveTextContent('Waking the server — this can take up to 30 seconds');
+      .toHaveTextContent('Can’t reach the server — retrying');
   });
 
   it('reads as offline on the very first render when it mounts that way', () => {
