@@ -108,12 +108,21 @@ measured `main`. Verify which **tree** is serving:
 
 ```bash
 lsof -nP -iTCP -sTCP:LISTEN | awk '$1=="node"{print $2, $9}' | sort -u | while read P ADDR; do
-  echo "$ADDR  $(lsof -a -p $P -d cwd -Fn | grep ^n | cut -c2-)"
+  echo "$ADDR  $(lsof -a -p $P -d cwd -Fn | grep '^n' | cut -c2-)"
 done
 ```
 
-- [ ] Kill anything from another checkout, then `npm run dev:all`.
-- [ ] Confirm both ports map to *this* working directory.
+**Quote `'^n'`.** In zsh — this project's shell — an unquoted `^n` is extended-glob negation and
+expands to the whole directory, so `grep` prints `dist: Is a directory` and no working directory at
+all. The unquoted form shipped in the Phase 4 notes and failed for the next person who ran it.
+
+- [ ] Kill anything from another checkout, then `npm run dev:all` — **both** servers. Plain
+      `npm run dev` starts Vite alone, and the missing 3001 is invisible until a room fails to
+      connect.
+- [ ] Confirm both ports map to *this* working directory, and that 3001 appears at all.
+- [ ] Restart Vite if it was running before a branch switch.
+- [ ] Confirm `VITE_SERVER_URL` is unset or commented out — pointed at Render, the client cannot
+      reach the seeding route, which exists only on a dev server.
 - [ ] Use **two isolated browser contexts**, not two tabs — `identity.ts` keys `localStorage` per
       room, so two tabs in one profile fight over the same seat.
 

@@ -20,9 +20,16 @@ code:
 
 ```bash
 lsof -nP -iTCP -sTCP:LISTEN | awk '$1=="node"{print $2, $9}' | sort -u | while read P ADDR; do
-  echo "$ADDR  $(lsof -a -p $P -d cwd -Fn | grep ^n | cut -c2-)"
+  echo "$ADDR  $(lsof -a -p $P -d cwd -Fn | grep '^n' | cut -c2-)"
 done
 ```
+
+**The quotes around `'^n'` are load-bearing in zsh**, which is this project's shell. Unquoted, `^n`
+is zsh's extended-glob negation — "every file except one named `n`" — so it expands to the whole
+directory and `grep` reports `dist: Is a directory` instead of a working directory. Recorded on
+2026-08-07 after the unquoted version, as originally written here, failed for the next person who
+ran it. A command whose whole job is to stop you measuring the wrong tree is worth having work in
+the shell you actually use.
 
 **Before any by-hand pass, verify which _tree_ is serving — not merely that something is.** A dev
 server that silently moves to the next free port is indistinguishable, from the browser, from the
