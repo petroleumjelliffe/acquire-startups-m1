@@ -324,7 +324,7 @@ describe('a stale identity, refused', () => {
 
     expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Ghost', playerId: 'p9', token: 'stale' }]);
 
-    f.sendRejected({ code: 'unknownIntent', message: 'cannot join ABC123' });
+    f.sendRejected({ code: 'seatRefused', message: 'That seat in ABC123 is no longer yours' });
 
     expect(loadIdentity('ABC123')).toBeNull();
   });

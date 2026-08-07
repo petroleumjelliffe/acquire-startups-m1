@@ -176,6 +176,15 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
         return;
       }
 
+      const target = rooms.get(msg.roomId);
+      if (!target) {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'noSuchRoom',
+          message: `Room ${msg.roomId} is no longer available`,
+        });
+        return;
+      }
+
       // One socket holds one seat per room.
       //
       // A `joinRoom` with no `playerId`/`token` seats a *new* player — that is
@@ -193,21 +202,21 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       let seat: Seat | null = null;
       const bound = bindings.get(socket.id);
       if (bound && bound.roomId === msg.roomId) {
-        const room = rooms.get(bound.roomId);
-        const player = room?.players.find((p) => p.id === bound.playerId);
-        if (room && player) seat = { room, player };
+        const player = target.players.find((p) => p.id === bound.playerId);
+        if (player) seat = { room: target, player };
       }
 
       seat ??= rooms.join(msg.roomId, msg.name, msg.playerId, msg.token);
-      if (seat) seat.player.connected = true;
 
       if (!seat) {
         socket.emit(SERVER_EVENTS.rejected, {
-          code: 'unknownIntent',
-          message: `cannot join ${msg.roomId}`,
+          code: 'seatRefused',
+          message: `That seat in ${msg.roomId} is no longer yours — join again to take a new one`,
         });
         return;
       }
+
+      seat.player.connected = true;
 
       bindings.set(socket.id, { roomId: seat.room.id, playerId: seat.player.id });
       void socket.join(seat.room.id);

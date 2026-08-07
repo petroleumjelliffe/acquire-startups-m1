@@ -106,17 +106,31 @@ export function toWire(intent: Intent): WireIntent {
 }
 
 /**
- * Everything the engine can refuse, plus the two refusals the engine knows
- * nothing about. Undo is not an intent — it never reaches `applyIntent` — so
+ * Everything the engine can refuse, plus the refusals the engine knows nothing
+ * about.
+ *
+ * Undo is not an intent — it never reaches `applyIntent` — so
  * `IllegalIntentCode` has no word for "that step belongs to a segment you no
  * longer own". `notConnected` is not a refusal at all in the protocol sense —
- * the server never sends it — it is the client's own signal that the
- * transport is down, given a real member here rather than borrowing an
- * unrelated wire code (`NetworkSession` used to reuse `unknownIntent` for
- * this, a transport condition wearing a protocol code). Adding these here
- * keeps `engine/` untouched.
+ * the server never sends it — it is the client's own signal that the transport
+ * is down, given a real member here rather than borrowing an unrelated wire
+ * code.
+ *
+ * `noSuchRoom` and `seatRefused` are one refusal split in two, because they
+ * have different remedies. Nothing reaches a room that is not there, so that
+ * is an ending: the game may have finished, or the server may have restarted
+ * with an ephemeral disk. A room that is there but refuses this seat means the
+ * stored identity is stale, and joining fresh works. Sending one code for both
+ * made every wiped game read as `cannot join ABC123`.
+ *
+ * Adding these here keeps `engine/` untouched.
  */
-export type RejectionCode = IllegalIntentCode | 'undoOutOfSegment' | 'notConnected';
+export type RejectionCode =
+  | IllegalIntentCode
+  | 'undoOutOfSegment'
+  | 'notConnected'
+  | 'noSuchRoom'
+  | 'seatRefused';
 
 /**
  * Why a state arrived.
