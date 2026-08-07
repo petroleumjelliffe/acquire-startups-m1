@@ -19,6 +19,7 @@ import {
   type CreateRoomMessage,
   type JoinRoomMessage,
   type JoinedMessage,
+  type RenamePlayerMessage,
   type RosterMessage,
   type StateMessage,
   type StateReason,
@@ -282,6 +283,68 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // `resume`, not `commit`: this socket may belong to the player the game
       // is waiting on, mid-segment, with work the server still holds.
       if (seat.room.lifecycle() !== 'lobby') sendState(seat.room, seat.player.id, 'resume');
+    });
+
+    socket.on(CLIENT_EVENTS.renamePlayer, (msg: RenamePlayerMessage) => {
+      const bound = bindings.get(socket.id);
+      const room = bound && rooms.get(bound.roomId);
+      if (!bound || !room) {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'notConnected',
+          message: 'No seat to rename — join a room first',
+        });
+        return;
+      }
+      // Lobby-only: the engine copies names into `GameState` at startGame,
+      // and a rename after that leaves the roster and the log disagreeing
+      // about who did what.
+      if (room.lifecycle() !== 'lobby') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'wrongStage',
+          message: 'Names are settled once the game starts',
+        });
+        return;
+      }
+      const name = typeof msg?.name === 'string' ? msg.name.trim() : '';
+      if (name === '') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'unknownIntent',
+          message: 'renamePlayer requires a name',
+        });
+        return;
+      }
+
+      // The binding names the seat; the payload cannot rename anyone else.
+      const player = room.players.find((p) => p.id === bound.playerId);
+      if (!player) return;
+      player.name = name;
+      io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
+    });
+
+    socket.on(CLIENT_EVENTS.leaveSeat, () => {
+      const bound = bindings.get(socket.id);
+      const room = bound && rooms.get(bound.roomId);
+      if (!bound || !room) return;
+      // Mid-game leaving is a disconnect, which keeps the seat and marks it
+      // away — the game waits. Only a lobby seat can be given up.
+      if (room.lifecycle() !== 'lobby') {
+        socket.emit(SERVER_EVENTS.rejected, {
+          code: 'wrongStage',
+          message: 'A started game keeps its seats — closing the tab is enough',
+        });
+        return;
+      }
+
+      const at = room.players.findIndex((p) => p.id === bound.playerId);
+      if (at === -1) return;
+      const wasHost = room.players[at].isHost;
+      room.players.splice(at, 1);
+      // A lobby with no host is a lobby nobody can ever start.
+      if (wasHost && room.players.length > 0) room.players[0].isHost = true;
+
+      bindings.delete(socket.id);
+      void socket.leave(room.id);
+      io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
     });
 
     socket.on(CLIENT_EVENTS.beginGame, () => {

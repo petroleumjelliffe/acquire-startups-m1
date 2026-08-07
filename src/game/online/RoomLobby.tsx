@@ -4,15 +4,22 @@ import { PLAYER_EMOJI } from '../../../engine/startups';
 export interface RoomLobbyProps {
   roomId: string;
   players: RosterMessage['players'];
+  /** Whose row gets the field and the ×. The design gives them to nobody else. */
+  myPlayerId: string | null;
   /** Only the host may start, which is the server's rule too. */
   isHost: boolean;
   /** A refusal that arrived while sitting here — shown, not navigated away from. */
   note?: string | null;
   onStart: () => void;
-  onExit: () => void;
+  /** Rename your own seat. Sent on blur or Enter, not per keystroke. */
+  onRename: (name: string) => void;
+  /** Give up your own seat — the × on your row, and the Leave button. */
+  onLeaveSeat: () => void;
 }
 
-export function RoomLobby({ roomId, players, isHost, note, onStart, onExit }: RoomLobbyProps) {
+export function RoomLobby({
+  roomId, players, myPlayerId, isHost, note, onStart, onRename, onLeaveSeat,
+}: RoomLobbyProps) {
   const enough = players.length >= 2;
 
   return (
@@ -31,20 +38,48 @@ export function RoomLobby({ roomId, players, isHost, note, onStart, onExit }: Ro
         <ul className="mb-6 flex flex-col gap-2">
           {players.map((p, seat) => (
             <li key={p.id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
-              {/* The chip the mockup draws, derived rather than invented: the
+              {/* The chip the design draws, derived rather than invented: the
                   engine assigns PLAYER_EMOJI by seat at startGame, so the
                   lobby shows each player the face the game is about to give
                   them. The presence dot stays — it is Phase 4 information the
-                  mockup predates. */}
+                  design predates. */}
               <span aria-hidden className="flex-none text-base leading-none">
                 {PLAYER_EMOJI[seat] ?? '•'}
               </span>
               <span
                 aria-hidden
-                className={`h-2 w-2 rounded-full ${p.connected ? 'bg-green-500' : 'bg-gray-300'}`}
+                className={`h-2 w-2 flex-none rounded-full ${p.connected ? 'bg-green-500' : 'bg-gray-300'}`}
               />
-              <span className="font-semibold">{p.name}</span>
-              {p.isHost && <span className="text-xs uppercase tracking-wide text-gray-500">host</span>}
+              {p.id === myPlayerId ? (
+                // Your row and only yours: the field and the ×. Committed on
+                // blur or Enter rather than per keystroke, so the room is not
+                // broadcast every letter of a half-typed name.
+                <>
+                  <input
+                    aria-label="Your name"
+                    defaultValue={p.name}
+                    onBlur={(e) => {
+                      const next = e.target.value.trim();
+                      if (next !== '' && next !== p.name) onRename(next);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                    }}
+                    className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 font-semibold"
+                  />
+                  <button
+                    type="button"
+                    aria-label="Leave your seat"
+                    onClick={onLeaveSeat}
+                    className="m-0 flex-none rounded px-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    ×
+                  </button>
+                </>
+              ) : (
+                <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
+              )}
+              {p.isHost && <span className="flex-none text-xs uppercase tracking-wide text-gray-500">host</span>}
             </li>
           ))}
         </ul>
@@ -70,7 +105,7 @@ export function RoomLobby({ roomId, players, isHost, note, onStart, onExit }: Ro
 
         <button
           type="button"
-          onClick={onExit}
+          onClick={onLeaveSeat}
           className="m-0 mt-3 w-full rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
         >
           Leave

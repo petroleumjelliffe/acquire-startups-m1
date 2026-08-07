@@ -2,7 +2,6 @@ import React from "react";
 import { Routes, Route } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
 import { OnlineLobbyPage } from "./pages/OnlineLobbyPage";
-import { CreateRoomPage } from "./pages/CreateRoomPage";
 import { JoinRoomPage } from "./pages/JoinRoomPage";
 import { PassAndPlayPage } from "./pages/PassAndPlayPage";
 import { PassAndPlayGamePage } from "./pages/PassAndPlayGamePage";
@@ -21,7 +20,6 @@ export default function App() {
 
       {/* Online multiplayer flow */}
       <Route path="/online" element={<OnlineLobbyPage />} />
-      <Route path="/online/create" element={<CreateRoomPage />} />
       <Route path="/online/join" element={<JoinRoomPage />} />
 
       {/* Pass and play: the lobby, then the board. Split so the back button

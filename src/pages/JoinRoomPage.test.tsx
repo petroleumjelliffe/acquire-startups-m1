@@ -31,6 +31,8 @@ function fakeConnection() {
     createRoom: () => {},
     joinRoom: (m) => { joins.push(m); },
     beginGame: () => {},
+    renamePlayer: () => {},
+    leaveSeat: () => {},
     onJoined: (h) => { joined = h; return () => { joined = null; }; },
     onRoster: () => () => {},
     close: () => {},

@@ -5,6 +5,7 @@ import {
   SERVER_EVENTS,
   type CreateRoomMessage,
   type JoinRoomMessage,
+  type RenamePlayerMessage,
   type JoinedMessage,
   type RosterMessage,
 } from '../../session/protocol';
@@ -55,6 +56,10 @@ export interface Connection {
   createRoom(name: string): void;
   joinRoom(msg: JoinRoomMessage): void;
   beginGame(): void;
+  /** Rename your own seat. Lobby-only; the server enforces it. */
+  renamePlayer(name: string): void;
+  /** Give up your own seat. Lobby-only; mid-game leaving is a disconnect. */
+  leaveSeat(): void;
   onJoined(handler: (msg: JoinedMessage) => void): () => void;
   onRoster(handler: (msg: RosterMessage) => void): () => void;
   close(): void;
@@ -100,6 +105,11 @@ function createConnection(): Connection {
     },
     joinRoom(msg) { socket.emit(CLIENT_EVENTS.joinRoom, msg); },
     beginGame() { socket.emit(CLIENT_EVENTS.beginGame); },
+    renamePlayer(name) {
+      const msg: RenamePlayerMessage = { name };
+      socket.emit(CLIENT_EVENTS.renamePlayer, msg);
+    },
+    leaveSeat() { socket.emit(CLIENT_EVENTS.leaveSeat); },
     onJoined(handler) {
       socket.on(SERVER_EVENTS.joined, handler);
       return () => { socket.off(SERVER_EVENTS.joined, handler); };

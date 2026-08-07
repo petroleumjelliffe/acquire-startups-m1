@@ -27,6 +27,8 @@ function fakeConnection() {
   const statusListeners = new Set<() => void>();
   const joins: unknown[] = [];
   const begins: number[] = [];
+  const renames: string[] = [];
+  const seatLeaves: number[] = [];
   let status: ConnectionStatus = 'open';
 
   const connection: Connection = {
@@ -45,6 +47,8 @@ function fakeConnection() {
     createRoom: () => {},
     joinRoom: (m) => { joins.push(m); },
     beginGame: () => { begins.push(1); },
+    renamePlayer: (n) => { renames.push(n); },
+    leaveSeat: () => { seatLeaves.push(1); },
     onJoined: (h) => { joined = h; return () => { joined = null; }; },
     onRoster: (h) => { roster = h; return () => { roster = null; }; },
     close: () => {},
@@ -54,6 +58,8 @@ function fakeConnection() {
     connection,
     joins,
     begins,
+    renames,
+    seatLeaves,
     sendJoined: (m: JoinedMessage) => act(() => { joined?.(m); }),
     sendRoster: (m: RosterMessage) => act(() => { roster?.(m); }),
     sendState: (m: StateMessage) => act(() => { for (const h of stateHandlers) h(m); }),
@@ -80,6 +86,9 @@ function renderRoom(connection: Connection) {
     <MemoryRouter initialEntries={['/room/ABC123']}>
       <Routes>
         <Route path="/room/:roomId" element={<RoomPage connect={() => connection} />} />
+        {/* Leaving navigates home; without this stub the router warns on
+            stderr, and a warning in the run regresses the clean baseline. */}
+        <Route path="/" element={<div>home</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -195,7 +204,8 @@ describe('the lobby', () => {
   it('shows the code to read out and everyone in it', () => {
     seated('Alex', true);
     expect(screen.getByTestId('room-code')).toHaveTextContent('ABC123');
-    expect(screen.getByText('Alex')).toBeInTheDocument();
+    // Your own name is the editable field; everyone else's is plain text.
+    expect(screen.getByDisplayValue('Alex')).toBeInTheDocument();
     expect(screen.getByText('Sam')).toBeInTheDocument();
   });
 
@@ -209,6 +219,44 @@ describe('the lobby', () => {
     seated('Alex', false);
     expect(screen.queryByRole('button', { name: /start game/i })).toBeNull();
     expect(screen.getByText(/waiting for the host/i)).toBeInTheDocument();
+  });
+
+  /**
+   * The design's own-row actions: the field and the × belong to your seat
+   * and nobody else's. Joined as p2 (Sam), so Alex's row must stay plain.
+   */
+  it('renames your own seat on blur, not per keystroke', () => {
+    const f = seated('Sam', false);
+
+    const field = screen.getByLabelText(/your name/i);
+    fireEvent.change(field, { target: { value: 'Samantha' } });
+    expect(f.renames).toEqual([]);
+
+    fireEvent.blur(field);
+    expect(f.renames).toEqual(['Samantha']);
+    // Alex's row grew no field: one input on the page, and it is yours.
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+  });
+
+  it('does not broadcast a rename to the name you already have', () => {
+    const f = seated('Sam', false);
+
+    const field = screen.getByLabelText(/your name/i);
+    fireEvent.blur(field);
+
+    expect(f.renames).toEqual([]);
+  });
+
+  it('the × gives up the seat and forgets it', () => {
+    const f = seated('Sam', false);
+    expect(loadIdentity('ABC123')).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /leave your seat/i }));
+
+    expect(f.seatLeaves).toHaveLength(1);
+    // The token is dead with the seat — keeping it would make the next visit
+    // attempt a rejoin the server must refuse.
+    expect(loadIdentity('ABC123')).toBeNull();
   });
 });
 
@@ -225,8 +273,10 @@ describe('a refusal that arrives after being seated', () => {
     expect(screen.getByText('Alex')).toBeInTheDocument();
     // The refusal is shown as a note, not swapped in for the lobby.
     expect(screen.getByText(/only the host may begin/i)).toBeInTheDocument();
-    // Not bounced back to a join form.
-    expect(screen.queryByLabelText(/your name/i)).toBeNull();
+    // Not bounced back to a join form. Keyed on the form's own submit button
+    // rather than the "Your name" label, which the lobby's editable own-row
+    // now legitimately carries.
+    expect(screen.queryByRole('button', { name: /join room/i })).toBeNull();
   });
 });
 

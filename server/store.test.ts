@@ -192,6 +192,7 @@ describe('the record carries what a resumed room needs', () => {
   });
 
   it('refuses a record with no protocol version at all', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = createFileStore(dir);
     // Written by hand rather than through `save`: this is what a file left by
     // an older server looks like, and nothing in this process can produce one.
@@ -202,6 +203,7 @@ describe('the record carries what a resumed room needs', () => {
   });
 
   it('refuses the previous save format outright', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = createFileStore(dir);
     await writeFile(
       join(dir, 'game-v4.json'),
@@ -224,6 +226,7 @@ describe('the record carries what a resumed room needs', () => {
  */
 describe('what loadAll says about files it cannot read', () => {
   it('names them, so the registry can decide what to do', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = createFileStore(dir);
     await store.save(record());
     await writeFile(join(dir, 'game-rotten.json'), '{ not json', 'utf8');
@@ -235,6 +238,7 @@ describe('what loadAll says about files it cannot read', () => {
   });
 
   it('quarantines by rename, and the file stops being read at the next load', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     const store = createFileStore(dir);
     await writeFile(join(dir, 'game-rotten.json'), '{ not json', 'utf8');
 

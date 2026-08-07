@@ -209,8 +209,12 @@ export interface RosterMessage {
  * Today a stale client fixes itself on the next reload. That stops being true
  * the moment a service worker makes an old client durable, which is the reason
  * this landed before the PWA rather than inside it.
+ *
+ * 2 (2026-08-07): `renamePlayer` and `leaveSeat` — the lobby's own-row edit
+ * and ×, from the Lobby Flow design. The first bump this constant ever took,
+ * hours after it landed.
  */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export interface CreateRoomMessage { name: string; protocolVersion: number }
 export interface JoinRoomMessage {
@@ -228,7 +232,23 @@ export const CLIENT_EVENTS = {
   beginGame: 'beginGame',
   intent: 'intent',
   undo: 'undo',
+  /**
+   * Change your own seat's name, in the lobby only. Identity comes from the
+   * socket binding, never the payload — there is no way to rename anyone
+   * else. Lobby-only because the engine copies names into `GameState` at
+   * startGame; a mid-game rename would leave the roster and the log
+   * disagreeing about who did what.
+   */
+  renamePlayer: 'renamePlayer',
+  /**
+   * Vacate your own seat, in the lobby only. The design's ×, on your own row
+   * and nobody else's. Distinct from a disconnect, which keeps the seat and
+   * marks it away: this one gives it up.
+   */
+  leaveSeat: 'leaveSeat',
 } as const;
+
+export interface RenamePlayerMessage { name: string }
 
 export const SERVER_EVENTS = {
   state: 'state',

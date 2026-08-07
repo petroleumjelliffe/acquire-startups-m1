@@ -25,6 +25,14 @@ export interface Room {
   /** Join with a name, for someone arriving on a shared link. */
   join(name: string): void;
   begin(): void;
+  /** Rename your own seat, lobby-only. The roster broadcast is the answer. */
+  rename(name: string): void;
+  /**
+   * Give up your own seat, lobby-only — the design's ×. Clears the stored
+   * identity too: the seat is gone, so the token is dead, and keeping it
+   * would make the next visit attempt a rejoin the server must refuse.
+   */
+  leaveSeat(): void;
 }
 
 /**
@@ -248,6 +256,27 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
 
   const begin = useCallback(() => { connection.beginGame(); }, [connection]);
 
+  const rename = useCallback((name: string) => {
+    connection.renamePlayer(name);
+    // Keep the stored copy current so a refresh rejoins under the new name.
+    // The server ignores the name on a token rejoin, but a stale stored name
+    // would still surface anywhere the client reads it before the roster
+    // arrives.
+    const identity = identityRef.current;
+    if (identity !== null) {
+      const updated = { ...identity, name };
+      identityRef.current = updated;
+      saveIdentity(roomId, updated);
+    }
+    rememberName(name);
+  }, [connection, roomId]);
+
+  const leaveSeat = useCallback(() => {
+    connection.leaveSeat();
+    clearIdentity(roomId);
+    identityRef.current = null;
+  }, [connection, roomId]);
+
   // Order matters. A roster means we are seated, and a refusal that arrives
   // afterwards ("only the host may begin") is a note to show *in* the lobby —
   // ranking `message` above `roster` would throw a seated player back to a
@@ -278,5 +307,5 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
                 : (joining || autoJoins) ? 'joining'
                   : 'needName';
 
-  return { phase, status, roster, playerId, session, message, join, begin };
+  return { phase, status, roster, playerId, session, message, join, begin, rename, leaveSeat };
 }

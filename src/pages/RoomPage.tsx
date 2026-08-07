@@ -104,10 +104,18 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
         <RoomLobby
           roomId={room.roster.roomId}
           players={room.roster.players}
+          myPlayerId={room.playerId}
           isHost={me?.isHost === true}
           note={room.message}
           onStart={room.begin}
-          onExit={leave}
+          onRename={room.rename}
+          // Leaving a *lobby* gives the seat up — the design's ×, and the
+          // Leave button too. A disconnect would keep the seat and leave the
+          // room waiting on a player who is not coming back.
+          onLeaveSeat={() => {
+            room.leaveSeat();
+            leave();
+          }}
         />
       </>
     );

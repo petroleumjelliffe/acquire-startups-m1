@@ -1,16 +1,17 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { CreateRoomPage } from './CreateRoomPage';
+import { OnlineLobbyPage } from './OnlineLobbyPage';
 import type { Connection } from '../net/connection';
 import type { JoinedMessage, RejectedMessage } from '../../session/protocol';
 
+// `CreateRoomPage.test.tsx`'s coverage, carried here when that page was
+// deleted: the Lobby Flow design has no name form in front of a room, so
+// Create Room seats you immediately and the room's own-row edit is where a
+// name gets chosen.
+
 function fakeConnection() {
   let joined: ((m: JoinedMessage) => void) | null = null;
-  // A Set, not a single slot — matches `JoinRoomPage.test.tsx`'s fake:
-  // production is `socket.on`/`socket.off`, and a single overwritten slot
-  // would hide a regression in multiple listeners coexisting on the same
-  // transport.
   const rejectedHandlers = new Set<(m: RejectedMessage) => void>();
   const created: string[] = [];
 
@@ -26,6 +27,8 @@ function fakeConnection() {
     createRoom: (name) => { created.push(name); },
     joinRoom: () => {},
     beginGame: () => {},
+    renamePlayer: () => {},
+    leaveSeat: () => {},
     onJoined: (h) => { joined = h; return () => { joined = null; }; },
     onRoster: () => () => {},
     close: () => {},
@@ -39,47 +42,57 @@ function fakeConnection() {
   };
 }
 
+function renderLobby(connection: Connection) {
+  return render(
+    <MemoryRouter initialEntries={['/online']}>
+      <Routes>
+        <Route path="/online" element={<OnlineLobbyPage connect={() => connection} />} />
+        <Route path="/room/:roomId" element={<div>room page</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
 beforeEach(() => { localStorage.clear(); });
 
-describe('creating a room', () => {
-  it('asks the server for one, then lands in it', () => {
+describe('creating a room, with no name form in the way', () => {
+  it('asks the server for one under a default name, then lands in it', () => {
     const f = fakeConnection();
-    render(
-      <MemoryRouter initialEntries={['/online/create']}>
-        <Routes>
-          <Route path="/online/create" element={<CreateRoomPage connect={() => f.connection} />} />
-          <Route path="/room/:roomId" element={<div>room page</div>} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderLobby(f.connection);
 
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Alex' } });
     fireEvent.click(screen.getByRole('button', { name: /create room/i }));
-    expect(f.created).toEqual(['Alex']);
+
+    // A name was sent without any form: remembered from last time, or a
+    // generated placeholder. Which one is not this test's business — that it
+    // was non-empty is, because the server refuses blank names.
+    expect(f.created).toHaveLength(1);
+    expect(f.created[0].trim()).not.toBe('');
 
     f.sendJoined({ roomId: 'ABC123', playerId: 'p1', token: 'tok' });
 
     expect(screen.getByText('room page')).toBeInTheDocument();
-    // Creating a room stores the seat the server issued, under that room's
-    // key, so the room screen it lands on rejoins rather than taking a new
-    // seat.
-    expect(JSON.parse(localStorage.getItem('acquire.room.ABC123')!)).toEqual({
-      playerId: 'p1', token: 'tok', name: 'Alex',
-    });
+    // The seat the server issued is stored under the room's key, so the room
+    // screen rejoins rather than taking a second seat.
+    const stored = JSON.parse(localStorage.getItem('acquire.room.ABC123')!);
+    expect(stored.playerId).toBe('p1');
+    expect(stored.token).toBe('tok');
+    expect(stored.name).toBe(f.created[0]);
+  });
+
+  it('creates under the remembered name when there is one', () => {
+    localStorage.setItem('acquire.name', 'Alex');
+    const f = fakeConnection();
+    renderLobby(f.connection);
+
+    fireEvent.click(screen.getByRole('button', { name: /create room/i }));
+
+    expect(f.created).toEqual(['Alex']);
   });
 
   it('recovers from a rejection instead of hanging on "Creating…" forever', () => {
     const f = fakeConnection();
-    render(
-      <MemoryRouter initialEntries={['/online/create']}>
-        <Routes>
-          <Route path="/online/create" element={<CreateRoomPage connect={() => f.connection} />} />
-          <Route path="/room/:roomId" element={<div>room page</div>} />
-        </Routes>
-      </MemoryRouter>,
-    );
+    renderLobby(f.connection);
 
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Alex' } });
     fireEvent.click(screen.getByRole('button', { name: /create room/i }));
     expect(screen.getByRole('button', { name: /creating/i })).toBeDisabled();
 
@@ -91,6 +104,6 @@ describe('creating a room', () => {
     expect(screen.getByText(/createRoom requires a name/i)).toBeInTheDocument();
 
     fireEvent.click(button);
-    expect(f.created).toEqual(['Alex', 'Alex']);
+    expect(f.created).toHaveLength(2);
   });
 });
