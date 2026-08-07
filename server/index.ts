@@ -10,6 +10,7 @@ import { Server as SocketServer, type Socket } from 'socket.io';
 import { project } from './projection.js';
 import { createRoomRegistry, type RoomRegistry, type Seat } from './rooms.js';
 import { createFileStore, createNullStore, type RoomStore } from './store.js';
+import { registerDevSeed } from './devSeed.js';
 import type { Delivery, GameRoom } from './room.js';
 import {
   CLIENT_EVENTS,
@@ -52,6 +53,11 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
   const io = new SocketServer(httpServer, { cors: { origin: '*' } });
   const rooms = createRoomRegistry(options.store ?? createNullStore());
   const bindings = new Map<string, Binding>();
+
+  // Dev only, and absent rather than guarded — see `devSeed.ts`. This is the
+  // only way to put a browser into a mid-game room, which is what the
+  // two-browser merger pass has been waiting on.
+  if (process.env.NODE_ENV !== 'production') registerDevSeed(app, rooms);
 
   function socketsFor(roomId: string, playerId: string): Socket[] {
     return [...io.sockets.sockets.values()].filter((s) => {
