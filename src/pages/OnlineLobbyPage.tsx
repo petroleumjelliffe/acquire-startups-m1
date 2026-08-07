@@ -6,9 +6,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRandomEmojiName } from '../utils/emojiNames';
 import { getConnection, type Connection } from '../net/connection';
-import { rememberedName, rememberName, saveIdentity } from '../net/identity';
+import { rememberedName, saveIdentity } from '../net/identity';
 
 export interface OnlineLobbyPageProps {
   /** Injectable for tests. The app never passes it. */

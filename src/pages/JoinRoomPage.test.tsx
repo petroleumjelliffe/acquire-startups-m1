@@ -111,7 +111,7 @@ describe('joining a room', () => {
     // the button's `disabled` attribute would itself suppress a second click
     // in a real browser, which would prove nothing about the page's own
     // guard. Dispatching `submit` on the form bypasses that and exercises the
-    // guard in `JoinForm`'s submit handler on its own merits.
+    // guard in the card's own submit handler on its own merits.
     const form = container.querySelector('form')!;
     fireEvent.submit(form);
     fireEvent.submit(form);

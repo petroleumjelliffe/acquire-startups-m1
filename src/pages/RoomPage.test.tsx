@@ -100,12 +100,23 @@ function LocationProbe() {
   return <span data-testid="location-search">{location.search}</span>;
 }
 
-/** Joins as `name`, gets seated, and lands in the lobby with a second player already in it. */
-function seated(name: string, isHost: boolean) {
+/**
+ * Renders the room as somebody who has called themselves `name` before.
+ *
+ * There is no form to fill in any more: arriving at a room joins it, under a
+ * remembered name if there is one and under a name the server chooses if not.
+ * So the name has to be in storage *before* the render that sends the join.
+ */
+function arriveAs(name: string) {
+  localStorage.setItem('acquire.name', name);
   const f = fakeConnection();
   renderRoom(f.connection);
-  fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: name } });
-  fireEvent.click(screen.getByRole('button', { name: /join/i }));
+  return f;
+}
+
+/** Joins as `name`, gets seated, and lands in the lobby with a second player already in it. */
+function seated(name: string, isHost: boolean) {
+  const f = arriveAs(name);
   f.sendJoined({ roomId: 'ABC123', playerId: isHost ? 'p1' : 'p2', token: 'tok' });
   f.sendRoster({
     roomId: 'ABC123',
@@ -121,20 +132,18 @@ function seated(name: string, isHost: boolean) {
 beforeEach(() => { localStorage.clear(); });
 
 describe('arriving at a room without a seat', () => {
-  it('asks for a name rather than joining as nobody', () => {
+  it('joins immediately and lets the server name the seat', () => {
     const f = fakeConnection();
     renderRoom(f.connection);
 
-    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
-    expect(f.joins).toEqual([]);
+    // No form in the way — the same rule Create Room and Join Room follow.
+    // A shared link now seats you rather than interviewing you first.
+    expect(screen.queryByLabelText(/your name/i)).toBeNull();
+    expect(f.joins).toEqual([{ roomId: 'ABC123', protocolVersion: PROTOCOL_VERSION }]);
   });
 
-  it('joins with the name given', () => {
-    const f = fakeConnection();
-    renderRoom(f.connection);
-
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+  it('joins under the remembered name when there is one', () => {
+    const f = arriveAs('Sam');
 
     expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION }]);
   });
@@ -159,8 +168,8 @@ function phasesSeen(connection: Connection, roomId = 'ABC123'): RoomPhase[] {
   return phases;
 }
 
-describe('a returning player is never shown a form they will not fill in', () => {
-  it('goes straight to joining, with no needName frame, when a seat is stored', () => {
+describe('nobody is ever shown a form on the way into a room', () => {
+  it('goes straight to joining when a seat is stored', () => {
     localStorage.setItem(
       'acquire.room.ABC123',
       JSON.stringify({ playerId: 'p2', token: 'tok', name: 'Sam' }),
@@ -169,21 +178,30 @@ describe('a returning player is never shown a form they will not fill in', () =>
 
     const phases = phasesSeen(f.connection);
 
-    // The join is sent from an effect, which runs *after* the render where
-    // the socket first reads as open. That render used to fall through to
-    // `needName` and paint a join form at someone already holding a seat —
-    // seen on a phone reloading mid-game: menu, then a join form, then the
-    // board.
-    expect(phases).not.toContain('needName');
     expect(phases.at(-1)).toBe('joining');
   });
 
-  it('still asks a genuine stranger for a name', () => {
-    // Nothing stored, and no remembered name: this is the one case the form
-    // exists for, and suppressing it here would strand the player.
-    const phases = phasesSeen(fakeConnection().connection);
+  /**
+   * The case that used to be the exception. A stranger with nothing stored
+   * and nothing remembered was the one player the name form existed for; now
+   * they are joined like everyone else and named by the server.
+   *
+   * Asserted over every frame, not just the settled one, because the phase
+   * this replaced was itself only ever visible for a frame.
+   */
+  it('joins a complete stranger too, with no intermediate frame of anything else', () => {
+    const f = fakeConnection();
 
-    expect(phases).toContain('needName');
+    const phases = phasesSeen(f.connection);
+
+    expect(phases.at(-1)).toBe('joining');
+    expect(new Set(phases)).toEqual(new Set(['joining']));
+    // And `joining` has to be more than a label. The phase expression now
+    // falls through to it whenever the socket is open and nothing else has
+    // happened, so it reads identically whether or not the effect actually
+    // sent anything — disabling the stranger path leaves every assertion
+    // above this one green. Only the wire says a join really went out.
+    expect(f.joins).toEqual([{ roomId: 'ABC123', protocolVersion: PROTOCOL_VERSION }]);
   });
 });
 
@@ -300,10 +318,7 @@ describe('a refusal that arrives after being seated', () => {
 
 describe('the first state message starts the game', () => {
   it('swaps the lobby for the board, seen from my own seat', () => {
-    const f = fakeConnection();
-    renderRoom(f.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    const f = arriveAs('Sam');
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const state = buildFixture({
@@ -324,10 +339,7 @@ describe('the first state message starts the game', () => {
   });
 
   it('keeps updating the board after the session is built, not just for the first message', () => {
-    const f = fakeConnection();
-    renderRoom(f.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    const f = arriveAs('Sam');
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const opening = buildFixture({
@@ -387,10 +399,7 @@ function midGameState() {
 
 describe('a dropped connection', () => {
   it('clears a stuck "Sending…" and goes inert, even mid-turn', () => {
-    const f = fakeConnection();
-    renderRoom(f.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    const f = arriveAs('Sam');
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const state = midGameState();
@@ -418,10 +427,7 @@ describe('a dropped connection', () => {
   });
 
   it('resends the stored-identity join once the socket comes back', () => {
-    const f = fakeConnection();
-    renderRoom(f.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    const f = arriveAs('Sam');
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const state = midGameState();
@@ -443,10 +449,7 @@ describe('a dropped connection', () => {
 
 describe('a player who has dropped', () => {
   it('is named in the toast when the game is waiting on them', () => {
-    const f = fakeConnection();
-    renderRoom(f.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    const f = arriveAs('Sam');
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const state = buildFixture({
@@ -537,20 +540,31 @@ describe('a room that is gone', () => {
     expect(screen.queryByLabelText(/your name/i)).toBeNull();
   });
 
-  it('sends a refused seat to the join form instead, because that one is fixable', () => {
+  it('offers a refused seat a retry instead, because that one is fixable', () => {
     localStorage.setItem(
       'acquire.room.ABC123',
       JSON.stringify({ playerId: 'p9', token: 'stale', name: 'Ghost' }),
     );
     const f = fakeConnection();
     renderRoom(f.connection);
+    const before = f.joins.length;
 
     f.sendRejected({ code: 'seatRefused', message: 'That seat in ABC123 is no longer yours' });
 
     // The room is still there. The identity was stale and has been cleared,
-    // so joining fresh is exactly the remedy.
-    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
+    // so joining fresh is exactly the remedy — and it is offered as a retry
+    // rather than a name form, because there is no name to correct.
+    expect(screen.getByTestId('room-refused')).toBeInTheDocument();
+    expect(screen.getByText(/no longer yours/i)).toBeInTheDocument();
     expect(screen.queryByText(/no longer available/i)).toBeNull();
+    expect(screen.queryByLabelText(/your name/i)).toBeNull();
+
+    // And the retry really re-joins — as a stranger, since the stale identity
+    // was cleared, which is the only join that can now succeed.
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(f.joins.slice(before)).toEqual([
+      { roomId: 'ABC123', protocolVersion: PROTOCOL_VERSION },
+    ]);
   });
 
   it('replaces a live board with the ending screen, not a dead one, when it disappears mid-game', () => {
@@ -560,10 +574,7 @@ describe('a room that is gone', () => {
     // outranked `gone` in the phase ternary, so the board never left the
     // screen — it just went dead, `status` back to `'open'` and every click
     // dropped silently by the server.
-    const f = fakeConnection();
-    renderRoom(f.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    const f = arriveAs('Sam');
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const state = buildFixture({
@@ -608,10 +619,7 @@ describe('a version the server does not speak', () => {
   });
 
   it('replaces a live board rather than leaving one that cannot act', () => {
-    const f = fakeConnection();
-    renderRoom(f.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
+    const f = arriveAs('Sam');
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const state = buildFixture({
@@ -709,10 +717,9 @@ describe('a version the server does not speak', () => {
  */
 describe('a refresh mid-turn', () => {
   it('rejoins the same seat and comes back to the open segment, not the start of the turn', () => {
+    localStorage.setItem('acquire.name', 'Sam');
     const first = fakeConnection();
     const { unmount } = renderRoom(first.connection);
-    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
-    fireEvent.click(screen.getByRole('button', { name: /join/i }));
     first.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
     const opening = buildFixture({
@@ -833,8 +840,10 @@ describe('a seat handed over in the URL, in dev', () => {
     const f = fakeConnection();
     renderSeeded('/room/ABC123', f.connection);
 
+    // Nothing seeded: no identity written, and the join that goes out is a
+    // plain first join carrying neither a playerId nor a token — which is
+    // what distinguishes it from the seeded case above.
     expect(loadIdentity('ABC123')).toBeNull();
-    expect(f.joins).toEqual([]);
-    expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
+    expect(f.joins).toEqual([{ roomId: 'ABC123', protocolVersion: PROTOCOL_VERSION }]);
   });
 });

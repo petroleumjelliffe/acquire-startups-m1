@@ -7,7 +7,6 @@ import { clearIdentity, loadIdentity, rememberName, rememberedName, saveIdentity
 export type RoomPhase =
   | 'connecting'
   | 'joining'
-  | 'needName'
   | 'lobby'
   | 'playing'
   | 'error'
@@ -22,8 +21,11 @@ export interface Room {
   playerId: string | null;
   session: NetworkSession | null;
   message: string | null;
-  /** Join with a name, for someone arriving on a shared link. */
-  join(name: string): void;
+  /**
+   * Join again after a refusal. The name is optional — omitting it asks the
+   * server to name the seat, which is what every ordinary arrival now does.
+   */
+  join(name?: string): void;
   begin(): void;
   /** Rename your own seat, lobby-only. The roster broadcast is the answer. */
   rename(name: string): void;
@@ -49,27 +51,8 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [session, setSession] = useState<NetworkSession | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [joining, setJoining] = useState(false);
   const [gone, setGone] = useState(false);
   const [stale, setStale] = useState(false);
-  /**
-   * Whether this mount is going to join by itself, without asking anyone.
-   *
-   * Read once, at mount, from the same two sources the join effect below
-   * consults. It exists because that effect runs *after* the render in which
-   * the socket first opens — so for one frame `joining` is still false and
-   * the phase expression used to fall all the way through to `needName`,
-   * flashing a join form at a player who already holds a seat and is about
-   * to be put straight back into their game. Seen on a phone, reloading
-   * mid-game: menu, then a join form, then the board.
-   *
-   * Deliberately not recomputed. Once a stored identity is refused, the same
-   * handler that clears it sets `message`, which outranks this — so the form
-   * still appears for the case that genuinely needs it.
-   */
-  const [autoJoins] = useState(
-    () => roomId !== '' && (loadIdentity(roomId) !== null || rememberedName() !== null),
-  );
 
   const sessionRef = useRef<NetworkSession | null>(null);
   // Read once, at mount, for whatever `roomId` the hook first saw. A `roomId`
@@ -227,7 +210,6 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
     const stored = identityRef.current;
     if (stored !== null) {
       sent.current = true;
-      setJoining(true);
       connection.joinRoom({
         roomId,
         name: stored.name,
@@ -238,20 +220,28 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
       return;
     }
 
-    const remembered = rememberedName();
-    if (remembered === null) return; // phase: needName
-
+    // No stored seat: a first join. Whatever this player last called
+    // themselves, if anything — and if nothing, no name at all, which asks the
+    // server to name the seat. There is no longer a case where the socket is
+    // open and we sit here waiting to be told who we are.
     sent.current = true;
-    setJoining(true);
-    connection.joinRoom({ roomId, name: remembered, protocolVersion: PROTOCOL_VERSION });
+    const remembered = rememberedName();
+    connection.joinRoom({
+      roomId,
+      ...(remembered === null ? {} : { name: remembered }),
+      protocolVersion: PROTOCOL_VERSION,
+    });
   }, [connection, roomId, status]);
 
-  const join = useCallback((name: string) => {
-    rememberName(name);
+  const join = useCallback((name?: string) => {
+    if (name !== undefined) rememberName(name);
     sent.current = true;
-    setJoining(true);
     setMessage(null);
-    connection.joinRoom({ roomId, name, protocolVersion: PROTOCOL_VERSION });
+    connection.joinRoom({
+      roomId,
+      ...(name === undefined ? {} : { name }),
+      protocolVersion: PROTOCOL_VERSION,
+    });
   }, [connection, roomId]);
 
   const begin = useCallback(() => { connection.beginGame(); }, [connection]);
@@ -299,13 +289,15 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
         : gone ? 'gone'
           : roster !== null ? 'lobby'
             : message !== null ? 'error'
-              : status !== 'open' ? 'connecting'
-              // `autoJoins` alongside `joining`: one means the join has been
-              // sent, the other that it is certain to be, in an effect that
-              // has not run yet. Both should look the same to a player, and
-              // neither is a reason to show a form.
-                : (joining || autoJoins) ? 'joining'
-                  : 'needName';
+              // Everything below a live socket is `joining`, because an open
+              // socket in a room with no roster and no refusal *is* joining:
+              // the effect above sends one unconditionally. The pair of flags
+              // that used to live here — one for "sent", one for "certain to
+              // be sent by an effect that has not run yet" — existed only to
+              // keep a name form from flashing between them, and there is no
+              // name form any more.
+                : status !== 'open' ? 'connecting'
+                  : 'joining';
 
   return { phase, status, roster, playerId, session, message, join, begin, rename, leaveSeat };
 }

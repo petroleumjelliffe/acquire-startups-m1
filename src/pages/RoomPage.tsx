@@ -4,7 +4,7 @@ import { RoomLobby } from '../game/online/RoomLobby';
 import { RoomGone } from '../game/online/RoomGone';
 import { StaleClient } from '../game/online/StaleClient';
 import { ConnectionStrip } from '../game/online/ConnectionStrip';
-import { JoinForm } from '../game/online/JoinForm';
+import { RoomRefused } from '../game/online/RoomRefused';
 import { useRoom } from '../net/useRoom';
 import { useDevSeat } from '../net/devSeat';
 import { getConnection, closeConnection, type Connection } from '../net/connection';
@@ -81,16 +81,15 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
     );
   }
 
-  if (room.phase === 'needName' || room.phase === 'error') {
+  if (room.phase === 'error') {
     return (
       <>
         <ConnectionStrip status={room.status} />
-        <JoinForm
+        <RoomRefused
           roomId={roomId}
-          title={`Join ${roomId ?? ''}`}
-          submitLabel="Join room"
-          error={room.message}
-          onSubmit={(name) => room.join(name)}
+          message={room.message}
+          onRetry={() => room.join()}
+          onExit={leave}
         />
       </>
     );
