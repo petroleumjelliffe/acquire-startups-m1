@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { GameState } from '../engine/gameTypes.js';
 import { createGameRoom, type GameRoom, type RoomPlayer } from './room.js';
-import { saveGame } from './persistence.js';
+import { createNullStore, SAVE_VERSION, type RoomStore, type SavedRoom } from './store.js';
 
 export interface Seat {
   room: GameRoom;
@@ -36,7 +36,7 @@ function roomCode(): string {
   return out;
 }
 
-export function createRoomRegistry(): RoomRegistry {
+export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRegistry {
   const rooms = new Map<string, GameRoom>();
 
   return {
@@ -91,7 +91,18 @@ export function createRoomRegistry(): RoomRegistry {
       // uncommitted work was never real, which is the segment model stated as
       // a storage fact.
       if (room.lifecycle() === 'lobby') return;
-      await saveGame(room.id, room.committed());
+      const record: SavedRoom = {
+        roomId: room.id,
+        version: SAVE_VERSION,
+        savedAt: Date.now(),
+        // Copied, not referenced: `connected` mutates under a live socket and
+        // a record is a snapshot. The value written is irrelevant — `restore`
+        // forces every seat disconnected — but a record that keeps changing
+        // after it was handed over is a trap for the next reader.
+        players: room.players.map((p) => ({ ...p })),
+        state: room.committed(),
+      };
+      await store.save(record);
     },
   };
 }
