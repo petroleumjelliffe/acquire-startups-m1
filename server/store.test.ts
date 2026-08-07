@@ -96,6 +96,15 @@ describe('the file store', () => {
     expect(await store.loadAll()).toEqual([]);
   });
 
+  // What this proves: after a completed save, nothing named `*.tmp` is left for a
+  // later `loadAll` glob to trip over — the directory holds exactly the final name.
+  // What it does not prove: that the record was ever staged through a temp file and
+  // `rename`d into place at all. Writing straight to the target file, with no temp
+  // step, leaves this same directory listing — verified as break 2 while building
+  // this test. So this assertion is not a check on the temp+rename mechanism itself,
+  // only on its absence of leftovers. The thing `rename`'s atomicity actually guards
+  // — a process dying between the write finishing and the rename landing — has no
+  // window a synchronous unit test can open, which is why no test here covers it.
   it('leaves no partial file behind — every write lands whole, under a final name', async () => {
     const store = createFileStore(dir);
     await store.save(record());
