@@ -111,7 +111,9 @@ Small carried items, each riding whichever stage touches its file rather than be
 | Cold-start copy asserts a cause it cannot know; the honest repair blames nothing: `Can't reach the server — retrying` | Stage 1 | a product ruling, then one string |
 | Unreadable saves warn on every boot forever — eviction deletes *old* records, not unparseable ones | Stage 1 | needs a quarantine decision, not a reflex delete |
 | `restore()` is boot-only and only a docstring says so | Stage 1 | enforce it |
-| The away dot has never been rendered on a measured page; `/catalog` has no away state | Stage 3 | catalog gap |
+| **Presence is carried only in a row designed to clip**, so a disconnected non-actor can be entirely off-screen — observed 2026-08-07, and it contradicts the Phase 4 ruling. A disconnected *actor* is still visible, being rotated to the front | its own design pass, with the tap-to-expand roster the strip's own comment already anticipates | not a patch |
+| `/catalog` has no away state, which is why the above went unseen | Stage 3 | catalog gap |
+| The final scoring screen has no presence at all — `presence` never reaches `FinalScoring` | a product call | small once decided |
 | `Board.tsx` renders a read-only cell as a `<button>`, putting it in keyboard tab order | Stage 0's fallout | small |
 | Seat names truncate hard at 768px | Stage 3 | small |
 | `sections.tsx` builds every fixture at module load | Stage 3 | small |

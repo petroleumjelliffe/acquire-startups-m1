@@ -134,11 +134,17 @@ that could never fail. Worth treating it as one.
   was taken at was not the moment being reasoned about.
 
   Still owed on prod: refresh mid-turn and the dropped socket.
-- **The away dot has never been rendered on a measured page.** The final review traced the geometry
-  and ruled it does not block merge — the strip is `overflow-hidden`, the active seat is `flex-none`
-  at index 0, every other seat shrinks to zero — but nobody has looked at it. It also redirected the
-  fix: the hole is not `verify-layout.mjs` (which drives pass-and-play, where presence is absent by
-  design) but `/catalog`, the acceptance surface, which has no away state at all.
+- ~~**The away dot has never been rendered on a measured page.**~~ **Looked at on 2026-08-07, and
+  the ruling was wrong** — see [2026-08-07-full-game-by-hand-notes.md](./2026-08-07-full-game-by-hand-notes.md),
+  Finding 3. The final review traced the geometry (`overflow-hidden`, the active seat `flex-none` at
+  index 0, every other seat shrinking to zero) and ruled the dot did not block merge. The reasoning
+  was correct; the conclusion was not, because it answered "is the dot rendered?" when the question
+  was "can the player see it?" A disconnected non-actor is clipped off the end of the row entirely,
+  dot and all. The urgent case survives — a disconnected *actor* is rotated to the front — but
+  presence for everyone else is carried in a row designed to clip.
+
+  The redirect still stands and is now better supported: the hole is `/catalog`, which has no away
+  state, not `verify-layout.mjs`, which drives pass-and-play where presence is absent by design.
 - **`npm run verify:layout` is intermittently flaky**, project-wide and pre-existing. Every "five
   gates green" claim in this phase is weaker than it reads until that is understood. It should stop
   counting as evidence until someone explains it.
