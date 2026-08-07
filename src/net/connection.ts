@@ -9,7 +9,25 @@ import {
 } from '../../session/protocol';
 import { createSocketTransport, type RoomTransport } from './transport';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+/**
+ * Where the server is.
+ *
+ * A deployed build sets `VITE_SERVER_URL` and that wins. The fallback is for
+ * development, and it derives the host from the page rather than hardcoding
+ * `localhost` — because `localhost` is only correct for the machine running
+ * the dev server. `npm run dev` is `vite --host`, so the app is served across
+ * the network on purpose, and a phone loading it from `192.168.x.x` used to
+ * resolve this to *its own* `localhost` and sit on "Connecting…" forever.
+ * Found by hand, testing two devices; a second browser on the same machine
+ * never reveals it.
+ *
+ * The port stays fixed: the dev server is `tsx watch server/index.ts`, which
+ * listens on 3001 unless `PORT` says otherwise, and that env var belongs to
+ * the server process rather than to this bundle.
+ */
+const DEV_SERVER_PORT = 3001;
+const SERVER_URL =
+  import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:${DEV_SERVER_PORT}`;
 
 export type ConnectionStatus = 'connecting' | 'open' | 'closed';
 
