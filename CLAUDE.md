@@ -5,11 +5,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Current focus
 
 The **React app revamp**, following the roadmap in
-`docs/superpowers/specs/2026-07-31-react-app-revamp-roadmap-design.md`. **Phases 0 through 3b and 5
-are done.** The server is the authority (Phase 3a) and a real client speaks its protocol (Phase
-3b): `src/net/`'s `NetworkSession` wraps the same `GameSession`/`GameScreen` pass-and-play uses, so
-two browsers can create a room, join it, and play a game against the server over real sockets. The
-legacy modal UI (`src/Game.tsx`, `src/components/`, `src/context/`) is deleted.
+`docs/superpowers/specs/2026-07-31-react-app-revamp-roadmap-design.md`. **Every phase on it — 0
+through 5 — is built.** The server is the authority (Phase 3a) and a real client speaks its
+protocol (Phase 3b): `src/net/`'s `NetworkSession` wraps the same `GameSession`/`GameScreen`
+pass-and-play uses, so two browsers can create a room, join it, and play a game against the server
+over real sockets. The legacy modal UI (`src/Game.tsx`, `src/components/`, `src/context/`) is
+deleted.
 
 **Phase 5 (2026-08-06) closed twenty-six findings from playing it by hand** —
 `docs/superpowers/plans/2026-08-06-phase-5-online-ui.md`. Most of the panel changed: the step stack
@@ -35,6 +36,13 @@ not have says so by name; a dropped player shows on the seat and in the toast. S
 local), and a ruling on the cold-start copy, which still says "waking the server" when the real
 condition is online-but-unreachable.
 
+**The next round is sequenced in `specs/2026-08-07-next-round-sequencing.md`** — read it before
+starting anything. Four stages: the by-hand full game first (Stage 0, planned in
+`plans/2026-08-07-by-hand-full-game.md`), then protocol/save versioning, then pass-and-play
+persistence, then diagnosing the layout gate. The PWA is staged after all of it, gated on
+pass-and-play persistence and on a **protocol version in `session/protocol.ts`**, which has none.
+A spectator seat and a panel-only phone view are wanted together, and are their own design pass.
+
 **Dev surfaces:** `/catalog` is every component state; `/scenarios` loads any golden-game state and
 plays on from it, which is how to reach a merger in two clicks rather than several minutes.
 
@@ -47,23 +55,49 @@ before starting work.
 | Path | What it is |
 |---|---|
 | `engine/` | The rules. Pure, immutable, no React. `applyIntent(state, intent)` is the single reducer; `history.ts` adds snapshot undo. |
-| `engine/golden/` | Golden games G1–G16 — the executable rules spec, stored as data. Run by `golden.test.ts`. |
+| `engine/golden/` | Golden games G1–G17 (`ALL_GOLDEN_GAMES`) — the executable rules spec, stored as data. Run by `golden.test.ts` against the engine and by `server/goldenSocket.test.ts` over real sockets. |
 | `src/game/` | The new component layer (Phase 1b). Pure, props-in, styled through `tokens.ts`. |
 | `src/game/catalog/` | `/catalog` route — every component state, mostly replayed from golden games. The acceptance surface. Also `/scenarios`: any golden-game state, playable on from that point. Both lazily routed so the golden data stays out of the main chunk. |
 | `session/` | Shared between client and server (Phase 3a). `GameSession` — the local draft/session model — and `protocol.ts`'s wire types (`WireIntent`, `StateMessage`, …). No React, no transport. |
 | `src/net/` | The client's half of the wire (Phase 3b). `NetworkSession` — a `GameSession` whose authority is the server: six intents apply optimistically, three (`endTurn`, `tradeInDeadTiles`, `startGame`) wait on a `correction`. `connection.ts` is the socket.io transport, opened lazily on online routes only. `identity.ts` keeps a per-room `{ playerId, token, name }` in `localStorage` so a refresh rejoins the same seat. |
 | `server/` | Express + Socket.io. Authoritative over intents as of Phase 3a — runs `applyIntent`, projects state per player before broadcast, rejects out-of-turn/illegal intents. `store.ts` (Phase 4) persists a room's roster, rejoin tokens and last committed state; `rooms.restore()` seats them at boot, before `listen`, forcing every seat disconnected. `recovery.test.ts` kills a server and reboots it against the same store. The XState layer is deleted. |
+| `src/pages/` | Routes. `/room/:roomId` is the online game; `useRoom` (in `src/net/`) owns its `connecting → joining → needName → lobby → playing` phase machine, plus `error` and `gone`. |
 | `prototype/` | The buildless design lab the component layer was ported from. Reference, not a build target. |
+
+**Root-level `*.md` are history, not guidance.** `MULTIPLAYER_ARCHITECTURE.md` and
+`XSTATE_REFACTOR_PLAN.md` say so in a banner; `TESTING.md` (drives a deleted `server/test.html`) and
+`TESTING_PLAN.md` ("no test suite exists" — there are 664, in 63 files) do not. `README.md` and
+`DEPLOYMENT.md` are still current.
 
 ## Commands
 
 ```bash
-npm run dev            # Vite dev server
-npx vitest run         # full suite (engine in node, src/server in jsdom)
+npm run dev            # Vite dev server (5173). Pass-and-play, /catalog and /scenarios only
+npm run dev:server     # Socket.io server (3001). Needed for anything under /online or /room
+npm run dev:all        # both, concurrently — what an online by-hand pass needs
+npx vitest run         # full suite
+npx vitest run server/recovery.test.ts        # one file
+npx vitest run -t 'the roster, the tokens'    # one test by name
+npx vitest run --project node                 # engine + session + server only
 npm run typecheck      # never run bare `tsc`
 npx vite build
 npm run check:bundle   # guards vitest and golden data out of the main chunk
+npm run verify:layout  # drives a real Chrome over CDP — see the caveat below
 ```
+
+- **Two vitest projects, and the split is load-bearing.** `node` runs
+  `engine/`, `session/` and `server/`; `app` runs `src/` under jsdom with
+  `src/test/setup.ts`. `engine`/`session`/`server` run in the *server process* in production, so a
+  stray `window.` or `localStorage` there is a production crash that a single jsdom suite could
+  never catch. `session/nodeEnvironment.test.ts` asserts that boundary; don't add root-level
+  `setupFiles` (vitest 4 merges the array into both projects, silently disarming it).
+- **`npm run verify:layout` is intermittently flaky**, project-wide and pre-existing, and nobody has
+  explained it. Treat a green run as weak evidence until someone does. It needs Chrome at
+  `CHROME_PATH` (defaults to the macOS app bundle) and drives pass-and-play only — presence and
+  online states are not on its path.
+- **Before any by-hand pass, check which tree is serving.** Vite silently moves to the next free
+  port when another checkout already holds 5173, and a Phase 4 round was measured against `main`
+  before anyone noticed.
 
 ## Working rules
 
@@ -76,6 +110,16 @@ npm run check:bundle   # guards vitest and golden data out of the main chunk
 - **Verify in a browser.** jsdom reports zero for all layout, so a structural test can pass while the
   thing it guards is visibly broken. This has happened. Measure real pages for anything about size,
   fit or overflow.
+- **Prove a new test can fail — by breaking the code and reading real output, never by reading the
+  check.** Eleven "hollow gates" have been caught this way and every one was found by running the
+  break: a shared temp filename that made a write-ordering test pass by luck, an absence assertion
+  looping over an empty array, a mount test satisfied by a `useState` initializer rather than the
+  effect it claimed to guard. A green test that could never go red is worse than no test.
+- **A measurement you did not measure is the same defect.** Phase 4 wrote up a confident "4–7
+  seconds" from an unmeasured gap; against a shared clock it was 98ms.
+- **Review the whole branch at the end, not only each task.** Both of Phase 4's worst bugs — a
+  dead-looking board after a restart, and one bad save record stopping the server booting — spanned
+  two tasks each and survived ten clean per-task reviews.
 
 ## Key concepts
 
@@ -96,3 +140,19 @@ npm run check:bundle   # guards vitest and golden data out of the main chunk
   zone's top edge. Two earlier attempts animated the contents instead, both passed their gates, and
   both were wrong — if a transform appears on the step list again, that is the mistake returning.
 - Respect `prefers-reduced-motion` (skip enter animations).
+- **Persistence is best-effort and silent by design.** `save()` never rejects, so a commit lost to a
+  failed write is unknowable to the room. `SAVE_VERSION` (4) covers the record's shape only —
+  `isSavedRoom` trusts `state` past "is an object", so a `GameState` change without a bump is not
+  caught. `rooms.restore()` is boot-only: at runtime it would swap live room objects out from under
+  their socket bindings.
+
+## Environment and deployment
+
+Client on GitHub Pages under the base path `/acquire-startups-m1` (hardcoded in `vite.config.ts` and
+`src/main.tsx`); server on Render free. `VITE_SERVER_URL` points the client at a server, defaulting
+to `http://<current hostname>:3001` in dev — the hostname, not `localhost`, so a phone on the LAN
+works. The server reads `PORT` (3001) and writes rooms to `server/games/`, gitignored.
+
+**Render free's disk is ephemeral**, so a restart there loses every room *even though persistence
+works*. The gone-room ending is the normal case in prod, not an edge case — `server/store.ts` is a
+`RoomStore` interface precisely so a durable backend can be swapped in without a redesign.
