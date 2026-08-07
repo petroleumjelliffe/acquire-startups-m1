@@ -203,6 +203,23 @@ Written down so the next comparison pass does not "find" them again:
   (`0fb10b1`) to give the step stack ~40px back.
 - **The staging pile has no "empty" placeholder.** Removed deliberately (`0c0abdf`).
 
+## Status, 2026-08-06
+
+Executed the same day it was written. **Tasks 2, 4 and 5 shipped** (`714e7b6`): startup not brand,
+the liquidation step names its chain and shareholder, the buy step shows the cap. **Tasks 1, 3 and
+6 were declined by the owner**, and the reasons are worth keeping — the placement hint is
+unnecessary now the tiles are in the panel; holdings belong in the hand zone, which is why they were
+taken out of the survivor picker in the first place; and the prototype's staging labels are verbose.
+**Task 7 (the turn-start wallet) is still open** and is the same decision as whether the founder's
+share belongs in the staging pile.
+
+Two findings came out of the pass that were not in it: founding logged twice under one phase
+(`714e7b6`), and the placement row went on asking a question it had already been answered
+(`935fda6`, `f35e1c3`). Both were found by the owner reading the panel, not by the comparison.
+
+The motion side of the prototype is a separate plan —
+[2026-08-06-step-resolves-in-place.md](2026-08-06-step-resolves-in-place.md).
+
 ## Verification
 
 - Every task's test observed failing first, with the break named.
