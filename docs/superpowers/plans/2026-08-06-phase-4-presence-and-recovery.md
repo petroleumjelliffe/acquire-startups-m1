@@ -23,6 +23,26 @@
 - **Panel zone order** is `stepstack → active → staging → hand → players`, and zone heights are floors, not fixed heights.
 - **Copy, verbatim, where this plan gives it.** `Waking the server — this can take up to 30 seconds` uses an em dash. `This room is no longer available` is sentence case.
 
+## Known errors in this plan, found during execution
+
+Recorded here rather than silently patched, because the task text below still contains them and an
+implementer reading a task in isolation needs the warning at the top.
+
+**Board adjacency is wrong in three tasks' fixtures.** Tasks 3, 5 and 6 each build what they call a
+"plain placement" out of a lone tile at `E5` and a hand tile at `E6`. **Those two squares are
+adjacent**, so the placement founds a chain, the stage moves to `foundStartup`, and the `endTurn`
+that follows is refused with `wrongStage`. Three separate implementers hit this and traced it
+independently before finding it.
+
+The rule, from `engine/gameHelpers.ts`: rows are `A`–`I`, columns `1`–`12`, and two squares are
+adjacent when they share a row and differ by one column, or share a column and differ by one row.
+For a placement that founds nothing, the tile must touch no placed tile at all — `I5` beside a hand
+of `E6` and `A1` works, and is what the tasks actually shipped.
+
+**Check adjacency yourself before trusting any fixture in this document.** The same care applies to
+any new fixture: a placement that quietly founds a chain produces a test that passes for the wrong
+reason, or fails somewhere unrelated to what it meant to prove.
+
 ---
 
 ## File Structure
