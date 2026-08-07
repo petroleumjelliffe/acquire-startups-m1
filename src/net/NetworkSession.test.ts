@@ -38,6 +38,7 @@ function harness(state = board()) {
   return {
     sent,
     undos,
+    transport,
     setOpen: (v: boolean) => { open = v; },
     serverSays: (m: StateMessage) => onState?.(m),
     serverRefuses: (m: RejectedMessage) => onRejected?.(m),
@@ -203,6 +204,34 @@ describe('a dropped connection clears a stuck pending', () => {
     session.connectionLost();
 
     expect(session.getView().state).toBe(before);
+  });
+});
+
+describe('a resume', () => {
+  it('adopts the server previousSegmentStart rather than starting blind', () => {
+    const h = harness();
+    const session = createNetworkSession({
+      transport: h.transport,
+      playerId: 'p2',
+      initial: { state: board(), reason: 'resume', segmentStart: 12, previousSegmentStart: 4 },
+    });
+
+    // A refresh builds this session from one message. Without the field, the
+    // step stack's read-only previous turn is blank until the next commit —
+    // recovery that forgets what you were reading.
+    expect(session.getView().previousSegmentStart).toBe(4);
+  });
+
+  it('clears a parked disconnection message when the state comes back', () => {
+    const h = harness();
+    const session = h.session('p2');
+
+    session.connectionLost();
+    expect(session.getView().error?.code).toBe('notConnected');
+
+    h.serverSays({ state: board(), reason: 'resume', segmentStart: board().nextStepId });
+
+    expect(session.getView().error).toBeNull();
   });
 });
 

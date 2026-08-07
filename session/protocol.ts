@@ -119,17 +119,37 @@ export function toWire(intent: Intent): WireIntent {
 export type RejectionCode = IllegalIntentCode | 'undoOutOfSegment' | 'notConnected';
 
 /**
- * Why a state arrived. `commit` went to the whole table; `correction` and
- * `reset` went to one player. Tests assert on this: "a non-actor never
- * receives a correction" is the draft-privacy guarantee, stated directly.
+ * Why a state arrived.
+ *
+ * `commit` went to the whole table; `correction`, `reset` and `resume` went to
+ * one player. Tests assert on this: "a non-actor never receives a correction"
+ * is the draft-privacy guarantee, stated directly.
+ *
+ * `resume` is what a rejoining socket gets. It is deliberately not `commit`:
+ * `sendState`'s draft rule keys off "is this a commit", so sending `commit`
+ * here handed a reconnecting actor the state at the *start* of their turn
+ * while the server still held their open draft — and their next intent then
+ * landed on a state they could not see. `resume` is also not `reset`, because
+ * a reset is the rollback half of a rejection and deliberately preserves the
+ * error explaining it; a resume has nothing to explain and should clear one.
  */
-export type StateReason = 'commit' | 'correction' | 'reset';
+export type StateReason = 'commit' | 'correction' | 'reset' | 'resume';
 
 export interface StateMessage {
   /** Projected for this recipient: no seed, no bag, no other player's hand. */
   state: GameState;
   reason: StateReason;
   segmentStart: number;
+  /**
+   * Where the segment before the open one began, when there is one.
+   *
+   * The client can derive this by watching `segmentStart` change across
+   * messages, and does — but a client rebuilt from a single message after a
+   * refresh has no earlier message to have watched. Sending it is what lets
+   * the step stack show the previous turn immediately rather than after the
+   * next commit.
+   */
+  previousSegmentStart?: number;
 }
 
 export interface RejectedMessage {

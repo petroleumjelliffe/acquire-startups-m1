@@ -66,15 +66,22 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
     // `reset` follows a rejection, and a rejection can be addressed to someone
     // who is *not* the actor — an out-of-turn intent, or an undo from the
     // wrong player. Sending them the draft hands over the actor's uncommitted
-    // board, cash and log, which is the leak this phase exists to prevent.
+    // board, cash and log, which is the leak this rule exists to prevent.
     // They get the committed state: it is what they already had, which is what
     // "reset" should mean for them.
+    //
+    // `resume` rides the same rule, and that is the point of it being a
+    // separate reason: a reconnecting actor is by definition the player the
+    // game is waiting on, so they get their own open draft back, and every
+    // other reconnecting player gets the committed state — the same privacy
+    // boundary, applied to a new arrival rather than a rejection.
     const ownsDraft = reason !== 'commit' && playerId === room.actorId();
     const source = ownsDraft ? room.draft() : room.committed();
     const message: StateMessage = {
       state: project(source, playerId),
       reason,
       segmentStart: room.segmentStart(),
+      previousSegmentStart: room.previousSegmentStart(),
     };
     for (const socket of socketsFor(room.id, playerId)) {
       socket.emit(SERVER_EVENTS.state, message);
@@ -213,7 +220,9 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       socket.emit(SERVER_EVENTS.joined, joined);
       io.to(seat.room.id).emit(SERVER_EVENTS.roster, roster(seat.room));
 
-      if (seat.room.lifecycle() !== 'lobby') sendState(seat.room, seat.player.id, 'commit');
+      // `resume`, not `commit`: this socket may belong to the player the game
+      // is waiting on, mid-segment, with work the server still holds.
+      if (seat.room.lifecycle() !== 'lobby') sendState(seat.room, seat.player.id, 'resume');
     });
 
     socket.on(CLIENT_EVENTS.beginGame, () => {
