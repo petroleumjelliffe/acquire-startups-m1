@@ -58,10 +58,27 @@ export interface SavedRoom {
   previousSegmentStart?: number;
 }
 
+/** What a load found: the records it could parse, and the files it could not. */
+export interface LoadResult {
+  records: SavedRoom[];
+  /** Filenames, not room ids — an unreadable file's room id is unknowable. */
+  unreadable: string[];
+}
+
 export interface RoomStore {
   save(record: SavedRoom): Promise<void>;
-  loadAll(): Promise<SavedRoom[]>;
+  loadAll(): Promise<LoadResult>;
   remove(roomId: string): Promise<void>;
+  /**
+   * Sets a file this store could not read aside, out of the load path.
+   *
+   * A rename, deliberately not an unlink: deleting a file you could not
+   * parse is destructive, and Phase 4's carry-forward ruled it deserves a
+   * decision rather than a reflex. The rename preserves the bytes for a
+   * human and stops the file warning at every boot forever. Whether to call
+   * it is the registry's decision; this is only the mechanics.
+   */
+  quarantine(name: string): Promise<void>;
 }
 
 function isRoomPlayer(value: unknown): value is RoomPlayer {
@@ -181,7 +198,7 @@ export function createFileStore(dir: string): RoomStore {
         names = await readdir(dir);
       } catch {
         // No directory yet is the ordinary first-boot case, not a fault.
-        return [];
+        return { records: [], unreadable: [] };
       }
 
       // `!`, not `✗`: vitest prints `✗` for a failed test, and a boot log
@@ -189,18 +206,33 @@ export function createFileStore(dir: string): RoomStore {
       // it — the exact confusion an earlier commit already fixed once, for
       // the test run itself. This is that same objection, moved to the boot
       // log rather than answered there.
-      const out: SavedRoom[] = [];
+      const records: SavedRoom[] = [];
+      const unreadable: string[] = [];
       for (const name of names) {
         if (!name.endsWith('.json')) continue;
         try {
           const parsed: unknown = JSON.parse(await readFile(join(dir, name), 'utf-8'));
-          if (isSavedRoom(parsed)) out.push(parsed);
-          else console.warn(`! Ignoring unreadable save ${name}`);
+          if (isSavedRoom(parsed)) records.push(parsed);
+          else {
+            console.warn(`! Ignoring unreadable save ${name}`);
+            unreadable.push(name);
+          }
         } catch {
           console.warn(`! Ignoring unreadable save ${name}`);
+          unreadable.push(name);
         }
       }
-      return out;
+      return { records, unreadable };
+    },
+
+    async quarantine(name) {
+      try {
+        await rename(join(dir, name), join(dir, `${name}.bad`));
+      } catch {
+        // Already quarantined by a sibling process, or removed by hand in the
+        // window since it was listed. Either way it is out of the load path,
+        // which is all this promises.
+      }
     },
 
     async remove(roomId) {
@@ -223,7 +255,8 @@ export function createFileStore(dir: string): RoomStore {
 export function createNullStore(): RoomStore {
   return {
     save: async () => {},
-    loadAll: async () => [],
+    loadAll: async () => ({ records: [], unreadable: [] }),
     remove: async () => {},
+    quarantine: async () => {},
   };
 }

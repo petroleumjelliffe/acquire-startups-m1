@@ -3,7 +3,7 @@ import { buildFixture } from '../engine/golden/fixtures.js';
 import { createRoomRegistry, MAX_AGE_MS } from './rooms.js';
 import { createFileStore, SAVE_VERSION, type SavedRoom } from './store.js';
 import { PROTOCOL_VERSION } from '../session/protocol.js';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -111,7 +111,7 @@ describe('restoring rooms at boot', () => {
     const rooms = createRoomRegistry(store);
     const room = rooms.fromState(roomId, ['Alex', 'Sam'], fixture());
     await rooms.persist(room);
-    const [saved] = await store.loadAll();
+    const [saved] = (await store.loadAll()).records;
     return saved;
   }
 
@@ -196,7 +196,7 @@ describe('restoring rooms at boot', () => {
   it('skips a record written by a different protocol, and still seats the good one', async () => {
     await seedSavedRoom('GOOD01');
     const store = createFileStore(dir);
-    const [good] = await store.loadAll();
+    const [good] = (await store.loadAll()).records;
     // What a file written by last week's server looks like after a protocol
     // bump: valid in every respect except the wire its state speaks.
     await writeFile(
@@ -217,6 +217,32 @@ describe('restoring rooms at boot', () => {
     expect(warn.mock.calls.some((c) => String(c[0]).includes('STALE1'))).toBe(true);
   });
 
+  /**
+   * Phase 4's Finding 4, closed: 23 stale files warned at every boot,
+   * forever, because eviction only deleted records that were too *old*. The
+   * ruling is quarantine — renamed aside for a human, never deleted — and
+   * "warns once, not forever" is the observable difference, so that is what
+   * is asserted: a second boot over the same directory is silent.
+   */
+  it('quarantines an unreadable file at boot, and the next boot is quiet', async () => {
+    await seedSavedRoom('GOOD01');
+    await writeFile(join(dir, 'game-rotten.json'), '{ not json', 'utf8');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const first = createRoomRegistry(createFileStore(dir));
+    expect(await first.restore()).toBe(1);
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('game-rotten.json'))).toBe(true);
+
+    warn.mockClear();
+    const second = createRoomRegistry(createFileStore(dir));
+    expect(await second.restore()).toBe(1);
+
+    // The load path no longer sees it, so nothing warns — but the bytes are
+    // still there under `.bad`, for whoever wants to know what happened.
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('game-rotten'))).toBe(false);
+    expect(await readdir(dir)).toContain('game-rotten.json.bad');
+  });
+
   it('drops and deletes a record older than the age limit', async () => {
     await seedSavedRoom('OLD123');
     const store = createFileStore(dir);
@@ -228,7 +254,7 @@ describe('restoring rooms at boot', () => {
     expect(rooms.get('OLD123')).toBeUndefined();
     // Deleted, not merely skipped — otherwise the directory grows forever
     // and every boot re-reads records it will never use.
-    expect(await store.loadAll()).toEqual([]);
+    expect((await store.loadAll()).records).toEqual([]);
   });
 
   it('is zero, not a crash, with nothing saved', async () => {
@@ -304,7 +330,7 @@ describe('what persist writes to disk', () => {
 
     await rooms.persist(room);
 
-    const [saved] = await store.loadAll();
+    const [saved] = (await store.loadAll()).records;
     expect(saved.state.board).toEqual(room.committed().board);
   });
 
@@ -313,7 +339,7 @@ describe('what persist writes to disk', () => {
     const rooms = createRoomRegistry(store);
     await rooms.persist(rooms.fromState('X', ['Alex', 'Sam'], fixture()));
 
-    const [saved] = await store.loadAll();
+    const [saved] = (await store.loadAll()).records;
     expect(saved.protocolVersion).toBe(PROTOCOL_VERSION);
   });
 });

@@ -59,7 +59,7 @@ describe('the file store', () => {
     const saved = record();
 
     await store.save(saved);
-    const loaded = await store.loadAll();
+    const { records: loaded } = await store.loadAll();
 
     expect(loaded).toHaveLength(1);
     expect(loaded[0].roomId).toBe('ABC123');
@@ -80,7 +80,7 @@ describe('the file store', () => {
     // that promise honest without printing it during the test run.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    expect(await createFileStore(dir).loadAll()).toEqual([]);
+    expect((await createFileStore(dir).loadAll()).records).toEqual([]);
     expect(warn).toHaveBeenCalledWith('! Ignoring unreadable save OLD123.json');
   });
 
@@ -90,13 +90,13 @@ describe('the file store', () => {
 
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    expect(await createFileStore(dir).loadAll()).toEqual([]);
+    expect((await createFileStore(dir).loadAll()).records).toEqual([]);
     expect(warn).toHaveBeenCalledWith('! Ignoring unreadable save JUNK01.json');
     expect(warn).toHaveBeenCalledWith('! Ignoring unreadable save HALF02.json');
   });
 
   it('is empty, not broken, when the directory does not exist yet', async () => {
-    expect(await createFileStore(join(dir, 'not-created')).loadAll()).toEqual([]);
+    expect(await createFileStore(join(dir, 'not-created')).loadAll()).toEqual({ records: [], unreadable: [] });
   });
 
   it('removes a record', async () => {
@@ -105,7 +105,7 @@ describe('the file store', () => {
 
     await store.remove('ABC123');
 
-    expect(await store.loadAll()).toEqual([]);
+    expect((await store.loadAll()).records).toEqual([]);
   });
 
   // What this proves: after a completed save, nothing named `*.tmp` is left for a
@@ -150,7 +150,7 @@ describe('two saves for the same room, in flight at once', () => {
     const b = store.save(record({ savedAt: 2 }));
     await Promise.all([a, b]);
 
-    const loaded = await store.loadAll();
+    const { records: loaded } = await store.loadAll();
     expect(loaded[0].savedAt).toBe(2);
   });
 });
@@ -160,7 +160,7 @@ describe('the null store', () => {
     const store = createNullStore();
     await store.save(record());
     await store.remove('ABC123');
-    expect(await store.loadAll()).toEqual([]);
+    expect((await store.loadAll()).records).toEqual([]);
   });
 });
 
@@ -169,7 +169,7 @@ describe('the record carries what a resumed room needs', () => {
     const store = createFileStore(dir);
     await store.save(record({ protocolVersion: PROTOCOL_VERSION, previousSegmentStart: 7 }));
 
-    const [loaded] = await store.loadAll();
+    const [loaded] = (await store.loadAll()).records;
 
     expect(loaded.protocolVersion).toBe(PROTOCOL_VERSION);
     // Without this the step stack's "previous turn" is blank after a restart —
@@ -185,7 +185,7 @@ describe('the record carries what a resumed room needs', () => {
     const store = createFileStore(dir);
     await store.save(record({ protocolVersion: PROTOCOL_VERSION }));
 
-    const [loaded] = await store.loadAll();
+    const [loaded] = (await store.loadAll()).records;
 
     expect(loaded.previousSegmentStart).toBeUndefined();
     expect(loaded.roomId).toBe('ABC123');
@@ -198,7 +198,7 @@ describe('the record carries what a resumed room needs', () => {
     const { protocolVersion, ...older } = record({ protocolVersion: PROTOCOL_VERSION });
     await writeFile(join(dir, 'game-older.json'), JSON.stringify(older), 'utf8');
 
-    expect(await store.loadAll()).toEqual([]);
+    expect((await store.loadAll()).records).toEqual([]);
   });
 
   it('refuses the previous save format outright', async () => {
@@ -211,6 +211,46 @@ describe('the record carries what a resumed room needs', () => {
 
     // A version-4 record has no `protocolVersion` and no `previousSegmentStart`
     // — it is not upgradable, only discardable.
-    expect(await store.loadAll()).toEqual([]);
+    expect((await store.loadAll()).records).toEqual([]);
+  });
+});
+
+/**
+ * Phase 4 left eviction deleting only records that are too *old* — a
+ * permanently unreadable file was refused and kept, so 23 stale files warned
+ * at every boot, forever. The ruling (Stage 1): quarantine, do not delete.
+ * Renaming a file you could not parse preserves it for a human to look at;
+ * unlinking it is a reflex the carry-forward explicitly warned against.
+ */
+describe('what loadAll says about files it cannot read', () => {
+  it('names them, so the registry can decide what to do', async () => {
+    const store = createFileStore(dir);
+    await store.save(record());
+    await writeFile(join(dir, 'game-rotten.json'), '{ not json', 'utf8');
+
+    const { records, unreadable } = await store.loadAll();
+
+    expect(records).toHaveLength(1);
+    expect(unreadable).toEqual(['game-rotten.json']);
+  });
+
+  it('quarantines by rename, and the file stops being read at the next load', async () => {
+    const store = createFileStore(dir);
+    await writeFile(join(dir, 'game-rotten.json'), '{ not json', 'utf8');
+
+    await store.quarantine('game-rotten.json');
+
+    // Renamed, not unlinked: still on disk for a human, out of the boot path.
+    const names = await readdir(dir);
+    expect(names).toEqual(['game-rotten.json.bad']);
+    const { unreadable } = await store.loadAll();
+    expect(unreadable).toEqual([]);
+  });
+
+  it('survives quarantining a file that vanished in the meantime', async () => {
+    // Two processes sharing a directory over a redeploy is the ordinary case,
+    // and the loser of that race must not throw out of the boot path.
+    const store = createFileStore(dir);
+    await expect(store.quarantine('game-gone.json')).resolves.toBeUndefined();
   });
 });

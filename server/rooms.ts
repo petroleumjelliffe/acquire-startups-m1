@@ -144,7 +144,17 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
       // cleaned up. That is a leftover file on disk, not a restore bug; if it
       // ever needs reclaiming, boot is the natural place, but no sweep exists
       // yet and this task does not add one.
-      const saved = await store.loadAll();
+      const { records: saved, unreadable } = await store.loadAll();
+
+      // The decision Phase 4 deferred, made here where policy lives: a file
+      // that cannot be parsed is quarantined — renamed aside, kept for a
+      // human — rather than deleted, and rather than warning at every boot
+      // forever, which is what 23 stale files were doing.
+      for (const name of unreadable) {
+        console.warn(`! Quarantining unreadable save ${name} as ${name}.bad`);
+        await store.quarantine(name);
+      }
+
       let seated = 0;
 
       for (const record of saved) {
