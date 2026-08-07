@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { JoinForm } from '../game/online/JoinForm';
 import { getConnection, type Connection } from '../net/connection';
 import { rememberName, saveIdentity } from '../net/identity';
+import { PROTOCOL_VERSION } from '../../session/protocol';
 
 export interface JoinRoomPageProps {
   connect?: () => Connection;
@@ -42,7 +43,7 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
         rememberName(name);
         setError(null);
         setWaiting(true);
-        connection.joinRoom({ roomId, name });
+        connection.joinRoom({ roomId, name, protocolVersion: PROTOCOL_VERSION });
       }}
     />
   );

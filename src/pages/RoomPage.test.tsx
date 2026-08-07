@@ -3,7 +3,13 @@ import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { RoomPage } from './RoomPage';
 import type { Connection, ConnectionStatus } from '../net/connection';
-import type { JoinedMessage, RejectedMessage, RosterMessage, StateMessage } from '../../session/protocol';
+import {
+  PROTOCOL_VERSION,
+  type JoinedMessage,
+  type RejectedMessage,
+  type RosterMessage,
+  type StateMessage,
+} from '../../session/protocol';
 import { buildFixture } from '../../engine/golden/fixtures';
 import { loadIdentity } from '../net/identity';
 import { useRoom, type RoomPhase } from '../net/useRoom';
@@ -121,7 +127,7 @@ describe('arriving at a room without a seat', () => {
     fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Sam' } });
     fireEvent.click(screen.getByRole('button', { name: /join/i }));
 
-    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam' }]);
+    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION }]);
   });
 });
 
@@ -181,7 +187,7 @@ describe('a refresh rejoins the same seat', () => {
     const f = fakeConnection();
     renderRoom(f.connection);
 
-    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok' }]);
+    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok', protocolVersion: PROTOCOL_VERSION }]);
   });
 });
 
@@ -352,7 +358,7 @@ describe('a dropped connection', () => {
 
     const state = midGameState();
     f.sendState({ state, reason: 'commit', segmentStart: state.nextStepId });
-    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam' }]);
+    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION }]);
 
     f.setStatus('closed');
     f.setStatus('open');
@@ -361,8 +367,8 @@ describe('a dropped connection', () => {
     // has to reset on the drop, or this rejoin — the thing that actually
     // rebinds the socket server-side — never happens.
     expect(f.joins).toEqual([
-      { roomId: 'ABC123', name: 'Sam' },
-      { roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok' },
+      { roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION },
+      { roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok', protocolVersion: PROTOCOL_VERSION },
     ]);
   });
 });
@@ -427,7 +433,7 @@ describe('a stale identity, refused', () => {
     const f = fakeConnection();
     renderRoom(f.connection);
 
-    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Ghost', playerId: 'p9', token: 'stale' }]);
+    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Ghost', playerId: 'p9', token: 'stale', protocolVersion: PROTOCOL_VERSION }]);
 
     f.sendRejected({ code: 'seatRefused', message: 'That seat in ABC123 is no longer yours' });
 
@@ -564,7 +570,7 @@ describe('a refresh mid-turn', () => {
     // The stored identity is what makes this the same seat rather than a new
     // one — the token, not the name.
     expect(second.joins).toEqual([
-      { roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok' },
+      { roomId: 'ABC123', name: 'Sam', playerId: 'p2', token: 'tok', protocolVersion: PROTOCOL_VERSION },
     ]);
 
     second.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
@@ -632,7 +638,7 @@ describe('a seat handed over in the URL, in dev', () => {
     // them is a stranger arriving at a room whose game has started, which the
     // server refuses — the failure this hook exists to prevent.
     expect(f.joins).toEqual([
-      { roomId: 'DEVG2', name: 'Sam', playerId: 'p2', token: 'tok-2' },
+      { roomId: 'DEVG2', name: 'Sam', playerId: 'p2', token: 'tok-2', protocolVersion: PROTOCOL_VERSION },
     ]);
     expect(screen.queryByLabelText(/your name/i)).not.toBeInTheDocument();
   });

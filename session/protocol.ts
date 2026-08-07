@@ -130,6 +130,14 @@ export type RejectionCode =
   | 'undoOutOfSegment'
   | 'notConnected'
   | 'noSuchRoom'
+  /**
+   * The client and the server do not speak the same protocol.
+   *
+   * Its own code, deliberately. A stale client told `noSuchRoom` goes hunting
+   * for a room that is perfectly fine, and the player has no way to learn that
+   * reloading is the fix.
+   */
+  | 'versionMismatch'
   | 'seatRefused';
 
 /**
@@ -184,8 +192,34 @@ export interface RosterMessage {
   players: { id: string; name: string; isHost: boolean; connected: boolean }[];
 }
 
-export interface CreateRoomMessage { name: string }
-export interface JoinRoomMessage { roomId: string; name: string; playerId?: string; token?: string }
+/**
+ * What "the wire" currently is.
+ *
+ * Bump this when the shape of anything in this file changes: `WireIntent`,
+ * `StateMessage`, `RejectionCode`, `JoinedMessage`, `RosterMessage`,
+ * `CLIENT_EVENTS` or `SERVER_EVENTS`. This file owns all of them, which is why
+ * the constant lives here and nowhere else — it is the only place that knows
+ * what "changed" means.
+ *
+ * Skew runs in **both** directions in this deployment. The client ships to
+ * GitHub Pages and the server to Render, independently, so either can be the
+ * newer one. Anything checking this must compare for equality, not for "at
+ * least".
+ *
+ * Today a stale client fixes itself on the next reload. That stops being true
+ * the moment a service worker makes an old client durable, which is the reason
+ * this landed before the PWA rather than inside it.
+ */
+export const PROTOCOL_VERSION = 1;
+
+export interface CreateRoomMessage { name: string; protocolVersion: number }
+export interface JoinRoomMessage {
+  roomId: string;
+  name: string;
+  playerId?: string;
+  token?: string;
+  protocolVersion: number;
+}
 export interface UndoMessage { stepId: number }
 
 export const CLIENT_EVENTS = {

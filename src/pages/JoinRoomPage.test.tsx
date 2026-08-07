@@ -3,7 +3,12 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { JoinRoomPage } from './JoinRoomPage';
 import type { Connection } from '../net/connection';
-import type { JoinedMessage, JoinRoomMessage, RejectedMessage } from '../../session/protocol';
+import {
+  PROTOCOL_VERSION,
+  type JoinedMessage,
+  type JoinRoomMessage,
+  type RejectedMessage,
+} from '../../session/protocol';
 
 function fakeConnection() {
   let joined: ((m: JoinedMessage) => void) | null = null;
@@ -61,7 +66,7 @@ describe('joining a room', () => {
     fireEvent.change(screen.getByLabelText(/room code/i), { target: { value: 'abc123' } });
     fireEvent.click(screen.getByRole('button', { name: /join room/i }));
 
-    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam' }]);
+    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION }]);
 
     f.sendJoined({ roomId: 'ABC123', playerId: 'p2', token: 'tok' });
 
@@ -88,8 +93,8 @@ describe('joining a room', () => {
     fireEvent.click(screen.getByRole('button', { name: /join room/i }));
 
     expect(f.joins).toEqual([
-      { roomId: 'WRONG1', name: 'Sam' },
-      { roomId: 'ABC123', name: 'Sam' },
+      { roomId: 'WRONG1', name: 'Sam', protocolVersion: PROTOCOL_VERSION },
+      { roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION },
     ]);
   });
 
@@ -109,6 +114,6 @@ describe('joining a room', () => {
     fireEvent.submit(form);
     fireEvent.submit(form);
 
-    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam' }]);
+    expect(f.joins).toEqual([{ roomId: 'ABC123', name: 'Sam', protocolVersion: PROTOCOL_VERSION }]);
   });
 });

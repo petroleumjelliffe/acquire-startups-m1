@@ -1,6 +1,7 @@
 import { io, type Socket } from 'socket.io-client';
 import {
   CLIENT_EVENTS,
+  PROTOCOL_VERSION,
   SERVER_EVENTS,
   type CreateRoomMessage,
   type JoinRoomMessage,
@@ -94,7 +95,7 @@ function createConnection(): Connection {
       return () => { listeners.delete(listener); };
     },
     createRoom(name) {
-      const msg: CreateRoomMessage = { name };
+      const msg: CreateRoomMessage = { name, protocolVersion: PROTOCOL_VERSION };
       socket.emit(CLIENT_EVENTS.createRoom, msg);
     },
     joinRoom(msg) { socket.emit(CLIENT_EVENTS.joinRoom, msg); },
