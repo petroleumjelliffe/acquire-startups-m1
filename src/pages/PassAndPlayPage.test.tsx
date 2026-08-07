@@ -103,6 +103,58 @@ describe('the lobby with a game in progress', () => {
     renderLobby();
     expect(screen.queryByTestId('continue-card')).toBeNull();
   });
+
+  /**
+   * The mockup's two states, held apart: with a save, the card is New Game
+   * above Continue and the roster is not on screen; without one, the roster
+   * is the whole card and no New Game button exists — which is what makes
+   * "confirm only when a game exists" structural rather than conditional.
+   */
+  it('shows New Game and Continue instead of the roster', () => {
+    seed();
+    renderLobby();
+
+    expect(screen.getByRole('button', { name: /new game/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /start game/i })).toBeNull();
+    expect(screen.queryByText(/add a player/i)).toBeNull();
+  });
+
+  it('has no New Game button at all when there is nothing to discard', () => {
+    renderLobby();
+
+    expect(screen.queryByRole('button', { name: /new game/i })).toBeNull();
+    expect(screen.getByRole('button', { name: /start game/i })).toBeInTheDocument();
+  });
+
+  it('confirms before discarding, and cancel leaves everything standing', () => {
+    seed();
+    renderLobby();
+
+    fireEvent.click(screen.getByRole('button', { name: /new game/i }));
+
+    // Inline on the card, not a modal — and nothing destroyed yet.
+    expect(screen.getByText(/discard the saved game\?/i)).toBeInTheDocument();
+    expect(load()).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(screen.queryByText(/discard the saved game\?/i)).toBeNull();
+    expect(screen.getByTestId('continue-card')).toBeInTheDocument();
+    expect(load()).not.toBeNull();
+  });
+
+  it('discards on confirm and opens the roster for a fresh game', () => {
+    seed();
+    renderLobby();
+
+    fireEvent.click(screen.getByRole('button', { name: /new game/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^discard$/i }));
+
+    // The one sanctioned discard: the save is gone and setup is the card now.
+    expect(load()).toBeNull();
+    expect(screen.getByRole('button', { name: /start game/i })).toBeInTheDocument();
+    expect(screen.queryByTestId('continue-card')).toBeNull();
+  });
 });
 
 describe('the lobby over a save it cannot use', () => {

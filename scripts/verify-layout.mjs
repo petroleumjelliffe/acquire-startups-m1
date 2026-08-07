@@ -479,6 +479,14 @@ async function main() {
     await send('Page.navigate', { url: `http://localhost:${VITE_PORT}/pass-and-play` });
     await sleep(2000);
 
+    // Pass-and-play persists to localStorage as of Stage 2, and this
+    // profile (line ~461) persists between runs — so without this, the
+    // lobby shows Continue instead of Start game, seeded by *this gate's
+    // own previous run*. A gate whose result depends on its run history is
+    // the same defect as measuring the wrong tree.
+    await evaluate('localStorage.clear(); location.reload()');
+    await sleep(1500);
+
     await evaluate(START_GAME);
     const curtain = await evaluate(CURTAIN);
     if (!curtain) {
@@ -490,8 +498,10 @@ async function main() {
       );
     }
 
-    // The measuring walk starts from the setup screen, so reload to undo the
-    // game the curtain check just started.
+    // The measuring walk starts from the setup screen. A reload alone no
+    // longer gets there — the game the curtain check just started is *saved*
+    // now, and the lobby would offer Continue — so the save is cleared first.
+    await evaluate('localStorage.clear()');
     await send('Page.navigate', { url: `http://localhost:${VITE_PORT}/pass-and-play` });
     await sleep(1500);
 

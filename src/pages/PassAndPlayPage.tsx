@@ -9,10 +9,11 @@
 // way. That initial write is also what makes a refresh during the *first*
 // turn return to the deal rather than to a dead route.
 
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LocalSetupScreen } from '../game/setup/LocalSetupScreen';
 import { createGameSession } from '../../session/GameSession';
-import { load, loadFailure, save } from '../game/local/localSave';
+import { clear, load, loadFailure, save } from '../game/local/localSave';
 
 /** `Last played: 2 days ago` — the Continue card's line, from `savedAt`. */
 function lastPlayed(savedAt: number): string {
@@ -27,8 +28,12 @@ function lastPlayed(savedAt: number): string {
 
 export function PassAndPlayPage() {
   const navigate = useNavigate();
-  const saved = load();
-  const failure = loadFailure();
+  // Re-read after a discard, not once per mount: the page's whole job is to
+  // reflect what is saved, and the discard below changes that mid-mount.
+  const [generation, setGeneration] = useState(0);
+  const saved = useMemo(() => load(), [generation]);
+  const failure = useMemo(() => loadFailure(), [generation]);
+  const [confirming, setConfirming] = useState(false);
 
   const start = (config: { seed: string; names: string[] }) => {
     // The session is built only to deal the opening state; the game route
@@ -39,43 +44,92 @@ export function PassAndPlayPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="mx-auto max-w-md">
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="m-0 mb-4 rounded-lg border border-gray-300 px-4 py-2 hover:bg-gray-50"
-        >
-          ← Back
-        </button>
+    <div className="flex min-h-screen items-start justify-center bg-gray-50 p-6">
+      <div className="mt-8 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+        <h1 className="text-center text-xl font-bold">Pass &amp; Play</h1>
+        <p className="mb-4 text-center text-sm text-gray-600">Pass and play on this device</p>
 
         {failure === 'stale' && (
           // Named, not silent: the failure mode being designed out is a save
           // that quietly vanished, indistinguishable from never having
-          // existed. The bytes stay until New Game overwrites them.
+          // existed. The bytes stay until a new deal overwrites them.
           <p data-testid="stale-save" className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             A saved game from an older version can&rsquo;t be continued.
           </p>
         )}
 
-        {saved && (
-          <section data-testid="continue-card" className="mb-4 rounded-xl bg-white p-4 shadow">
-            <h2 className="font-bold">Game in progress</h2>
-            <p className="text-sm text-gray-600">
-              {saved.state.players.map((p) => `${p.emoji} ${p.name}`).join(', ')}
-            </p>
-            <p className="text-xs text-gray-500">{lastPlayed(saved.savedAt)}</p>
-            <button
-              type="button"
-              onClick={() => navigate('game')}
-              className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
-            >
-              Continue
-            </button>
-          </section>
+        {saved ? (
+          // The mockup's saved state: New Game above Continue, no roster. The
+          // roster only appears once there is nothing left to discard — which
+          // is what makes "confirm only when a game exists" structural: the
+          // button needing a confirmation does not otherwise exist.
+          <>
+            {confirming ? (
+              // Inline, not a modal — the modal family is deleted and stays
+              // deleted. Discarding is irreversible and one press away,
+              // directly above the card showing the thing it destroys.
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="mb-2 text-sm font-semibold text-red-800">Discard the saved game?</p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clear();
+                      setConfirming(false);
+                      setGeneration((g) => g + 1);
+                    }}
+                    className="m-0 flex-1 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white hover:bg-red-700"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setConfirming(false)}
+                    className="m-0 flex-1 rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                className="m-0 mb-4 w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+              >
+                New Game
+              </button>
+            )}
+
+            <p className="mb-1 text-sm font-semibold text-gray-700">Continue</p>
+            <section data-testid="continue-card" className="rounded-lg border border-gray-200 p-3">
+              <h2 className="font-bold">Game in progress</h2>
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="text-sm text-gray-600">
+                  {saved.state.players.map((p) => `${p.emoji} ${p.name}`).join(', ')}
+                </p>
+                <p className="flex-none text-xs text-gray-500">{lastPlayed(saved.savedAt)}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('game')}
+                className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+              >
+                Continue
+              </button>
+            </section>
+          </>
+        ) : (
+          <LocalSetupScreen onStart={start} />
         )}
 
-        <LocalSetupScreen onStart={start} />
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          className="m-0 mt-4 w-full rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
+        >
+          Leave
+        </button>
       </div>
     </div>
   );
