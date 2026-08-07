@@ -16,6 +16,15 @@ export interface LiqActionsProps {
   unitPrice: number;
   canSell: boolean;
   canTrade: boolean;
+  /**
+   * The survivor has no shares left to trade for.
+   *
+   * Separate from `canTrade` because a trade can be unavailable for several
+   * reasons — not your turn, fewer than `TRADE_RATIO` shares in hand, an empty
+   * pool — and only this one is invisible in the rest of the panel. Without it
+   * the button simply greyed out and the player had no way to learn why.
+   */
+  survivorSoldOut?: boolean;
   onSell?: () => void;
   onTrade?: () => void;
 }
@@ -32,6 +41,7 @@ export function LiqActions({
   unitPrice,
   canSell,
   canTrade,
+  survivorSoldOut = false,
   onSell,
   onTrade,
 }: LiqActionsProps) {
@@ -56,16 +66,28 @@ export function LiqActions({
         <Cash amount={unitPrice} />
       </button>
 
+      {/* The badge and its wording are the buy step's, not a second vocabulary
+          for the same fact: that row already says `sold` on a muted badge when
+          a brand's pool is empty. */}
       <button
         type="button"
-        aria-label={`Trade ${TRADE_RATIO} shares for one survivor share`}
+        aria-label={
+          survivorSoldOut
+            ? `${survivorId} — sold out`
+            : `Trade ${TRADE_RATIO} shares for one survivor share`
+        }
         className={ACTION}
         disabled={!canTrade}
         onClick={onTrade}
       >
         <StockStack id={absorbedId} count={TRADE_RATIO} price={unitPrice} size="sm" />
         <span className="text-gray-400">→</span>
-        <StockCard id={survivorId} size="sm" />
+        <StockCard
+          id={survivorId}
+          size="sm"
+          badge={survivorSoldOut ? 'sold' : undefined}
+          badgeTone="muted"
+        />
       </button>
     </div>
   );

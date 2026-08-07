@@ -59,4 +59,29 @@ describe('LiqActions', () => {
     const sell = screen.getByRole('button', { name: /sell/i });
     expect(within(sell).getAllByText('$400')).toHaveLength(2);
   });
+
+  /**
+   * A disabled trade button and an exhausted survivor pool looked identical:
+   * the button greyed out and nothing said why, so the player had no way to
+   * learn the pool was empty. Found by hand, 2026-08-07, driving G2 in two
+   * browsers — the first time this panel had been used by a person.
+   *
+   * The vocabulary is the buy step's, deliberately. That row already says
+   * `sold` on a muted badge for exactly this fact, and one fact should not
+   * have two names.
+   */
+  it('says the survivor is sold out rather than just going inert', () => {
+    render(<LiqActions {...props} canSell canTrade={false} survivorSoldOut />);
+
+    const trade = screen.getByRole('button', { name: /sold out/i });
+    expect(trade).toBeDisabled();
+    expect(within(trade).getByText('sold')).toBeInTheDocument();
+  });
+
+  it('says nothing about sold out while the pool still has shares', () => {
+    render(<LiqActions {...props} canSell canTrade />);
+
+    expect(screen.queryByText('sold')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /trade/i })).toBeEnabled();
+  });
 });

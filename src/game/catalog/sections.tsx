@@ -392,6 +392,26 @@ export const SECTIONS: CatalogSection[] = [
           />
         ),
       },
+      {
+        // The state that was missing when this panel was first driven by hand:
+        // the trade went inert with nothing to say the survivor's pool was
+        // empty. Two disabled trades that look identical and mean different
+        // things are exactly what this surface exists to tell apart, so it sits
+        // next to the one above rather than replacing it.
+        label: 'liquidate · survivor sold out',
+        fixture: authored('the survivor has no shares left — the trade is inert and says why'),
+        node: (
+          <LiqActions
+            absorbedId="ZuckFace"
+            survivorId="Messla"
+            unitPrice={G2_MERGER.mergerContext?.absorbedPrices.ZuckFace ?? 0}
+            canSell
+            canTrade={false}
+            survivorSoldOut
+            onSell={noop}
+          />
+        ),
+      },
     ],
   },
 

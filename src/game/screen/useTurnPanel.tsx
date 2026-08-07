@@ -352,6 +352,12 @@ export function useTurnPanel(
       const keep = held - staged.sell - staged.trade;
       const unitPrice = ctx.absorbedPrices[absorbedId] ?? 0;
 
+      // Survivor shares still claimable, staged trades already deducted. Two
+      // things read this and they must not disagree: whether a trade is
+      // possible, and whether the panel says the pool is empty.
+      const survivorPoolLeft =
+        (state.startups[survivorId]?.availableShares ?? 0) - staged.trade / TRADE_RATIO;
+
       const holders = ctx.shareholderQueue.map((id, i) => {
         const p = state.players.find((x) => x.id === id);
         return {
@@ -386,11 +392,13 @@ export function useTurnPanel(
                   survivorId={survivorId}
                   unitPrice={unitPrice}
                   canSell={canAct && keep >= 1}
-                  canTrade={
-                    canAct &&
-                    keep >= TRADE_RATIO &&
-                    (state.startups[survivorId]?.availableShares ?? 0) > staged.trade / TRADE_RATIO
-                  }
+                  canTrade={canAct && keep >= TRADE_RATIO && survivorPoolLeft > 0}
+                  // Named separately from `canTrade` because it is the one
+                  // reason a trade can be unavailable that nothing else on the
+                  // panel shows. Staged trades count against the pool, so this
+                  // goes true on the click that claims the last share — which
+                  // is exactly when the button goes inert.
+                  survivorSoldOut={survivorPoolLeft <= 0}
                   onSell={() => setStaged({ ...staged, sell: staged.sell + 1 })}
                   onTrade={() => setStaged({ ...staged, trade: staged.trade + TRADE_RATIO })}
                 />

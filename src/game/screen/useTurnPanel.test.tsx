@@ -423,6 +423,39 @@ describe('useTurnPanel — mergers', () => {
     expect(screen.getByRole('button', { name: /sell one share/i })).toBeInTheDocument();
   });
 
+  /**
+   * Found by hand on 2026-08-07, driving G2 in two browsers: the trade button
+   * greyed out after one click and nothing said why. The reason is that
+   * G2 leaves Messla with a single available share, so one trade empties the
+   * pool — but an inert button and an empty pool looked identical.
+   *
+   * Derived from the golden state rather than asserted against a typed-in
+   * number: the precondition below is checked, so if G2's share arithmetic
+   * ever changes this test fails loudly instead of quietly proving nothing.
+   */
+  it('says the survivor is sold out once a staged trade empties the pool', () => {
+    const state = stateWhere((s) => s.stage === 'mergerLiquidation', 'G2');
+    const survivorId = state.mergerContext!.survivorId;
+
+    // The whole point of the case: exactly one share to be had.
+    expect(state.startups[survivorId as 'Messla'].availableShares).toBe(1);
+
+    render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
+
+    // Before: a trade is on offer and nothing claims the pool is empty.
+    expect(screen.queryByText('sold')).not.toBeInTheDocument();
+    const trade = screen.getByRole('button', { name: /trade .* shares/i });
+    expect(trade).toBeEnabled();
+
+    fireEvent.click(trade);
+
+    // After: the one share is spoken for, and the panel says so in the buy
+    // step's own words rather than going silently inert.
+    expect(screen.getByRole('button', { name: new RegExp(`${survivorId} — sold out`, 'i') }))
+      .toBeDisabled();
+    expect(screen.getByText('sold')).toBeInTheDocument();
+  });
+
   it('puts the survivor shares a trade gains into the staging pile', () => {
     // A state where the acting shareholder can actually afford a trade —
     // holding fewer than TRADE_RATIO absorbed shares leaves the button
