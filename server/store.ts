@@ -76,12 +76,25 @@ function isSavedRoom(value: unknown): value is SavedRoom {
   );
 }
 
+/**
+ * Process-wide, not per-store: two `createFileStore` instances in one process
+ * (as tests build repeatedly) must still never hand out the same temp name.
+ * Paired with `process.pid` so two *processes* sharing a directory — the
+ * ordinary case for a redeploy overlapping the process it replaces — can't
+ * collide either.
+ */
+let tempSeq = 0;
+
 export function createFileStore(dir: string): RoomStore {
   /**
    * One promise per room, so two commits landing in the same tick queue
    * rather than race. `deliver` calls `persist` fire-and-forget on every
    * commit, so "two writes in flight for one room" is the ordinary case, not
    * an edge one — and the loser of that race is the *newer* state.
+   *
+   * This chain is what makes the two writes apply in order at all — but
+   * order alone isn't enough to make the *outcome* right; see the temp-name
+   * comment below for the other half of that.
    */
   const chains = new Map<string, Promise<void>>();
 
@@ -91,7 +104,24 @@ export function createFileStore(dir: string): RoomStore {
     // leaves either the old record or the new one, never half of either.
     // Truncated JSON is exactly what a restart-recovery feature must not
     // produce for itself.
-    const temp = `${target}.tmp`;
+    //
+    // The name is unique per *write*, not per room: a temp file is private
+    // staging, and two writes for the same room sharing one temp name is a
+    // second collision hazard on top of the ordering the promise chain
+    // above already guards. Without this, two same-room writes racing past
+    // the chain (a bug in the chain, a future caller that bypasses `save`,
+    // a save issued before the chain existed) can still destroy each
+    // other: the second write's `writeFile` overwrites the first's
+    // in-flight temp file before the first has renamed it away, so the
+    // first's later `rename` either moves the *second* write's content
+    // under the first's stale promise, or — if the first renames first —
+    // throws ENOENT once the temp file it expected is already gone. Either
+    // way the two writes are no longer independent once they share a
+    // filename, which defeats the point of the chain queuing them at all.
+    // A unique name means the two are ordered *and* isolated: whichever
+    // `rename` runs last is simply the one that wins, which is exactly
+    // what "last write wins" is supposed to mean.
+    const temp = `${target}.${process.pid}.${tempSeq++}.tmp`;
     try {
       // `recursive: true` makes this idempotent, so there is no boot-time
       // setup step left to forget.
