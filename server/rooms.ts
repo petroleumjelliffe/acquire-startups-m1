@@ -108,7 +108,23 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
         return { room, player: existing };
       }
 
-      if (room.lifecycle() !== 'lobby') return null;
+      if (room.lifecycle() !== 'lobby') {
+        // The honor-system reclaim (owner ruling, 2026-08-08): same name,
+        // same room code takes the seat back — but only a seat nobody is
+        // sitting in. A token is still the seamless path; this is for the
+        // player whose browser forgot theirs, and it matches the name the
+        // way a human retypes it. Rotated token, because the seat changed
+        // hands and the old key should die with the handover.
+        const given = name?.trim().toLowerCase();
+        if (!given) return null;
+        const abandoned = room.players.find(
+          (p) => !p.connected && p.name.trim().toLowerCase() === given,
+        );
+        if (!abandoned) return null;
+        abandoned.token = randomUUID();
+        abandoned.connected = true;
+        return { room, player: abandoned };
+      }
       const player = seatPlayer(room.players.length, name);
       room.players.push(player);
       return { room, player };

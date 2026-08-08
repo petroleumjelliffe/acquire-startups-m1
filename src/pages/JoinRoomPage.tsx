@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { JoinRoomCard } from '../game/online/JoinRoomCard';
 import { getConnection, type Connection } from '../net/connection';
-import { rememberName, rememberedName, saveIdentity } from '../net/identity';
+import { loadIdentity, rememberName, rememberedName, saveIdentity } from '../net/identity';
 import { PROTOCOL_VERSION } from '../../session/protocol';
 
 export interface JoinRoomPageProps {
@@ -45,6 +45,18 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
       error={error}
       onLeave={() => navigate('/online')}
       onSubmit={() => {
+        const roomId = code.trim().toUpperCase();
+
+        // A code this device already holds a seat for is not a join at all —
+        // it is the way back in. Sending the tokenless join instead is the
+        // owner's own bug: browser-back out of a game, rejoin by code,
+        // refused, while the token that would have walked straight in sat
+        // unread in storage. The room page's `useRoom` owns the rejoin.
+        if (loadIdentity(roomId) !== null) {
+          navigate(`/room/${roomId}`);
+          return;
+        }
+
         const chosen = name.trim();
         sentName.current = chosen;
         // Only a name you actually typed is worth carrying to the next room.
@@ -52,7 +64,7 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
         setError(null);
         setWaiting(true);
         connection.joinRoom({
-          roomId: code.trim().toUpperCase(),
+          roomId,
           // Omitted rather than sent blank: absence is what asks the server to
           // name the seat, and a blank string would mean the same thing only
           // by the server's leniency rather than by the wire's shape.

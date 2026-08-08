@@ -132,6 +132,58 @@ describe('the registry', () => {
   });
 });
 
+/**
+ * The honor-system reclaim (owner ruling, 2026-08-08): same name, same room
+ * code takes the seat back. Nothing sensitive rides on a seat here, and the
+ * alternative — a player locked out of their own game because their browser
+ * forgot a token — was found by hand. The token is what makes a rejoin
+ * *seamless*; the name is what makes it *possible*.
+ */
+describe('reclaiming a mid-game seat by name', () => {
+  function midGame() {
+    const rooms = createRoomRegistry();
+    const room = rooms.fromState('golden-1', ['Alex', 'Sam'], fixture());
+    return { rooms, room };
+  }
+
+  it('hands a disconnected seat back to a tokenless joiner with the same name', () => {
+    const { rooms, room } = midGame();
+    const before = room.players[1].token;
+    room.players[1].connected = false;
+
+    const seat = rooms.join('golden-1', 'Sam');
+
+    expect(seat?.player.id).toBe('p2');
+    // Reclaimed, not re-seated: the roster did not grow.
+    expect(room.players).toHaveLength(2);
+    // Rotated: the seat changed hands, so the old device's token dies with
+    // the handover rather than leaving two keys to one chair.
+    expect(seat!.player.token).not.toBe(before);
+  });
+
+  it('matches the name the way a human retypes it — case and spacing forgiven', () => {
+    const { rooms, room } = midGame();
+    room.players[1].connected = false;
+
+    expect(rooms.join('golden-1', '  sam ')?.player.id).toBe('p2');
+  });
+
+  it('never hands over a seat whose player is still connected', () => {
+    const { rooms } = midGame();
+
+    expect(rooms.join('golden-1', 'Sam')).toBeNull();
+  });
+
+  it('still refuses a tokenless stranger mid-game', () => {
+    const { rooms, room } = midGame();
+    room.players[1].connected = false;
+
+    expect(rooms.join('golden-1', 'Jordan')).toBeNull();
+    expect(rooms.join('golden-1')).toBeNull();
+    expect(room.players).toHaveLength(2);
+  });
+});
+
 describe('restoring rooms at boot', () => {
   let dir: string;
 

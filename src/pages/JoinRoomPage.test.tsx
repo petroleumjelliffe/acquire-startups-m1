@@ -100,6 +100,32 @@ describe('joining a room', () => {
     ]);
   });
 
+  /**
+   * The owner's own bug: browser-back out of a game, then join by code —
+   * refused, because the card sent a tokenless stranger's join for a room
+   * whose seat this device still holds. The stored identity is the seamless
+   * path: skip the join entirely and go to the room, where `useRoom` presents
+   * the token.
+   */
+  it('goes straight to the room when this device already holds a seat there', () => {
+    localStorage.setItem(
+      'acquire.room.ABC123',
+      JSON.stringify({ playerId: 'p2', token: 'tok', name: 'Sam' }),
+    );
+    const f = fakeConnection();
+    renderJoin(f.connection);
+
+    fireEvent.change(screen.getByTestId('room-code'), { target: { value: 'abc123' } });
+    fireEvent.click(screen.getByRole('button', { name: /join game/i }));
+
+    expect(screen.getByText('room page')).toBeInTheDocument();
+    // Not one tokenless join on this connection — the room page's own hook
+    // owns the rejoin, token in hand.
+    expect(f.joins).toEqual([]);
+    // And the seat is still stored for it to present.
+    expect(JSON.parse(localStorage.getItem('acquire.room.ABC123')!).token).toBe('tok');
+  });
+
   it('sends only one joinRoom when submitted twice before a reply arrives', () => {
     const f = fakeConnection();
     const { container } = renderJoin(f.connection);
