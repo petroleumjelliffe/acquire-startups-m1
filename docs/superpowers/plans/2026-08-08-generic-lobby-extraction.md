@@ -913,6 +913,10 @@ by every game in this family. Three pieces: `lobby/` (wire types, node-safe),
 `server/lobby/` (seating registry + socket handlers), `src/lobby/` (headless
 React client + default UI under `ui/`).
 
+**The lobby is turn-agnostic.** It knows seats, presence, lifecycle, and "the
+host pressed begin" — never turns, actors, or timing. Turn-based, real-time,
+simultaneous: all equally at home; whatever happens after `onBegin` is yours.
+
 ## What your game provides
 
 - **A room**: anything with `id`, `players: SeatHolder[]`, and `lifecycle()`

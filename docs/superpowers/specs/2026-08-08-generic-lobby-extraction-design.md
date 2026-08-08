@@ -18,6 +18,13 @@ projection, segments, drafts/undo, corrections — stays per-game. It is nearly 
 too, but generalizing it would bake this game's segment/draft model in as the required
 shape for every future game, and no second game exists to check that against.
 
+**A consequence worth stating as a guarantee: the lobby is turn-agnostic.** It knows
+seats, tokens, lifecycle, presence, and "the host pressed begin" — never turns,
+actors, or timing; all of that lives on the game side of the seam. A real-time game
+sits on this lobby unchanged. The stub-consumer test (below) is the proof: its room
+has no turn concept at all. The one leak is cosmetic and on the re-ask list — the
+historically-named `notYourTurn` code for "you're not the host".
+
 **Packaging ruling: extract in place, lift at the join point.** The lobby lives in
 this repo behind a test-enforced import boundary. No npm package, no monorepo, no
 second repo until game #2 actually consumes it — see "Game #2 and the lift" below.
@@ -218,6 +225,37 @@ gets better with game #2's real needs in hand, and worse if rediscovered mid-lif
 - **Reconnect/backoff configurability.** The socket options are hardcoded with this
   game's deploy-survival rationale; exposing them on `LobbyConnectionOptions` is
   cheap if game #2 wants different behavior, and clutter before then.
+
+## Future directions the extraction must not foreclose — and doesn't
+
+Owner-named (2026-08-08), none built here; each is pinned to the seam it will land
+on so the extraction's choices stay compatible with it. All three change the wire,
+so each costs its game a protocol bump when it arrives — normal, per-game, and
+exactly what the version handshake exists for.
+
+- **Teams.** A team is seat state chosen in the lobby: `SeatHolder` grows a field,
+  the roster row carries it, and a lobby event sets it — the same shape `rename`
+  already has (identity from the socket binding, lobby-only, roster broadcast as
+  the answer). What the game does with teams is the game's business; the lobby
+  only seats them. Nothing in the current `SeatHolder`/roster design resists an
+  added optional field.
+- **A chosen emoji per player.** Today the seat emoji is *derived* — the game
+  assigns it by seat index, which is why the extraction makes it an injected
+  `seatEmoji(seat)` function rather than lobby state. A picker flips it to
+  *chosen*: the emoji moves onto `SeatHolder` beside `name`, rides the roster, and
+  is set the way `rename` is (probably the same event, carrying both). The
+  injected function is the migration point: it stops reading a constant table and
+  starts reading the roster. This pairs with the existing lobby-design memory that
+  emoji + name both belong to the player's own row.
+- **Spectators.** Watching the committed game without holding a seat. The lobby
+  half is already shaped for it: the lobby owns socket↔seat bindings, so a
+  spectator is a binding with no `SeatHolder` — a `watchRoom` join, a watcher
+  count (not roster rows), and an `onWatching(room, socketId)` hook beside
+  `onSeated`. The game half is the real work and stays per-game: deciding what a
+  seatless viewer may see is a projection question (today's `project` requires a
+  playerId and hides hands by it). Note the existing Stage 3 finding wants
+  spectating designed together with the panel-only phone view — that pairing
+  ruling stands; this entry only records the lobby seam for it.
 
 ## Out of scope
 
