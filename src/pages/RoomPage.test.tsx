@@ -256,6 +256,20 @@ describe('the lobby', () => {
     expect(screen.getAllByRole('textbox')).toHaveLength(1);
   });
 
+  it('carries a chosen name into the next room', () => {
+    // "Names should persist on device, across games" (owner). Renaming your
+    // seat is where an online name is chosen, so it is where the remembered
+    // name gets written — the next Create or Join reads it back.
+    const f = seated('Sam', false);
+
+    const field = screen.getByLabelText(/your name/i);
+    fireEvent.change(field, { target: { value: 'Samantha' } });
+    fireEvent.blur(field);
+
+    expect(f.renames).toEqual(['Samantha']);
+    expect(localStorage.getItem('acquire.name')).toBe('Samantha');
+  });
+
   it('does not broadcast a rename to the name you already have', () => {
     const f = seated('Sam', false);
 

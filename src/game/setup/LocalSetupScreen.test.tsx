@@ -30,6 +30,14 @@ describe('LocalSetupScreen', () => {
     expect(screen.getByRole('button', { name: /start game/i })).toBeDisabled();
   });
 
+  it('prefills the roster it is given, one seat per name', () => {
+    render(<LocalSetupScreen onStart={() => {}} initialNames={['Ada', 'Grace', 'Alan']} />);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByDisplayValue('Ada')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Grace')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Alan')).toBeInTheDocument();
+  });
+
   it('generates a different seed each mount so two games differ', () => {
     const { unmount } = render(<LocalSetupScreen onStart={() => {}} />);
     const first = (screen.getByLabelText(/seed/i) as HTMLInputElement).value;

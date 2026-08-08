@@ -61,6 +61,27 @@ describe('PassAndPlayPage', () => {
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
   });
 
+  it('remembers the names across games — the next setup opens on the last table', () => {
+    // The owner's ask: names persist on device, pass-and-play included. The
+    // roster you started with last time is the roster the next setup offers.
+    const { unmount } = renderLobby();
+    fireEvent.change(screen.getByDisplayValue('Player 1'), { target: { value: 'Ada' } });
+    fireEvent.change(screen.getByDisplayValue('Player 2'), { target: { value: 'Grace' } });
+    fireEvent.click(screen.getByRole('button', { name: /add player/i }));
+    fireEvent.change(screen.getByDisplayValue('Player 3'), { target: { value: 'Alan' } });
+    fireEvent.click(screen.getByRole('button', { name: /start game/i }));
+    unmount();
+
+    // The finished game is cleared; only the names survive.
+    localStorage.removeItem('acquire.local.game');
+    renderLobby();
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+    expect(screen.getByDisplayValue('Ada')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Grace')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Alan')).toBeInTheDocument();
+  });
+
   it('saves the deal before the board mounts, so turn one survives a refresh', () => {
     renderLobby();
     fireEvent.click(screen.getByRole('button', { name: /start game/i }));

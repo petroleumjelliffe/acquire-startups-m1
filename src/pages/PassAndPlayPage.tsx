@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { LocalSetupScreen } from '../game/setup/LocalSetupScreen';
 import { createGameSession } from '../../session/GameSession';
 import { clear, load, loadFailure, save } from '../game/local/localSave';
+import { loadNames, saveNames } from '../game/local/localNames';
 
 /** `Last played: 2 days ago` — the Continue card's line, from `savedAt`. */
 function lastPlayed(savedAt: number): string {
@@ -36,6 +37,9 @@ export function PassAndPlayPage() {
   const [confirming, setConfirming] = useState(false);
 
   const start = (config: { seed: string; names: string[] }) => {
+    // The names outlive the game they start (owner: names persist on device,
+    // across games) — the next setup opens on this table.
+    saveNames(config.names);
     // The session is built only to deal the opening state; the game route
     // rebuilds its own from the save. One mount path over there is worth one
     // throwaway construction here.
@@ -120,7 +124,7 @@ export function PassAndPlayPage() {
             </section>
           </>
         ) : (
-          <LocalSetupScreen onStart={start} />
+          <LocalSetupScreen onStart={start} initialNames={loadNames() ?? undefined} />
         )}
 
         <button

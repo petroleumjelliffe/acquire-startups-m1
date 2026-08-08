@@ -12,14 +12,24 @@ import { PlayerRoster, type Seat } from './PlayerRoster';
 export interface LocalSetupScreenProps {
   onStart: (config: { seed: string; names: string[] }) => void;
   defaultSeed?: string;
+  /**
+   * The roster to open on — the last table this device played, when the page
+   * has one. Props-in like everything else here: the screen never touches
+   * storage itself, so where the names persist is the page's business.
+   */
+  initialNames?: string[];
 }
 
 function randomSeed(): string {
   return Math.random().toString(36).slice(2, 10);
 }
 
-export function LocalSetupScreen({ onStart, defaultSeed }: LocalSetupScreenProps) {
-  const [seats, setSeats] = useState<Seat[]>([{ name: 'Player 1' }, { name: 'Player 2' }]);
+export function LocalSetupScreen({ onStart, defaultSeed, initialNames }: LocalSetupScreenProps) {
+  const [seats, setSeats] = useState<Seat[]>(() =>
+    initialNames && initialNames.length >= 2
+      ? initialNames.map((name) => ({ name }))
+      : [{ name: 'Player 1' }, { name: 'Player 2' }],
+  );
   const [seed, setSeed] = useState(() => defaultSeed ?? randomSeed());
 
   const names = seats.map((s) => s.name.trim());
