@@ -66,9 +66,29 @@ export function clearIdentity(roomId: string): void {
   }
 }
 
+/**
+ * Something a person could have meant as a name: at least one letter or digit,
+ * in any script. Emoji are neither, and neither is punctuation.
+ */
+const HAS_A_NAME_IN_IT = /[\p{L}\p{N}]/u;
+
+/**
+ * The name to reuse in the next room, or null for "let the server name me".
+ *
+ * Null for a name made only of emoji, which is a migration rather than a
+ * rule. Until 2026-08-07 a new player's name *was* an emoji — the deleted
+ * `getRandomEmojiName()` generated one and stored it here — so everybody who
+ * has already played has one sitting in this key, beside the seat's own emoji
+ * chip. Nobody chose it, so it is not carried forward.
+ *
+ * A player who genuinely wants an emoji name types it into their own row and
+ * pays for it once: `rememberName` still stores whatever it is given, and the
+ * room shows what the roster says. Only the *reuse* of an unchosen one stops.
+ */
 export function rememberedName(): string | null {
   const name = read(NAME_KEY);
-  return name === null || name.trim() === '' ? null : name;
+  if (name === null || name.trim() === '') return null;
+  return HAS_A_NAME_IN_IT.test(name) ? name : null;
 }
 
 export function rememberName(name: string): void {
