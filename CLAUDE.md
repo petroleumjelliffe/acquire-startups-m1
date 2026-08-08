@@ -32,9 +32,17 @@ not have says so by name; a dropped player shows on the seat and in the toast. S
 `docs/superpowers/specs/2026-08-07-phase-4-carry-forward.md`, and
 `2026-08-07-phase-4-by-hand-notes.md` for the five findings a human found that 661 tests could not.
 
-**Still owed by Phase 4:** the same three scenarios by hand **on prod** (everything so far is
-local), and a ruling on the cold-start copy, which still says "waking the server" when the real
-condition is online-but-unreachable.
+**Phase 4's prod debt is paid** (2026-08-07) — `specs/2026-08-07-prod-by-hand-notes.md`. A refresh
+mid-turn on Render comes back to the actor's **open draft**, undo and all, and a dropped socket
+shows the pill on one side and **the away dot on the other — observed on prod for the first time**.
+The draft also stayed private across the drop: the other player's board read `C2: empty` while it
+was held uncommitted.
+
+**Still owed:** the cold-start copy ruling (the prod pass was *device-offline*, which has its own
+honest wording; the unresolved case is **online-but-unreachable**), a recovery *time* — the
+reconnect beat the first 500ms sample, so there is still no number — and the clipped away dot,
+which needs five or six seats. The prod pass was heads-up, so the disconnected player was the
+**actor** and rotation kept them visible, which is the case that already worked.
 
 **Continuing from another machine? Start at `plans/2026-08-07-continuation.md`** — it holds the
 verify-merge-deploy steps for the pending branch, the machine-setup gotchas, and the queue.
@@ -48,13 +56,13 @@ both); and **pass-and-play persists** — one game per device in `localStorage`
 (`src/game/local/localSave.ts`), written at every segment close, resumed from `/pass-and-play`'s
 Continue card, cleared only by End game or a confirmed discard.
 
-**Pending on `revamp/online-lobby-mockup` (pushed, unmerged): protocol v2.** The board lost its
-row/column headers, the buy step gained a Pass gate so a turn cannot end over an empty basket by
-accident, and the Lobby Flow design landed — in two passes, not one. The first did Create Room
-(seats you immediately, no name form; `CreateRoomPage` deleted) and left **Join Room untouched**,
-still a separate screen with "Room code" and "Your name" inputs. An earlier version of this
-paragraph called that "implemented in full"; it was not, and the owner found it by hand on
-2026-08-07.
+**Protocol v2 is merged and deployed** (2026-08-07, `aef9428`) — `/health` reports
+`protocolVersion: 2`. The board lost its row/column headers, the buy step gained a Pass gate so a
+turn cannot end over an empty basket by accident, and the Lobby Flow design landed — in two passes,
+not one. The first did Create Room (seats you immediately, no name form; `CreateRoomPage` deleted)
+and left **Join Room untouched**, still a separate screen with "Room code" and "Your name" inputs.
+An earlier version of this paragraph called that "implemented in full"; it was not, and the owner
+found it by hand on 2026-08-07.
 
 The corrections are in
 `plans/2026-08-07-lobby-flow-corrections.md`: **New Room and Join Room are one card**
@@ -64,11 +72,18 @@ and **nothing asks for a name anywhere**, so `name` is optional on the wire and 
 an unnamed seat `Player N` from its seat index. `needName` and `JoinForm` are gone; a refused
 join gets `RoomRefused` and a retry.
 
-**`PROTOCOL_VERSION` stays 2 through all of that** — v2 has never been deployed, so its shape was
-still free to change. That stops being true the moment this merges.
+`PROTOCOL_VERSION` stayed 2 through all of that, because v2 was still undeployed and its shape was
+therefore free to change. **That window is now closed** — v2 is live, so the next wire change is a
+v3 bump and a second cutover.
 
-**Prod speaks v1 until then; merging deploys both halves in one push, and a local v2 client
-pointed at prod's v1 gets the stale-client screen — that is the feature, not a bug.**
+**A deploy is ~12 minutes, not the ~6 the older notes claim**, and `/health` goes *silent* for
+around 6½ minutes mid-restart rather than erroring — so a single poll that gives up reads as a
+failed deploy. Read the version back before believing it; the same goes for the GH Pages bundle
+hash, which served the old file for the first 90 seconds.
+
+**The next finding to build is the turn-order draw** — it resolves instantly for everyone instead
+of passing the turn. Designed, not built: `specs/2026-08-07-turn-order-draw-design.md` and
+`plans/2026-08-07-turn-order-draw.md`. It is protocol **v3** and wants its own branch off `main`.
 
 **Still open: Stage 3** — the layout gate's flakiness, with a live lead: `verify-layout.mjs`
 drives a *persistent* Chrome profile, so every run depends on run history; Stage 2 tripped over
