@@ -1,8 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import type { GameState } from '../engine/gameTypes.js';
 import { createGameRoom, type GameRoom, type RoomPlayer } from './room.js';
 import { createNullStore, SAVE_VERSION, type RoomStore, type SavedRoom } from './store.js';
 import { PROTOCOL_VERSION } from '../session/protocol.js';
+import { createLobbyRegistry, seatPlayer, type SeatHolder } from './lobby/rooms.js';
 
 export interface Seat {
   room: GameRoom;
@@ -45,101 +45,25 @@ export interface RoomRegistry {
  */
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * The one place both `create` and `join` seat somebody, and therefore the only
- * place that can name an unnamed player: the seat number is what the default
- * is made of, and the client does not know its seat until this has run.
- *
- * Nobody types a name before entering a room as of the Lobby Flow corrections
- * — both cards seat you first and let you edit your own row afterwards — so
- * an absent name is the ordinary case, not a malformed payload. A blank or
- * whitespace-only name is treated as absent rather than seating a nameless
- * row that no roster could render.
- */
-function seatPlayer(seat: number, name?: string): RoomPlayer {
-  const given = name?.trim();
-  return {
-    id: `p${seat + 1}`,
-    name: given ? given : `Player ${seat + 1}`,
-    token: randomUUID(),
-    isHost: seat === 0,
-    connected: true,
-  };
-}
-
-/** Six characters, unambiguous: no O/0 or I/1 to read out loud incorrectly. */
-function roomCode(): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out = '';
-  for (let i = 0; i < 6; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return out;
-}
-
 export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRegistry {
-  const rooms = new Map<string, GameRoom>();
+  const lobby = createLobbyRegistry<GameRoom>((id, players) => createGameRoom(id, players));
   let restored = false;
 
   return {
-    create(hostName) {
-      // Six random characters collide rarely, but "rarely" over a Map holding
-      // live games means silently orphaning one — every socket bound to the
-      // overwritten room stops resolving through `get()`, with no error raised
-      // anywhere. Retry rather than trust the odds.
-      let id = roomCode();
-      while (rooms.has(id)) id = roomCode();
+    create: (hostName) => lobby.create(hostName),
 
-      const host = seatPlayer(0, hostName);
-      const room = createGameRoom(id, [host]);
-      rooms.set(id, room);
-      return { room, player: host };
-    },
+    join: (roomId, name, playerId, token) => lobby.join(roomId, name, playerId, token),
 
-    join(roomId, name, playerId, token) {
-      const room = rooms.get(roomId);
-      if (!room) return null;
-
-      if (playerId) {
-        const existing = room.players.find((p) => p.id === playerId);
-        // A rejoin must prove itself. Without this, presenting someone else's
-        // id would bind their seat to your socket and project their hand to
-        // you — which is the whole guarantee projection exists to provide.
-        if (!existing || existing.token !== token) return null;
-        existing.connected = true;
-        return { room, player: existing };
-      }
-
-      if (room.lifecycle() !== 'lobby') {
-        // The honor-system reclaim (owner ruling, 2026-08-08): same name,
-        // same room code takes the seat back — but only a seat nobody is
-        // sitting in. A token is still the seamless path; this is for the
-        // player whose browser forgot theirs, and it matches the name the
-        // way a human retypes it. Rotated token, because the seat changed
-        // hands and the old key should die with the handover.
-        const given = name?.trim().toLowerCase();
-        if (!given) return null;
-        const abandoned = room.players.find(
-          (p) => !p.connected && p.name.trim().toLowerCase() === given,
-        );
-        if (!abandoned) return null;
-        abandoned.token = randomUUID();
-        abandoned.connected = true;
-        return { room, player: abandoned };
-      }
-      const player = seatPlayer(room.players.length, name);
-      room.players.push(player);
-      return { room, player };
-    },
-
-    get: (roomId) => rooms.get(roomId),
+    get: (roomId) => lobby.get(roomId),
 
     fromState(roomId, names, state) {
       const players = names.map((name, i) => seatPlayer(i, name));
       const room = createGameRoom(roomId, players, state);
-      rooms.set(roomId, room);
+      lobby.adopt(room);
       return room;
     },
 
-    all: () => [...rooms.values()],
+    all: () => lobby.all(),
 
     async persist(room) {
       // `committed()` throws before a game begins, so the lifecycle check is
@@ -220,8 +144,7 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
           // none. The roster broadcast that follows each rejoin is what turns
           // these back on, one seat at a time.
           const players = record.players.map((p) => ({ ...p, connected: false }));
-          rooms.set(
-            record.roomId,
+          lobby.adopt(
             createGameRoom(record.roomId, players, record.state, record.previousSegmentStart),
           );
           seated++;
