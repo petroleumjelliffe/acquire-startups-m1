@@ -6,6 +6,7 @@ import { StaleClient } from '../game/online/StaleClient';
 import { ConnectionStrip } from '../game/online/ConnectionStrip';
 import { RoomRefused } from '../game/online/RoomRefused';
 import { useRoom } from '../net/useRoom';
+import { forceUpdateAndReload } from '../pwa/update';
 import { useDevSeat } from '../net/devSeat';
 import { getConnection, closeConnection, type Connection } from '../net/connection';
 
@@ -62,12 +63,14 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
       <>
         <ConnectionStrip status={room.status} />
         {/*
-          A plain reload is the whole remedy today, because a refresh fetches
-          the current bundle. Once a service worker caches the shell this has
-          to reload past the worker instead — which is the reason the protocol
-          version landed before the PWA rather than inside it.
+          Not a plain reload any more. A service worker caches the shell, so
+          location.reload() alone can be served the same stale shell and loop
+          — the exact future the old comment here predicted, arrived. The
+          forced path activates any waiting worker, checks for a newer one,
+          clears every cache, and reloads in a finally, so there is no state
+          from which the button does nothing.
         */}
-        <StaleClient onReload={() => window.location.reload()} onExit={leave} />
+        <StaleClient onReload={() => { void forceUpdateAndReload(); }} onExit={leave} />
       </>
     );
   }

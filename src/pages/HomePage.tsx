@@ -4,6 +4,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOnline } from '../pwa/useOnline';
+import { useUpdateReady } from '../pwa/update';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -13,6 +14,11 @@ export function HomePage() {
   // Online is not offered as though it would work, with the same wording the
   // device-offline pill already uses. One vocabulary, not two.
   const online = useOnline();
+  // A new build, installed and waiting. Surfaced here and only here: the mode
+  // chooser is the one screen where nobody is mid-game, so restarting costs
+  // nothing. The ruling is next-launch activation — this button is the
+  // explicit exception, never an automatic one.
+  const update = useUpdateReady();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -60,6 +66,16 @@ export function HomePage() {
         <div className="mt-8 text-center text-xs text-gray-400">
           Both modes support 2–6 players
         </div>
+
+        {update.ready && (
+          <button
+            type="button"
+            onClick={update.apply}
+            className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            Update ready — restart the app
+          </button>
+        )}
       </div>
     </div>
   );
