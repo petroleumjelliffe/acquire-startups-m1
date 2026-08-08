@@ -3,13 +3,12 @@ import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { RoomPage } from './RoomPage';
 import type { Connection, ConnectionStatus } from '../net/connection';
+import { PROTOCOL_VERSION, type StateMessage } from '../../session/protocol';
 import {
-  PROTOCOL_VERSION,
   type JoinedMessage,
   type RejectedMessage,
   type RosterMessage,
-  type StateMessage,
-} from '../../session/protocol';
+} from '../../lobby/protocol';
 import { buildFixture } from '../../engine/golden/fixtures';
 import { loadIdentity } from '../net/identity';
 import { useRoom, type RoomPhase } from '../net/useRoom';

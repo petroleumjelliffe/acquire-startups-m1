@@ -1,14 +1,14 @@
 import { io, type Socket } from 'socket.io-client';
+import { PROTOCOL_VERSION } from '../../session/protocol';
 import {
-  CLIENT_EVENTS,
-  PROTOCOL_VERSION,
-  SERVER_EVENTS,
+  LOBBY_CLIENT_EVENTS,
+  LOBBY_SERVER_EVENTS,
   type CreateRoomMessage,
   type JoinRoomMessage,
   type RenamePlayerMessage,
   type JoinedMessage,
   type RosterMessage,
-} from '../../session/protocol';
+} from '../../lobby/protocol';
 import { createSocketTransport, type RoomTransport } from './transport';
 
 /**
@@ -116,22 +116,22 @@ function createConnection(): Connection {
       const msg: CreateRoomMessage = name === undefined
         ? { protocolVersion: PROTOCOL_VERSION }
         : { name, protocolVersion: PROTOCOL_VERSION };
-      socket.emit(CLIENT_EVENTS.createRoom, msg);
+      socket.emit(LOBBY_CLIENT_EVENTS.createRoom, msg);
     },
-    joinRoom(msg) { socket.emit(CLIENT_EVENTS.joinRoom, msg); },
-    beginGame() { socket.emit(CLIENT_EVENTS.beginGame); },
+    joinRoom(msg) { socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, msg); },
+    beginGame() { socket.emit(LOBBY_CLIENT_EVENTS.beginGame); },
     renamePlayer(name) {
       const msg: RenamePlayerMessage = { name };
-      socket.emit(CLIENT_EVENTS.renamePlayer, msg);
+      socket.emit(LOBBY_CLIENT_EVENTS.renamePlayer, msg);
     },
-    leaveSeat() { socket.emit(CLIENT_EVENTS.leaveSeat); },
+    leaveSeat() { socket.emit(LOBBY_CLIENT_EVENTS.leaveSeat); },
     onJoined(handler) {
-      socket.on(SERVER_EVENTS.joined, handler);
-      return () => { socket.off(SERVER_EVENTS.joined, handler); };
+      socket.on(LOBBY_SERVER_EVENTS.joined, handler);
+      return () => { socket.off(LOBBY_SERVER_EVENTS.joined, handler); };
     },
     onRoster(handler) {
-      socket.on(SERVER_EVENTS.roster, handler);
-      return () => { socket.off(SERVER_EVENTS.roster, handler); };
+      socket.on(LOBBY_SERVER_EVENTS.roster, handler);
+      return () => { socket.off(LOBBY_SERVER_EVENTS.roster, handler); };
     },
     close() {
       socket.disconnect();

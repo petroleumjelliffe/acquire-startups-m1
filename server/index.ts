@@ -13,20 +13,24 @@ import { createFileStore, createNullStore, SAVE_VERSION, type RoomStore } from '
 import { registerDevSeed } from './devSeed.js';
 import type { Delivery, GameRoom } from './room.js';
 import {
-  CLIENT_EVENTS,
+  GAME_CLIENT_EVENTS,
+  GAME_SERVER_EVENTS,
   PROTOCOL_VERSION,
-  SERVER_EVENTS,
-  type CreateRoomMessage,
-  type JoinRoomMessage,
-  type JoinedMessage,
-  type RenamePlayerMessage,
-  type RosterMessage,
   type StateMessage,
   type StateReason,
   type UndoMessage,
   type WireIntent,
   isWireIntent,
 } from '../session/protocol.js';
+import {
+  LOBBY_CLIENT_EVENTS,
+  LOBBY_SERVER_EVENTS,
+  type CreateRoomMessage,
+  type JoinRoomMessage,
+  type JoinedMessage,
+  type RenamePlayerMessage,
+  type RosterMessage,
+} from '../lobby/protocol.js';
 
 /** Which room and seat a socket is bound to. The client never says. */
 interface Binding {
@@ -104,7 +108,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       previousSegmentStart: room.previousSegmentStart(),
     };
     for (const socket of socketsFor(room.id, playerId)) {
-      socket.emit(SERVER_EVENTS.state, message);
+      socket.emit(GAME_SERVER_EVENTS.state, message);
     }
   }
 
@@ -141,7 +145,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
         return;
       case 'rejected':
         for (const socket of socketsFor(room.id, delivery.to)) {
-          socket.emit(SERVER_EVENTS.rejected, { code: delivery.code, message: delivery.message });
+          socket.emit(LOBBY_SERVER_EVENTS.rejected, { code: delivery.code, message: delivery.message });
         }
         sendState(room, delivery.to, 'reset');
         return;
@@ -174,7 +178,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
      */
     function speaksOurProtocol(version: unknown): boolean {
       if (version === PROTOCOL_VERSION) return true;
-      socket.emit(SERVER_EVENTS.rejected, {
+      socket.emit(LOBBY_SERVER_EVENTS.rejected, {
         code: 'versionMismatch',
         message:
           `This client speaks protocol ${String(version)}; this server speaks ${PROTOCOL_VERSION}`,
@@ -182,7 +186,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       return false;
     }
 
-    socket.on(CLIENT_EVENTS.createRoom, (msg: CreateRoomMessage) => {
+    socket.on(LOBBY_CLIENT_EVENTS.createRoom, (msg: CreateRoomMessage) => {
       // Before the shape check below, and before anything is created: a
       // client we cannot talk to must not leave a room behind, because an
       // abandoned room is persisted and restored at the next boot.
@@ -200,7 +204,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // so a throw here takes down every room in the process, not just this
       // connection.
       if (msg?.name !== undefined && typeof msg.name !== 'string') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'unknownIntent',
           message: 'createRoom name must be text',
         });
@@ -212,11 +216,11 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       void socket.join(room.id);
 
       const joined: JoinedMessage = { roomId: room.id, playerId: player.id, token: player.token };
-      socket.emit(SERVER_EVENTS.joined, joined);
-      io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
+      socket.emit(LOBBY_SERVER_EVENTS.joined, joined);
+      io.to(room.id).emit(LOBBY_SERVER_EVENTS.roster, roster(room));
     });
 
-    socket.on(CLIENT_EVENTS.joinRoom, (msg: JoinRoomMessage) => {
+    socket.on(LOBBY_CLIENT_EVENTS.joinRoom, (msg: JoinRoomMessage) => {
       // Before the room lookup, so a stale client is told it is stale rather
       // than told the room does not exist — which would send the player
       // hunting for a room that is perfectly fine.
@@ -229,7 +233,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // it. The name is not, for the same reason as `createRoom` above, and
       // a non-string one is refused for the same reason too.
       if (typeof msg?.roomId !== 'string' || (msg.name !== undefined && typeof msg.name !== 'string')) {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'unknownIntent',
           message: 'joinRoom requires a roomId, and a name must be text if given',
         });
@@ -238,7 +242,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
 
       const target = rooms.get(msg.roomId);
       if (!target) {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'noSuchRoom',
           message: `Room ${msg.roomId} is no longer available`,
         });
@@ -269,7 +273,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       seat ??= rooms.join(msg.roomId, msg.name, msg.playerId, msg.token);
 
       if (!seat) {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'seatRefused',
           message: `That seat in ${msg.roomId} is no longer yours — join again to take a new one`,
         });
@@ -286,19 +290,19 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
         playerId: seat.player.id,
         token: seat.player.token,
       };
-      socket.emit(SERVER_EVENTS.joined, joined);
-      io.to(seat.room.id).emit(SERVER_EVENTS.roster, roster(seat.room));
+      socket.emit(LOBBY_SERVER_EVENTS.joined, joined);
+      io.to(seat.room.id).emit(LOBBY_SERVER_EVENTS.roster, roster(seat.room));
 
       // `resume`, not `commit`: this socket may belong to the player the game
       // is waiting on, mid-segment, with work the server still holds.
       if (seat.room.lifecycle() !== 'lobby') sendState(seat.room, seat.player.id, 'resume');
     });
 
-    socket.on(CLIENT_EVENTS.renamePlayer, (msg: RenamePlayerMessage) => {
+    socket.on(LOBBY_CLIENT_EVENTS.renamePlayer, (msg: RenamePlayerMessage) => {
       const bound = bindings.get(socket.id);
       const room = bound && rooms.get(bound.roomId);
       if (!bound || !room) {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'notConnected',
           message: 'No seat to rename — join a room first',
         });
@@ -308,7 +312,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // and a rename after that leaves the roster and the log disagreeing
       // about who did what.
       if (room.lifecycle() !== 'lobby') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'wrongStage',
           message: 'Names are settled once the game starts',
         });
@@ -316,7 +320,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       }
       const name = typeof msg?.name === 'string' ? msg.name.trim() : '';
       if (name === '') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'unknownIntent',
           message: 'renamePlayer requires a name',
         });
@@ -327,17 +331,17 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       const player = room.players.find((p) => p.id === bound.playerId);
       if (!player) return;
       player.name = name;
-      io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
+      io.to(room.id).emit(LOBBY_SERVER_EVENTS.roster, roster(room));
     });
 
-    socket.on(CLIENT_EVENTS.leaveSeat, () => {
+    socket.on(LOBBY_CLIENT_EVENTS.leaveSeat, () => {
       const bound = bindings.get(socket.id);
       const room = bound && rooms.get(bound.roomId);
       if (!bound || !room) return;
       // Mid-game leaving is a disconnect, which keeps the seat and marks it
       // away — the game waits. Only a lobby seat can be given up.
       if (room.lifecycle() !== 'lobby') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'wrongStage',
           message: 'A started game keeps its seats — closing the tab is enough',
         });
@@ -353,17 +357,17 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
 
       bindings.delete(socket.id);
       void socket.leave(room.id);
-      io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
+      io.to(room.id).emit(LOBBY_SERVER_EVENTS.roster, roster(room));
     });
 
-    socket.on(CLIENT_EVENTS.beginGame, () => {
+    socket.on(LOBBY_CLIENT_EVENTS.beginGame, () => {
       const bound = bindings.get(socket.id);
       const room = bound && rooms.get(bound.roomId);
       if (!bound || !room) return;
 
       const host = room.players.find((p) => p.isHost);
       if (host?.id !== bound.playerId) {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'notYourTurn',
           message: 'only the host may begin the game',
         });
@@ -378,7 +382,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // crash into a clean rejection; they are not redundant with anything
       // upstream.
       if (room.lifecycle() !== 'lobby') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'wrongStage',
           message: 'the game has already begun',
         });
@@ -386,16 +390,16 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       }
 
       const delivery = room.begin(randomSeed());
-      io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
+      io.to(room.id).emit(LOBBY_SERVER_EVENTS.roster, roster(room));
       deliver(room, delivery);
     });
 
-    socket.on(CLIENT_EVENTS.intent, (wire: WireIntent) => {
+    socket.on(GAME_CLIENT_EVENTS.intent, (wire: WireIntent) => {
       const bound = bindings.get(socket.id);
       const room = bound && rooms.get(bound.roomId);
       if (!bound || !room) return;
       if (room.lifecycle() === 'lobby') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'wrongStage',
           message: 'the game has not begun',
         });
@@ -417,7 +421,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       // a clean rejection, same as the shape checks on `createRoom`/`joinRoom`/
       // `undo`.
       if (!isWireIntent(wire)) {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'unknownIntent',
           message: 'malformed intent payload',
         });
@@ -426,19 +430,19 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       deliver(room, room.dispatch(bound.playerId, wire));
     });
 
-    socket.on(CLIENT_EVENTS.undo, (msg: UndoMessage) => {
+    socket.on(GAME_CLIENT_EVENTS.undo, (msg: UndoMessage) => {
       const bound = bindings.get(socket.id);
       const room = bound && rooms.get(bound.roomId);
       if (!bound || !room) return;
       if (room.lifecycle() === 'lobby') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'wrongStage',
           message: 'the game has not begun',
         });
         return;
       }
       if (typeof msg?.stepId !== 'number') {
-        socket.emit(SERVER_EVENTS.rejected, {
+        socket.emit(LOBBY_SERVER_EVENTS.rejected, {
           code: 'undoOutOfSegment',
           message: 'undo requires a numeric stepId',
         });
@@ -459,7 +463,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
       if (socketsFor(room.id, bound.playerId).length === 0) {
         const player = room.players.find((p) => p.id === bound.playerId);
         if (player) player.connected = false;
-        io.to(room.id).emit(SERVER_EVENTS.roster, roster(room));
+        io.to(room.id).emit(LOBBY_SERVER_EVENTS.roster, roster(room));
       }
     });
   });

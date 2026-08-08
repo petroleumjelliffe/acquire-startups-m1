@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PROTOCOL_VERSION, type RosterMessage } from '../../session/protocol';
+import { PROTOCOL_VERSION } from '../../session/protocol';
+import type { RosterMessage } from '../../lobby/protocol';
 import { getConnection, type Connection, type ConnectionStatus } from './connection';
 import { createNetworkSession, type NetworkSession } from './NetworkSession';
 import { clearIdentity, loadIdentity, rememberName, rememberedName, saveIdentity } from './identity';

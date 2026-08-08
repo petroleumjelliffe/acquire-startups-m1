@@ -1,14 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { ALL_GOLDEN_GAMES } from '../engine/golden';
-import type { CreateRoomMessage, JoinRoomMessage, RejectionCode, WireIntent } from './protocol';
+import type { RejectionCode, WireIntent } from './protocol';
 import {
-  CLIENT_EVENTS,
-  SERVER_EVENTS,
+  GAME_CLIENT_EVENTS,
+  GAME_SERVER_EVENTS,
   DRAWS,
   PROTOCOL_VERSION,
   toWire,
   isWireIntent,
 } from './protocol';
+import type { CreateRoomMessage, JoinRoomMessage } from '../lobby/protocol';
+import { LOBBY_CLIENT_EVENTS, LOBBY_SERVER_EVENTS } from '../lobby/protocol';
 
 /**
  * Compile-time exhaustiveness. If `Intent` gains a member this Record stops
@@ -73,8 +75,8 @@ describe('WireIntent', () => {
 
 describe('event names', () => {
   it('are distinct across directions, so a handler cannot be wired backwards', () => {
-    const client = Object.values(CLIENT_EVENTS);
-    const server = Object.values(SERVER_EVENTS);
+    const client = [...Object.values(LOBBY_CLIENT_EVENTS), ...Object.values(GAME_CLIENT_EVENTS)];
+    const server = [...Object.values(LOBBY_SERVER_EVENTS), ...Object.values(GAME_SERVER_EVENTS)];
     expect(new Set([...client, ...server]).size).toBe(client.length + server.length);
   });
 });

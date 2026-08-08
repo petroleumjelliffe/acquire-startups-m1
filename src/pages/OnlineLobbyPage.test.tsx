@@ -3,7 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { OnlineLobbyPage } from './OnlineLobbyPage';
 import type { Connection } from '../net/connection';
-import type { JoinedMessage, RejectedMessage } from '../../session/protocol';
+import type { JoinedMessage, RejectedMessage } from '../../lobby/protocol';
 
 // `CreateRoomPage.test.tsx`'s coverage, carried here when that page was
 // deleted: the Lobby Flow design has no name form in front of a room, so

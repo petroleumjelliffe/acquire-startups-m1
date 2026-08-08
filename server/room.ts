@@ -3,6 +3,7 @@ import type { Intent } from '../engine/intents.js';
 import { createInitialGame } from '../engine/gameInit.js';
 import { createGameSession, type GameSession } from '../session/GameSession.js';
 import { DRAWS, type RejectionCode, type WireIntent } from '../session/protocol.js';
+import type { Lifecycle } from '../lobby/protocol.js';
 
 export interface RoomPlayer {
   id: string;
@@ -13,7 +14,7 @@ export interface RoomPlayer {
   connected: boolean;
 }
 
-export type Lifecycle = 'lobby' | 'playing' | 'over';
+export type { Lifecycle };
 
 /**
  * What the transport must do next. The room computes it and sends nothing:

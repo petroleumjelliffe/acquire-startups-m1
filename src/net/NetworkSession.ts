@@ -5,7 +5,7 @@ import {
   type SessionView,
 } from '../../session/GameSession';
 import type { Intent } from '../../engine/intents';
-import { DRAWS, toWire, type StateMessage } from '../../session/protocol';
+import { DRAWS, toWire, type RejectionCode, type StateMessage } from '../../session/protocol';
 import type { RoomTransport } from './transport';
 
 export interface NetworkSession extends GameSession {
@@ -106,7 +106,12 @@ export function createNetworkSession(
   });
 
   const offRejected = transport.onRejected((msg) => {
-    rejection = { code: msg.code, message: msg.message };
+    // `RejectedMessage.code` is `string` on the wire type — `lobby/protocol.ts`
+    // is game-agnostic and cannot name `RejectionCode`, which lives here and
+    // depends on the engine. The server only ever sends a real `RejectionCode`
+    // on this channel; this narrows back to what `SessionError` has always
+    // required.
+    rejection = { code: msg.code as RejectionCode, message: msg.message };
     pending = false;
     // The undo was refused, so its replacement is meaningless: the step it
     // meant to replace is still there.

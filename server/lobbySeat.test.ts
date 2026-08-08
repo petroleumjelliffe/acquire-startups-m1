@@ -13,14 +13,14 @@ import { io as connect, type Socket } from 'socket.io-client';
 import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import { connectPlayer } from './socketHarness.js';
+import { PROTOCOL_VERSION } from '../session/protocol.js';
 import {
-  CLIENT_EVENTS,
-  SERVER_EVENTS,
-  PROTOCOL_VERSION,
+  LOBBY_CLIENT_EVENTS,
+  LOBBY_SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
   type RosterMessage,
-} from '../session/protocol.js';
+} from '../lobby/protocol.js';
 
 let server: TestServer;
 
@@ -52,22 +52,22 @@ async function seat(action: 'create' | { join: string }, name?: string): Promise
   const socket = await raw();
   const rosters: RosterMessage[] = [];
   const rejections: RejectedMessage[] = [];
-  socket.on(SERVER_EVENTS.roster, (m: RosterMessage) => rosters.push(m));
-  socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+  socket.on(LOBBY_SERVER_EVENTS.roster, (m: RosterMessage) => rosters.push(m));
+  socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
   const joined = new Promise<JoinedMessage>((resolve, reject) => {
     const timer = setTimeout(
       () => reject(new Error(`${name ?? 'the unnamed player'} never seated`)),
       4000,
     );
-    socket.once(SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
+    socket.once(LOBBY_SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
   });
 
   const said = name === undefined ? {} : { name };
   if (action === 'create') {
-    socket.emit(CLIENT_EVENTS.createRoom, { ...said, protocolVersion: PROTOCOL_VERSION });
+    socket.emit(LOBBY_CLIENT_EVENTS.createRoom, { ...said, protocolVersion: PROTOCOL_VERSION });
   } else {
-    socket.emit(CLIENT_EVENTS.joinRoom, {
+    socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, {
       roomId: action.join, ...said, protocolVersion: PROTOCOL_VERSION,
     });
   }
@@ -110,7 +110,7 @@ describe('a seat taken without a name', () => {
     const host = await seat('create');
 
     try {
-      host.socket.emit(CLIENT_EVENTS.renamePlayer, { name: 'Alex' });
+      host.socket.emit(LOBBY_CLIENT_EVENTS.renamePlayer, { name: 'Alex' });
       await settleSocket(host.socket);
 
       expect(host.rosters.at(-1)!.players.map((p) => p.name)).toEqual(['Alex']);
@@ -120,12 +120,12 @@ describe('a seat taken without a name', () => {
   });
 
   it.each([
-    ['createRoom', CLIENT_EVENTS.createRoom, {}],
-    ['joinRoom', CLIENT_EVENTS.joinRoom, { roomId: 'ABC123' }],
+    ['createRoom', LOBBY_CLIENT_EVENTS.createRoom, {}],
+    ['joinRoom', LOBBY_CLIENT_EVENTS.joinRoom, { roomId: 'ABC123' }],
   ])('%s still refuses a name that is not a string', async (_label, event, extra) => {
     const socket = await raw();
     const rejections: RejectedMessage[] = [];
-    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+    socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
     try {
       // 42 is not a missing name, it is a wrong one — the shape hazard the
@@ -147,7 +147,7 @@ describe('renamePlayer', () => {
     const guest = await seat({ join: roomId }, 'Player 2');
 
     try {
-      guest.socket.emit(CLIENT_EVENTS.renamePlayer, { name: 'Sam' });
+      guest.socket.emit(LOBBY_CLIENT_EVENTS.renamePlayer, { name: 'Sam' });
       await settleSocket(guest.socket);
       await settleSocket(host.socket);
 
@@ -167,7 +167,7 @@ describe('renamePlayer', () => {
     const host = await seat('create', 'Alex');
 
     try {
-      host.socket.emit(CLIENT_EVENTS.renamePlayer, { name: '   ' });
+      host.socket.emit(LOBBY_CLIENT_EVENTS.renamePlayer, { name: '   ' });
       await settleSocket(host.socket);
 
       expect(host.rejections.map((r) => r.code)).toEqual(['unknownIntent']);
@@ -190,7 +190,7 @@ describe('renamePlayer', () => {
     );
 
     try {
-      alex.socket.emit(CLIENT_EVENTS.renamePlayer, { name: 'Alexander' });
+      alex.socket.emit(LOBBY_CLIENT_EVENTS.renamePlayer, { name: 'Alexander' });
       await settleSocket(alex.socket);
 
       expect(alex.rejections.map((r) => r.code)).toEqual(['wrongStage']);
@@ -203,10 +203,10 @@ describe('renamePlayer', () => {
   it('does nothing for a socket that holds no seat', async () => {
     const socket = await raw();
     const rejections: RejectedMessage[] = [];
-    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+    socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
     try {
-      socket.emit(CLIENT_EVENTS.renamePlayer, { name: 'Nobody' });
+      socket.emit(LOBBY_CLIENT_EVENTS.renamePlayer, { name: 'Nobody' });
       await settleSocket(socket);
 
       expect(rejections.map((r) => r.code)).toEqual(['notConnected']);
@@ -223,7 +223,7 @@ describe('leaveSeat', () => {
     const guest = await seat({ join: roomId }, 'Sam');
 
     try {
-      guest.socket.emit(CLIENT_EVENTS.leaveSeat);
+      guest.socket.emit(LOBBY_CLIENT_EVENTS.leaveSeat);
       await settleSocket(guest.socket);
       await settleSocket(host.socket);
 
@@ -243,7 +243,7 @@ describe('leaveSeat', () => {
     const guest = await seat({ join: roomId }, 'Sam');
 
     try {
-      host.socket.emit(CLIENT_EVENTS.leaveSeat);
+      host.socket.emit(LOBBY_CLIENT_EVENTS.leaveSeat);
       await settleSocket(host.socket);
       await settleSocket(guest.socket);
 
@@ -271,7 +271,7 @@ describe('leaveSeat', () => {
     );
 
     try {
-      alex.socket.emit(CLIENT_EVENTS.leaveSeat);
+      alex.socket.emit(LOBBY_CLIENT_EVENTS.leaveSeat);
       await settleSocket(alex.socket);
 
       expect(alex.rejections.map((r) => r.code)).toEqual(['wrongStage']);

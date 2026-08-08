@@ -3,7 +3,7 @@
 // already in the room it names, and the list holds everybody. Its Join Room
 // twin is `JoinRoomCard`; both are drawn by `LobbyCard`.
 
-import type { RosterMessage } from '../../../session/protocol';
+import type { RosterMessage } from '../../../lobby/protocol';
 import { LobbyCard, SeatRow, seatEmoji } from './LobbyCard';
 
 export interface RoomLobbyProps {

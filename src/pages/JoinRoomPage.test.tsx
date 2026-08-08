@@ -3,12 +3,12 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { JoinRoomPage } from './JoinRoomPage';
 import type { Connection } from '../net/connection';
+import { PROTOCOL_VERSION } from '../../session/protocol';
 import {
-  PROTOCOL_VERSION,
   type JoinedMessage,
   type JoinRoomMessage,
   type RejectedMessage,
-} from '../../session/protocol';
+} from '../../lobby/protocol';
 
 function fakeConnection() {
   let joined: ((m: JoinedMessage) => void) | null = null;
