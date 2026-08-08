@@ -87,7 +87,10 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
    *
    * Nobody's, until the draw has decided who goes first — online as much as
    * pass-and-play (owner ruling): a hand highlighted under the draw button
-   * reads as a turn already begun, whichever device it is on. After that,
+   * reads as a turn already begun, whichever device it is on. The engine now
+   * deals no hands until the last draw lands, so at the draw there is usually
+   * nothing to hide — this branch is the belt for any state that still has
+   * one, such as a save written before the deal moved. After the draw,
    * online shows me and pass-and-play shows the actor.
    */
   const viewer = state.stage === 'draw'

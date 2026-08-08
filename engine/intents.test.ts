@@ -807,12 +807,46 @@ describe('drawTurnOrderTile', () => {
     expect(placed.every(([, c]) => c.startupId === undefined)).toBe(true);
   });
 
+  /**
+   * The owner's sequencing, which is tabletop Acquire's: the draw to go first
+   * pulls from the *entire* bag, and only then are hands drawn from what is
+   * left — the bag minus the tiles now on the board. Hands dealt at init made
+   * the twelve dealt tiles undrawable for turn order, which is the procedure
+   * backwards.
+   */
+  it('draws for turn order from the whole bag — no hands are dealt yet', () => {
+    const state = createInitialGame('open-7', ['Alex', 'Sam', 'Jo']);
+
+    expect(state.bag).toHaveLength(108);
+    for (const p of state.players) expect(p.hand).toEqual([]);
+  });
+
+  it('deals hands round-robin in seat order once the last draw lands', () => {
+    const state = createInitialGame('open-7', ['Alex', 'Sam', 'Jo']);
+    const bag = [...state.bag];
+
+    const next = drawAll(state);
+
+    // The three turn-order tiles came off the top of the bag; the deal starts
+    // at bag[3], one tile per seat per round — consecutive positions go to
+    // different players, which is what keeps the odds even across the table.
+    for (let i = 0; i < 3; i++) {
+      expect(next.players[i].hand).toEqual(
+        [0, 1, 2, 3, 4, 5].map((round) => bag[3 + i + round * 3]),
+      );
+    }
+    expect(next.bag).toEqual(bag.slice(3 + 18));
+  });
+
   it('takes the starting tiles out of the bag rather than returning them', () => {
     const state = createInitialGame('open-1', ['Alex', 'Sam', 'Jo']);
     const before = state.bag.length;
     const next = drawAll(state);
 
-    expect(next.bag).toHaveLength(before - 3);
+    // Three turn-order tiles to the board, then six per hand off the top of
+    // what remained — the legacy opening pushed drawn tiles back onto the
+    // bag, which is the double-count this test exists to keep dead.
+    expect(next.bag).toHaveLength(before - 3 - 18);
     const placedCoords = Object.entries(next.board)
       .filter(([, c]) => c.placed)
       .map(([coord]) => coord);

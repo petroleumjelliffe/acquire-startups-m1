@@ -136,7 +136,7 @@ describe('changing your mind about a tile', () => {
 });
 
 describe('GameScreen at the turn-order draw', () => {
-  /** A fresh game: hands are dealt, but the draw has not happened. */
+  /** A fresh game: the draw has not happened, so no hands exist yet. */
   function atDraw() {
     return createGameSession({ seed: 'draw-1', names: ['Alex', 'Sam'] });
   }

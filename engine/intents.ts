@@ -15,6 +15,7 @@ import {
   getSharePrice,
   endBuyPhase,
 } from './gameLogic';
+import { dealStartingHands } from './gameInit';
 
 /**
  * The single server-authoritative vocabulary of player actions. Field names are
@@ -465,6 +466,12 @@ function doDrawTurnOrderTile(
     tok.tile(winner.tile),
     tok.text(' and plays first'),
   ]);
+
+  // Only now do hands exist: drawn from the bag minus the tiles the draw just
+  // put on the board, round-robin so the odds stay even. Inside the same
+  // intent as the winner's announcement, so no state ever has an order but no
+  // hands.
+  dealStartingHands(state);
 
   state.stage = 'play';
 }
