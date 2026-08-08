@@ -15,7 +15,9 @@ export interface RevealOverlayProps {
 
 export function RevealOverlay({ playerName, emoji, onReveal }: RevealOverlayProps) {
   return (
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white/95">
+    // Fully opaque (owner, hotseat pass): at 95% the board's positions read
+    // straight through the veil, and this overlay exists to hide them.
+    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white">
       {emoji && <span className="text-4xl leading-none">{emoji}</span>}
       <div className="text-lg font-bold text-gray-800">{`Pass to ${playerName}`}</div>
       {/*

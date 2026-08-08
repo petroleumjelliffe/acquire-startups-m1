@@ -28,6 +28,13 @@ export interface TileProps {
    * for inline use in the log where there is no affiliation to compose with.
    */
   selected?: boolean;
+  /**
+   * Pointer presence, for the panel's hand tiles: the board highlights a hand
+   * cell only while its panel twin is pointed at. Orthogonal to `onClick` —
+   * a tile can be worth pointing at (where is it?) with nothing to press.
+   */
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 // `m-0` is deliberate: a legacy global `button{margin:1px}` in styles/index.css
@@ -50,7 +57,7 @@ const STATE_CLASSES: Record<TileState, string> = {
 
 const SELECTED = 'outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]';
 
-export function Tile({ coord, state, brand, onClick, fill, selected }: TileProps) {
+export function Tile({ coord, state, brand, onClick, fill, selected, onMouseEnter, onMouseLeave }: TileProps) {
   const brandClasses = brand ? BRAND_CLASSES[brand] : null;
 
   // Chain members wear the brand ring so neighbouring rings overlap into a
@@ -109,6 +116,8 @@ export function Tile({ coord, state, brand, onClick, fill, selected }: TileProps
         data-tile-state={state}
         disabled={state === 'blocked'}
         onClick={onClick}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
       >
         {body}
       </button>
@@ -116,7 +125,13 @@ export function Tile({ coord, state, brand, onClick, fill, selected }: TileProps
   }
 
   return (
-    <span className={className} title={coord} data-tile-state={state}>
+    <span
+      className={className}
+      title={coord}
+      data-tile-state={state}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       {body}
     </span>
   );

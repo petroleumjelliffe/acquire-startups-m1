@@ -55,6 +55,13 @@ export interface TurnPanelContext {
    * tiles inert rather than a click that only produces an error.
    */
   onPlaceTile?: (coord: Coord) => void;
+  /**
+   * The pointer entering (coord) or leaving (null) a hand tile here. The
+   * screen turns it into the board's one highlighted cell — nothing on the
+   * board lights up on its own (owner, hotseat pass). Wired whether or not
+   * the viewer can act: "where is my A1" is worth answering while watching.
+   */
+  onHoverTile?: (coord: Coord | null) => void;
 }
 
 /** Everything a turn stages locally before committing it as one intent. */
@@ -105,7 +112,7 @@ export function useTurnPanel(
   view: SessionView,
   dispatch: (intent: Intent) => void,
   canAct: boolean = true,
-  { viewer, onPlaceTile }: TurnPanelContext = {},
+  { viewer, onPlaceTile, onHoverTile }: TurnPanelContext = {},
 ): TurnPanelSlots {
   const { state, actorId, error, pending } = view;
   /** Founded this turn, so its shares are new to the table. */
@@ -268,6 +275,8 @@ export function useTurnPanel(
                         onClick={
                           onPlaceTile && !isDead ? () => onPlaceTile(coord) : undefined
                         }
+                        onMouseEnter={onHoverTile ? () => onHoverTile(coord) : undefined}
+                        onMouseLeave={onHoverTile ? () => onHoverTile(null) : undefined}
                       />
                     );
                   })}

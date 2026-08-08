@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { GameSession } from '../../session/GameSession';
 import type { Intent } from '../../engine/intents';
 import type { Coord } from '../../engine/gameHelpers';
@@ -142,11 +143,18 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
       }
     : undefined;
 
+  // The board's one highlighted cell: the hand tile whose panel twin the
+  // pointer is on. Nothing else on the board lights up (owner, hotseat pass).
+  // Not reset on stage or actor changes because it does not need to be — the
+  // board ignores a highlight that is not in the current hand.
+  const [hoverTile, setHoverTile] = useState<Coord | null>(null);
+
   // The panel shows the same seat the board does — one resolution of "whose
   // tiles are these", passed to both.
   const { active, staging } = useTurnPanel(view, (intent) => session.dispatch(intent), canAct, {
     viewer,
     onPlaceTile: placeTile,
+    onHoverTile: setHoverTile,
   });
 
   /**
@@ -199,6 +207,7 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
           owners={ownerBadges(state)}
           hqTiles={foundingTiles(state)}
           landed={lastPlacedTile(state)}
+          highlight={hoverTile}
           onCellClick={placeTile}
         />
       </div>

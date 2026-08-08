@@ -32,6 +32,15 @@ export interface BoardProps {
    * someone else's turn lands on your screen all at once.
    */
   landed?: Coord | null;
+  /**
+   * The one hand tile to light up — the one whose twin in the panel is being
+   * pointed at. Nothing on the board is highlighted automatically (owner,
+   * hotseat pass): the whole hand lit at once read as six placements already
+   * made. Only applies to a cell actually in `hand`, so a stale hover after a
+   * placement paints nothing; and it changes only the paint — an
+   * unhighlighted hand cell is still tappable.
+   */
+  highlight?: Coord | null;
   onCellClick?: (c: Coord) => void;
 }
 
@@ -53,6 +62,7 @@ export function Board({
   blocked = [],
   hqTiles = [],
   landed = null,
+  highlight = null,
   onCellClick,
 }: BoardProps) {
   return (
@@ -76,6 +86,7 @@ export function Board({
           blocked={blocked}
           hqTiles={hqTiles}
           landed={landed}
+          highlight={highlight}
           onCellClick={onCellClick}
         />
       ))}
@@ -92,6 +103,7 @@ function RowCells({
   blocked,
   hqTiles,
   landed,
+  highlight,
   onCellClick,
 }: Required<Omit<BoardProps, 'onCellClick'>> & { row: (typeof ROWS)[number]; onCellClick?: (c: Coord) => void }) {
   return (
@@ -107,13 +119,16 @@ function RowCells({
         const isBlocked = inHand && blocked.includes(id);
         const owner = owners[id];
 
+        // A hand cell wears its highlight only while pointed at; the rest of
+        // the time it looks like any empty cell, and only the pointer (or a
+        // tap) knows the difference.
         const state = founded
           ? hqTiles.includes(id)
             ? 'founded'
             : 'chain'
           : cell.placed
             ? 'filled'
-            : inHand
+            : inHand && highlight === id
               ? isBlocked
                 ? 'blocked'
                 : 'hand'

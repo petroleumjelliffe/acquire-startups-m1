@@ -366,8 +366,11 @@ describe('the first state message starts the game', () => {
     });
     f.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
 
-    // A1 starts out in Sam's hand — a clickable tile.
-    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
+    // A1 starts out in Sam's hand. The board no longer badges hand cells on
+    // its own, and Alex is the actor so the cell is not a control either —
+    // the panel's hand is where the viewer's tiles are always visible.
+    const panelHand = () => document.querySelector('[data-panel-hand]') as HTMLElement;
+    expect(within(panelHand()).getByTitle('A1')).toBeInTheDocument();
 
     // A second state — the kind a real commit sends after a move — with A1
     // now placed on the board and a new tile, B2, drawn into the hand. This
@@ -384,10 +387,11 @@ describe('the first state message starts the game', () => {
     });
     f.sendState({ state: afterMove, reason: 'commit', segmentStart: afterMove.nextStepId });
 
-    // A1 is now a settled board tile, not a hand button.
-    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+    // A1 is now a settled board tile, not a hand tile.
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'filled');
+    expect(within(panelHand()).queryByTitle('A1')).toBeNull();
     // B2 is the new hand tile.
-    expect(onBoard('B2')).toHaveAttribute('data-tile-state', 'hand');
+    expect(within(panelHand()).getByTitle('B2')).toBeInTheDocument();
   });
 });
 
@@ -746,12 +750,13 @@ describe('a refresh mid-turn', () => {
       currentPlayerIndex: 1,
     });
     first.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
-    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
+    // In hand: a clickable cell (unhighlighted until pointed at).
+    expect(onBoard('A1').tagName).toBe('BUTTON');
 
     // Sam plays their tile. The segment is open and uncommitted: the server
     // holds a draft, and nothing has been broadcast.
     fireEvent.click(onBoard('A1'));
-    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'filled');
 
     // The refresh.
     unmount();
@@ -790,7 +795,7 @@ describe('a refresh mid-turn', () => {
     // state — which is what a rejoin got before Phase 4 — would put A1 back
     // in the hand while the server still believed it was played.
     expect(screen.getByTestId('game-surface')).toBeInTheDocument();
-    expect(onBoard('A1')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'filled');
   });
 });
 

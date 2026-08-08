@@ -101,6 +101,42 @@ describe('GameScreen', () => {
   });
 });
 
+describe('the hand highlight follows the pointer', () => {
+  /**
+   * The owner's hotseat pass: the board highlights nothing automatically —
+   * six lit cells read as six placements already made. A cell lights only
+   * while its twin in the panel's hand is pointed at, one at a time, and an
+   * unhighlighted cell is still the move.
+   */
+  it('lights a board cell only while its panel twin is pointed at', () => {
+    const { container } = render(<GameScreen session={createGameSession({ state: playable() })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
+
+    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'empty');
+    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'empty');
+
+    const panelHand = container.querySelector('[data-panel-hand]')!;
+    fireEvent.mouseOver(within(panelHand as HTMLElement).getByTitle('E6'));
+
+    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'empty');
+
+    fireEvent.mouseOut(within(panelHand as HTMLElement).getByTitle('E6'));
+    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'empty');
+  });
+
+  it('places from an unhighlighted board cell all the same', () => {
+    render(<GameScreen session={createGameSession({ state: playable() })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
+
+    // No hover anywhere — the cell looks empty and is still the move.
+    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'empty');
+    fireEvent.click(onBoard('E6'));
+
+    expect(screen.getByText(/found a startup/i)).toBeInTheDocument();
+  });
+});
+
 describe('changing your mind about a tile', () => {
   function placedE6() {
     render(<GameScreen session={createGameSession({ state: playable() })} />);
@@ -117,9 +153,12 @@ describe('changing your mind about a tile', () => {
 
     fireEvent.click(onBoard('H8'));
 
-    // H8 is played, E6 is back in hand, and nothing was refused.
-    expect(onBoard('H8')).not.toHaveAttribute('data-tile-state', 'hand');
-    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'hand');
+    // H8 is played, E6 is back in hand — a clickable cell again, wearing no
+    // highlight because nothing does until pointed at — and nothing was
+    // refused.
+    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'filled');
+    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'empty');
+    expect(onBoard('E6').tagName).toBe('BUTTON');
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
@@ -130,8 +169,11 @@ describe('changing your mind about a tile', () => {
 
     fireEvent.click(onBoard('H8'));
 
-    expect(onBoard('E6')).not.toHaveAttribute('data-tile-state', 'hand');
-    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'hand');
+    // E6 stands — part of the chain it founded — and H8 is not even a
+    // control any more, so the click above could do nothing at all.
+    expect(onBoard('E6')).not.toHaveAttribute('data-tile-state', 'empty');
+    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'empty');
+    expect(onBoard('H8').tagName).toBe('SPAN');
   });
 });
 
@@ -322,18 +364,20 @@ describe('GameScreen with a viewer who is not the actor', () => {
     expect(screen.queryByTestId('curtain')).toBeNull();
   });
 
-  it('shows me my own hand while someone else acts', () => {
-    render(watching());
-    // Every board coordinate renders a labelled cell regardless of occupancy
-    // — `queryByTitle` alone can't tell "not shown" from "shown as an inert
-    // empty square" (both carry `title={coord}`). A hand tile is the one
-    // rendered as a clickable `<button>`; an untouched square is a `<span>`.
-    // `data-tile-state`, not the tag: a hand tile with nothing to do is
-    // deliberately no longer a `<button>`, so the tag can no longer tell
-    // "mine" from "not mine". The state can, and is what the badge means.
+  it('shows me my own hand in the panel, lit on the board only when pointed at', () => {
+    // The hand lives in the panel; the board highlights nothing on its own
+    // (owner, hotseat pass). Pointing at a panel tile answers "where is my
+    // A1" — wired even while watching, when there is nothing to press.
+    const { container } = render(watching());
+
+    const panelHand = container.querySelector('[data-panel-hand]')!;
+    expect(within(panelHand as HTMLElement).getByTitle('A1')).toBeInTheDocument();
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'empty');
+
+    fireEvent.mouseOver(within(panelHand as HTMLElement).getByTitle('A1'));
     expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
-    expect(onBoard('E6')).not.toHaveAttribute('data-tile-state', 'hand');
-    expect(onBoard('H8')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'empty');
+    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'empty');
   });
 
   it('says whose turn it is where you cannot miss it, and offers nothing', () => {
