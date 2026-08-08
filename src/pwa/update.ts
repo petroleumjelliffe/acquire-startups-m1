@@ -19,8 +19,17 @@ import { useCallback, useEffect, useState } from 'react';
  *   precache;
  * - delete every cache, so nothing stale can be served in the window before
  *   the new worker owns fetches;
- * - reload in a `finally`, so even total failure of the above still produces
- *   a fresh network-first navigation.
+ * - navigate to the app root in a `finally`, so even total failure of the
+ *   above still produces a fresh network-first navigation.
+ *
+ * The root, not a reload of the current URL. With the worker just
+ * unregistered, nothing serves SPA deep links except the host's own
+ * fallback — and that is host-specific (GH Pages has the 404.html redirect;
+ * the local test mount had nothing and answered the recovery with a bare
+ * 404, observed live). `index.html` at the base is a real file on any static
+ * host, so landing there depends on nobody. The player lands on the mode
+ * chooser running the fixed client; their room seat survives in
+ * localStorage and one join re-seats them.
  */
 export async function forceUpdateAndReload(): Promise<void> {
   try {
@@ -32,9 +41,9 @@ export async function forceUpdateAndReload(): Promise<void> {
       for (const key of await caches.keys()) await caches.delete(key);
     }
   } catch {
-    // Fall through to the reload regardless — see above.
+    // Fall through to the navigation regardless — see above.
   } finally {
-    window.location.reload();
+    window.location.replace(import.meta.env.BASE_URL.replace(/\/?$/, '/'));
   }
 }
 

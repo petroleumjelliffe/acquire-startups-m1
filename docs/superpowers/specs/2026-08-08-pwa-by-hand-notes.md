@@ -55,3 +55,29 @@ bug that survives its own fix being deployed. That drive happens **before the ap
 anyone**, per the owner's recorded deadline. Also untested: a real phone (the offline drive used
 desktop Chrome), and iOS's historical eviction of `localStorage` under storage pressure, accepted
 as a known weakness in the design.
+
+## Addendum: the protocol-bump update drama, driven locally (same day)
+
+The owner asked for the version-bump path to be tested before any deploy, and it was — twice,
+because the first run found a bug.
+
+**The stage:** a production build served worker-style on the Pages-shaped mount, pointed at a
+local game server (`VITE_SERVER_URL` override at build; the first attempt silently tested against
+*real prod* because `.env.production` bakes the Render URL into every default build — worth
+remembering). Client cached at protocol N, sitting in a real room it created.
+
+**The drama, as it would happen in prod:** the server deploys N+1 → the restart drops the socket →
+the reconnect offers N and is refused → `StaleClient` appears mid-room. The client fix deploys.
+The player presses **Reload to update** once → lands on the mode chooser running the new client,
+worker re-registered, all 8 files re-cached.
+
+**What the first run found:** the recovery reloaded the *deep room URL* after unregistering the
+worker — leaving nothing to serve an SPA route except the host's fallback. GH Pages has one
+(404.html); the test mount did not, and the recovery landed on a bare 404. Fixed: the button now
+navigates to the app root, which is a real file on any host. The player's seat survives in
+localStorage; one join re-seats them.
+
+**Still untested, unchanged:** the same drama on a *real installed app* (no tab to close,
+OS-managed lifecycle, iOS) — that needs the deploy, and remains the cutoff before the app is
+handed to anyone. The phone cannot test any of this from a LAN dev URL: no secure context, no
+worker, no offline.
