@@ -471,9 +471,33 @@ function randomSeed(): string {
   return Math.random().toString(36).slice(2, 12);
 }
 
+/**
+ * Where rooms are persisted.
+ *
+ * `server/games/` is right for development and wrong for the deployment: on
+ * Render that path lives on the instance's ephemeral filesystem, so every
+ * deploy and every restart empties it. That — not the plan, and not any
+ * shortcoming of the file store — is why the gone-room ending is the *normal*
+ * prod case rather than an edge one.
+ *
+ * `GAMES_DIR` points it at a mounted persistent disk instead, which turns out
+ * to be the whole change: the file store was already durable, it was simply
+ * writing somewhere that is not. No second `RoomStore` implementation is
+ * needed unless a disk proves insufficient. `createFileStore` creates the
+ * directory itself, so the mount point needs no preparation.
+ *
+ * Exported, and taking its environment as an argument, so the fallback is
+ * testable — it is reached only from the run-directly block below, which no
+ * test executes.
+ */
+export function gamesDir(env: NodeJS.ProcessEnv = process.env): string {
+  const configured = env.GAMES_DIR?.trim();
+  return configured ? configured : join(process.cwd(), 'server', 'games');
+}
+
 // Started only when run directly, so tests can boot their own on port 0.
 if (process.argv[1]?.endsWith('index.ts')) {
-  const store = createFileStore(join(process.cwd(), 'server', 'games'));
+  const store = createFileStore(gamesDir());
   const { httpServer, rooms } = createServer({ store });
   const port = Number(process.env.PORT ?? 3001);
 
