@@ -80,8 +80,8 @@ an unnamed seat `Player N` from its seat index. `needName` and `JoinForm` are go
 join gets `RoomRefused` and a retry.
 
 `PROTOCOL_VERSION` stayed 2 through all of that, because v2 was still undeployed and its shape was
-therefore free to change. **That window is now closed** — v2 is live, so the next wire change is a
-v3 bump and a second cutover.
+therefore free to change. That window closed when v2 went live; the v3 cutover has since happened
+too (below).
 
 **A Render deploy is ~40 seconds, push to live** — measured end to end on 2026-08-08
 (`dep-d9r8a0rncjis7391usa0`): push returned 01:23:14, the deploy fired one second later, the build
@@ -102,7 +102,9 @@ an interval and then invites you to attribute it to whatever you assumed.
 The GH Pages bundle hash needs the same discipline — it served the old file for ~90 seconds. Read
 the version back before believing either half.
 
-**The turn-order draw is built, on `revamp/turn-order-draw` — unmerged, and protocol v3.** Each
+**The turn-order draw is built, merged and deployed — protocol v3 is live** (2026-08-08;
+`/health` reports `protocolVersion: 3`, and the v3 draw was smoke-tested on prod across two
+isolated clients, including the last-drawer-wins commit case). Each
 player draws their own tile in seat order; the order resolves when the last one lands. `startGame`
 is gone, replaced by `drawTurnOrderTile`. Almost none of it is new machinery: `getCurrentActor`
 returns `players[turnOrderDraws.length]` during the draw, and because that function is the segment
@@ -132,8 +134,12 @@ panel-only phone view are wanted together, and are their own design pass. Presen
 open findings from Stage 0: the away dot rides a roster row designed to clip, and final scoring has
 no presence at all.
 
-**Dev surfaces:** `/catalog` is every component state; `/scenarios` loads any golden-game state and
-plays on from it, which is how to reach a merger in two clicks rather than several minutes.
+**Dev surfaces — dev builds only:** `/catalog` is every component state; `/scenarios` loads any
+golden-game state and plays on from it, which is how to reach a merger in two clicks rather than
+several minutes. **Neither exists in a production build** (owner ruling, 2026-08-08):
+`import.meta.env.DEV` guards in `src/App.tsx` mean the routes and their golden-data chunks are
+never emitted, and `check:bundle` greps `dist/` for golden title strings to hold it there. The
+client-side twin of the server's `/dev/rooms`.
 
 Design specs and implementation plans live in `docs/superpowers/{specs,plans}/`. Each phase ends
 with a carry-forward doc in `specs/` recording what it hands to the next one — read the newest
@@ -262,8 +268,10 @@ npm run verify:layout  # drives a real Chrome over CDP — see the caveat below
 
 ## Environment and deployment
 
-Client on GitHub Pages under the base path `/acquire-startups-m1` (hardcoded in `vite.config.ts` and
-`src/main.tsx`); server on Render, service `srv-d3klnhnfte5s73diht90`, **plan `starter`** (paid) —
+Client on GitHub Pages under the base path `/acquire-startups-m1` — **one copy, in `basePath.ts`**
+(the old duplicate hardcodes in `vite.config.ts` and `src/main.tsx` are gone; the config imports
+it, the router derives its basename from Vite's `BASE_URL`, and the manifest generator reads it
+too); server on Render, service `srv-d3klnhnfte5s73diht90`, **plan `starter`** (paid) —
 *not* free, whatever older notes say. `VITE_SERVER_URL` points the client at a server, defaulting
 to `http://<current hostname>:3001` in dev — the hostname, not `localhost`, so a phone on the LAN
 works. The server reads `PORT` (3001) and writes rooms to `server/games/`, gitignored.
@@ -298,3 +306,30 @@ that was scoped against "Render free".
 `starter` does not. This is Render's documented behaviour rather than something measured here (it
 would take a 15-minute idle window to observe), but it is why the cold-start story below is
 suspect.
+
+**The client is a PWA** (built 2026-08-08, `revamp/pwa`). Installable, `display: standalone`;
+pass-and-play works fully offline (shell from the worker's cache, game from `localStorage`); online
+modes say plainly that they need a network — the server is the authority and there is deliberately
+no local fallback. The pieces, and where they live:
+
+- `public/manifest.webmanifest` is **generated at every build** (`prebuild` →
+  `scripts/generate-manifest.ts`) from `APP_COLORS` in `src/game/tokens.ts`; `index.html`'s
+  theme-color goes through a Vite plugin reading the same token. Change the palette in tokens and
+  both follow — never edit the manifest or the tag by hand. Icons are static PNGs
+  (`scripts/generate-icons.mjs` re-renders them via headless Chrome when the art changes).
+- `dist/sw.js` is generated after every build from `scripts/sw.template.js` — the precache list is
+  derived from the files actually emitted, the cache name is a content hash, and activation prunes
+  old caches. Network-first navigations (falling back to the cached shell on failure *or* a
+  non-ok response), cache-first hashed assets, same-origin GETs only. **No `skipWaiting` on
+  install:** updates activate on next launch (owner ruling), with two explicit exceptions —
+  the mode chooser's "Update ready" button, and `StaleClient`'s reload, which now runs
+  `forceUpdateAndReload` (`src/pwa/update.ts`): **unregister → clear caches → reload in a
+  `finally`**. Unregister, not just cache-clearing — clearing alone left an active worker whose
+  install never re-runs, i.e. no offline cache until the next deploy. Observed live before fixed.
+- When templating anything (`sw.template.js`, `index.html`): **`replaceAll`, never `replace`**, and
+  keep placeholder names out of comments — `.replace()` substituted a placeholder named in its own
+  explanatory comment twice in one day.
+- **Still owed before the first real install:** the update path driven on a real installed app
+  against a real protocol bump. Zero installs exist, so nothing can wedge yet — but a broken
+  updater is the one bug that survives its own fix being deployed, so that verification is the
+  hard cutoff before handing anyone the app.
