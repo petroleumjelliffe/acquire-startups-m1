@@ -1,7 +1,10 @@
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { registerServiceWorker } from "./pwa/register";
 import "./styles/index.css";
+
+registerServiceWorker();
 
 // The router's basename comes from Vite's own BASE_URL, which the config
 // builds from the one copy of the path in `basePath.ts` — this file used to

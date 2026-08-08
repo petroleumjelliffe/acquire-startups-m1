@@ -1,7 +1,18 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+import { createHash } from "node:crypto";
 import { BASE_PATH } from "./basePath";
 import { APP_COLORS } from "./src/game/tokens";
+
+/** Every file under dir, as paths relative to it. */
+function walk(dir: string, root = dir): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const full = join(dir, name);
+    return statSync(full).isDirectory() ? walk(full, root) : [relative(root, full)];
+  });
+}
 
 export default defineConfig(({ command }) => ({
   plugins: [
@@ -29,6 +40,41 @@ export default defineConfig(({ command }) => ({
         html
           .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
           .replaceAll("__PWA_BASE__", `${command === "build" ? BASE_PATH : ""}/`),
+    },
+    // Writes dist/sw.js after the build, from scripts/sw.template.js.
+    //
+    // The precache list is *derived* — every file the build emitted (plus the
+    // public/ copies), never a hand-maintained array, so a renamed chunk
+    // cannot silently rot it. The cache name is a hash of the listed files'
+    // contents: identical builds reuse their cache, any real change mints a
+    // new one, and activation prunes the rest. `closeBundle` rather than
+    // `writeBundle` because the public/ copies (manifest, icons) are not in
+    // the bundle object and this list must include them.
+    {
+      name: "sw-from-build",
+      apply: "build",
+      closeBundle() {
+        const dist = join(__dirname, "dist");
+        const files = walk(dist)
+          .filter((f) => !f.endsWith(".map") && f !== "sw.js" && f !== "404.html")
+          .sort();
+        const hash = createHash("sha256");
+        for (const f of files) hash.update(f).update(readFileSync(join(dist, f)));
+        // replaceAll, always. A .replace() here substituted the first
+        // occurrence — which was the template's own comment naming the
+        // placeholder — and shipped a worker whose PRECACHE was still the
+        // placeholder. The same mistake as index.html's theme colour, made
+        // twice in one day; replaceAll is now the house rule for templating.
+        const sw = readFileSync(join(__dirname, "scripts", "sw.template.js"), "utf8")
+          .replaceAll("__CACHE_NAME__", `acquire-${hash.digest("hex").slice(0, 12)}`)
+          .replaceAll("__BASE__", `${BASE_PATH}/`)
+          .replaceAll("__PRECACHE__", JSON.stringify(
+            files.map((f) => `${BASE_PATH}/${f.replaceAll("\\", "/")}`),
+            null, 2,
+          ));
+        writeFileSync(join(dist, "sw.js"), sw);
+        console.log(`✓ sw.js written (${files.length} files precached)`);
+      },
     },
   ],
   server: { port: 5173 },
