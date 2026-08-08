@@ -17,7 +17,7 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "check:bundle": "vite build && ! grep -rlE \"['\\\"]vitest['\\\"]\" dist/assets 2>/dev/null",
+    "check:bundle": "vite build && ! grep -rlE \"['\\\"]vitest['\\\"]\" dist/assets 2>/dev/null && ! grep -rlE 'baseline turn cycle|turn order draw, starting tiles' dist/assets 2>/dev/null",
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {

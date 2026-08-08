@@ -7,10 +7,25 @@ import { PassAndPlayPage } from "./pages/PassAndPlayPage";
 import { PassAndPlayGamePage } from "./pages/PassAndPlayGamePage";
 import { RoomPage } from "./pages/RoomPage";
 
-// Lazy on purpose: both pull in the golden games and replay them, and none of
-// that belongs in the main chunk. `npm run check:bundle` is the guard.
-const CatalogPage = React.lazy(() => import("./game/catalog/CatalogPage"));
-const ScenarioPage = React.lazy(() => import("./game/catalog/ScenarioPage"));
+// Dev surfaces only — not shipped (owner, 2026-08-08: "for testing only,
+// shouldn't be available in the deployed clients"). The client-side twin of
+// the server's /dev/rooms, which registers only outside production.
+//
+// `import.meta.env.DEV` is replaced with a literal at build time, so in a
+// production build the branch below is dead code: the routes vanish AND the
+// dynamic imports are never emitted as chunks — golden-game data included.
+// That upgrades `npm run check:bundle`'s guarantee from "the golden data is
+// not in the main chunk" to "it is not in the build at all", and the guard
+// greps the whole of dist/assets to hold it there.
+//
+// Still lazy in dev, for the original reason: neither belongs in the chunk
+// the dev server serves first.
+const CatalogPage = import.meta.env.DEV
+  ? React.lazy(() => import("./game/catalog/CatalogPage"))
+  : null;
+const ScenarioPage = import.meta.env.DEV
+  ? React.lazy(() => import("./game/catalog/ScenarioPage"))
+  : null;
 
 export default function App() {
   return (
@@ -31,28 +46,31 @@ export default function App() {
       {/* Room page - for both host and joining players */}
       <Route path="/room/:roomId" element={<RoomPage />} />
 
-      {/* Component catalog - the Phase 1 acceptance surface */}
-      <Route
-        path="/catalog"
-        element={
-          <React.Suspense fallback={null}>
-            <CatalogPage />
-          </React.Suspense>
-        }
-      />
-
-      {/* Any golden-game state, playable from that point. The catalog shows
-          what a component looks like; this shows whether the game works from
-          here — a merger is two clicks away instead of several minutes of
-          play. */}
-      <Route
-        path="/scenarios"
-        element={
-          <React.Suspense fallback={null}>
-            <ScenarioPage />
-          </React.Suspense>
-        }
-      />
+      {/* Component catalog (the Phase 1 acceptance surface) and /scenarios
+          (any golden-game state, playable from that point — a merger is two
+          clicks away instead of several minutes of play). Dev builds only;
+          see the note on the imports above. In a production build these
+          paths fall through to nothing, exactly like any other unknown URL. */}
+      {CatalogPage && (
+        <Route
+          path="/catalog"
+          element={
+            <React.Suspense fallback={null}>
+              <CatalogPage />
+            </React.Suspense>
+          }
+        />
+      )}
+      {ScenarioPage && (
+        <Route
+          path="/scenarios"
+          element={
+            <React.Suspense fallback={null}>
+              <ScenarioPage />
+            </React.Suspense>
+          }
+        />
+      )}
     </Routes>
   );
 }
