@@ -85,6 +85,7 @@ describe('Board', () => {
     const { container } = render(<Board board={createEmptyBoard()} hand={['C6'] as Coord[]} />);
     expect(container.querySelector('button[title="C6"]')).toBeNull();
     expect(screen.getByTitle('C6').className).not.toMatch(/cursor-pointer/);
+    expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'hand');
   });
 
   it('is a control once there is something to do with it', () => {
@@ -95,15 +96,38 @@ describe('Board', () => {
     expect(screen.getByTitle('C6').className).toMatch(/cursor-pointer/);
   });
 
+  it('lights the whole hand by default — online, this is your own screen', () => {
+    render(<Board board={createEmptyBoard()} hand={['C6', 'D8'] as Coord[]} />);
+    expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'hand');
+    expect(screen.getByTitle('D8')).toHaveAttribute('data-tile-state', 'hand');
+  });
+
+  it('marks blocked hand tiles and makes them unclickable', () => {
+    const { container } = render(
+      <Board board={createEmptyBoard()} hand={['C6'] as Coord[]} blocked={['C6'] as Coord[]} />,
+    );
+    expect(screen.getByTitle('C6').className).toMatch(/cursor-not-allowed/);
+    expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'blocked');
+    // No handler was given, so it is not a control at all — not merely a
+    // disabled one. With a handler it renders as a disabled button instead.
+    expect(container.querySelector('[title="C6"] button, button[title="C6"]')).toBeNull();
+  });
+
   /**
-   * The owner's hotseat ruling: nothing on the board is highlighted
+   * The owner's hotseat ruling — pass-and-play only, which is what
+   * `autoHighlight={false}` means: on a shared board nothing is highlighted
    * automatically. A hand tile lights up only while its twin in the panel is
    * pointed at — one at a time — but it stays tappable either way, because
    * the highlight is a hint, not the affordance.
    */
-  it('keeps hand tiles unhighlighted until one is pointed at', () => {
+  it('keeps hand tiles unhighlighted until one is pointed at, when told to', () => {
     const { container } = render(
-      <Board board={createEmptyBoard()} hand={['C6', 'D8'] as Coord[]} onCellClick={() => {}} />,
+      <Board
+        board={createEmptyBoard()}
+        hand={['C6', 'D8'] as Coord[]}
+        autoHighlight={false}
+        onCellClick={() => {}}
+      />,
     );
     expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'empty');
     expect(screen.getByTitle('D8')).toHaveAttribute('data-tile-state', 'empty');
@@ -113,7 +137,12 @@ describe('Board', () => {
 
   it('highlights exactly the pointed-at tile, nothing else in the hand', () => {
     render(
-      <Board board={createEmptyBoard()} hand={['C6', 'D8'] as Coord[]} highlight="C6" />,
+      <Board
+        board={createEmptyBoard()}
+        hand={['C6', 'D8'] as Coord[]}
+        autoHighlight={false}
+        highlight="C6"
+      />,
     );
     expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'hand');
     expect(screen.getByTitle('D8')).toHaveAttribute('data-tile-state', 'empty');
@@ -122,24 +151,22 @@ describe('Board', () => {
   it('ignores a highlight that is not in the hand', () => {
     // A stale hover — the tile was just placed, say — must not paint a cell
     // that is no longer anyone's to play.
-    render(<Board board={createEmptyBoard()} hand={['C6'] as Coord[]} highlight="D8" />);
+    render(
+      <Board board={createEmptyBoard()} hand={['C6'] as Coord[]} autoHighlight={false} highlight="D8" />,
+    );
     expect(screen.getByTitle('D8')).toHaveAttribute('data-tile-state', 'empty');
   });
 
-  it('marks a blocked hand tile only while pointed at, and never as a control', () => {
-    const { container } = render(
+  it('marks a blocked hand tile only while pointed at, on the shared board', () => {
+    render(
       <Board
         board={createEmptyBoard()}
         hand={['C6'] as Coord[]}
         blocked={['C6'] as Coord[]}
-        highlight="C6"
+        autoHighlight={false}
       />,
     );
-    expect(screen.getByTitle('C6').className).toMatch(/cursor-not-allowed/);
-    expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'blocked');
-    // No handler was given, so it is not a control at all — not merely a
-    // disabled one. With a handler it renders as a disabled button instead.
-    expect(container.querySelector('[title="C6"] button, button[title="C6"]')).toBeNull();
+    expect(screen.getByTitle('C6')).toHaveAttribute('data-tile-state', 'empty');
   });
 
   it('shows the ticker on an HQ tile and keeps the coordinate reachable on hover', () => {

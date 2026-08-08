@@ -366,11 +366,9 @@ describe('the first state message starts the game', () => {
     });
     f.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
 
-    // A1 starts out in Sam's hand. The board no longer badges hand cells on
-    // its own, and Alex is the actor so the cell is not a control either —
-    // the panel's hand is where the viewer's tiles are always visible.
-    const panelHand = () => document.querySelector('[data-panel-hand]') as HTMLElement;
-    expect(within(panelHand()).getByTitle('A1')).toBeInTheDocument();
+    // A1 starts out in Sam's hand — badged as such, because online the
+    // always-on badges stayed (the hover-only rule is pass-and-play's alone).
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
 
     // A second state — the kind a real commit sends after a move — with A1
     // now placed on the board and a new tile, B2, drawn into the hand. This
@@ -389,9 +387,8 @@ describe('the first state message starts the game', () => {
 
     // A1 is now a settled board tile, not a hand tile.
     expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'filled');
-    expect(within(panelHand()).queryByTitle('A1')).toBeNull();
     // B2 is the new hand tile.
-    expect(within(panelHand()).getByTitle('B2')).toBeInTheDocument();
+    expect(onBoard('B2')).toHaveAttribute('data-tile-state', 'hand');
   });
 });
 
@@ -750,8 +747,7 @@ describe('a refresh mid-turn', () => {
       currentPlayerIndex: 1,
     });
     first.sendState({ state: opening, reason: 'commit', segmentStart: opening.nextStepId });
-    // In hand: a clickable cell (unhighlighted until pointed at).
-    expect(onBoard('A1').tagName).toBe('BUTTON');
+    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
 
     // Sam plays their tile. The segment is open and uncommitted: the server
     // holds a draft, and nothing has been broadcast.

@@ -34,13 +34,19 @@ export interface BoardProps {
   landed?: Coord | null;
   /**
    * The one hand tile to light up — the one whose twin in the panel is being
-   * pointed at. Nothing on the board is highlighted automatically (owner,
-   * hotseat pass): the whole hand lit at once read as six placements already
-   * made. Only applies to a cell actually in `hand`, so a stale hover after a
-   * placement paints nothing; and it changes only the paint — an
+   * pointed at. Only applies to a cell actually in `hand`, so a stale hover
+   * after a placement paints nothing; and it changes only the paint — an
    * unhighlighted hand cell is still tappable.
    */
   highlight?: Coord | null;
+  /**
+   * Whether hand cells are painted as yours without being pointed at. Online
+   * they are — it is your own screen, and the badge is how your tiles are
+   * found on the board. Pass-and-play passes false (owner, hotseat pass —
+   * and hotseat *only*): on a shared board six lit cells read as six
+   * placements already made, so there a cell lights only via `highlight`.
+   */
+  autoHighlight?: boolean;
   onCellClick?: (c: Coord) => void;
 }
 
@@ -63,6 +69,7 @@ export function Board({
   hqTiles = [],
   landed = null,
   highlight = null,
+  autoHighlight = true,
   onCellClick,
 }: BoardProps) {
   return (
@@ -87,6 +94,7 @@ export function Board({
           hqTiles={hqTiles}
           landed={landed}
           highlight={highlight}
+          autoHighlight={autoHighlight}
           onCellClick={onCellClick}
         />
       ))}
@@ -104,6 +112,7 @@ function RowCells({
   hqTiles,
   landed,
   highlight,
+  autoHighlight,
   onCellClick,
 }: Required<Omit<BoardProps, 'onCellClick'>> & { row: (typeof ROWS)[number]; onCellClick?: (c: Coord) => void }) {
   return (
@@ -119,16 +128,16 @@ function RowCells({
         const isBlocked = inHand && blocked.includes(id);
         const owner = owners[id];
 
-        // A hand cell wears its highlight only while pointed at; the rest of
-        // the time it looks like any empty cell, and only the pointer (or a
-        // tap) knows the difference.
+        // Whether this hand cell wears its paint: always on your own screen
+        // (online), only while pointed at on a shared one (pass-and-play).
+        const lit = inHand && (autoHighlight || highlight === id);
         const state = founded
           ? hqTiles.includes(id)
             ? 'founded'
             : 'chain'
           : cell.placed
             ? 'filled'
-            : inHand && highlight === id
+            : lit
               ? isBlocked
                 ? 'blocked'
                 : 'hand'

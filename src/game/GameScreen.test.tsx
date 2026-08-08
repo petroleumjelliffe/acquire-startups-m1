@@ -364,20 +364,14 @@ describe('GameScreen with a viewer who is not the actor', () => {
     expect(screen.queryByTestId('curtain')).toBeNull();
   });
 
-  it('shows me my own hand in the panel, lit on the board only when pointed at', () => {
-    // The hand lives in the panel; the board highlights nothing on its own
-    // (owner, hotseat pass). Pointing at a panel tile answers "where is my
-    // A1" — wired even while watching, when there is nothing to press.
-    const { container } = render(watching());
-
-    const panelHand = container.querySelector('[data-panel-hand]')!;
-    expect(within(panelHand as HTMLElement).getByTitle('A1')).toBeInTheDocument();
-    expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'empty');
-
-    fireEvent.mouseOver(within(panelHand as HTMLElement).getByTitle('A1'));
+  it('shows me my own hand while someone else acts', () => {
+    // Online the badges stay always-on: it is your own screen, and the badge
+    // is how your tiles are found on the board. The hover-only rule is
+    // pass-and-play's alone (owner: "it was meant for pass and play only").
+    render(watching());
     expect(onBoard('A1')).toHaveAttribute('data-tile-state', 'hand');
-    expect(onBoard('E6')).toHaveAttribute('data-tile-state', 'empty');
-    expect(onBoard('H8')).toHaveAttribute('data-tile-state', 'empty');
+    expect(onBoard('E6')).not.toHaveAttribute('data-tile-state', 'hand');
+    expect(onBoard('H8')).not.toHaveAttribute('data-tile-state', 'hand');
   });
 
   it('says whose turn it is where you cannot miss it, and offers nothing', () => {

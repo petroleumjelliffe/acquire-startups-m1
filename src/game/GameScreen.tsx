@@ -143,10 +143,12 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
       }
     : undefined;
 
-  // The board's one highlighted cell: the hand tile whose panel twin the
-  // pointer is on. Nothing else on the board lights up (owner, hotseat pass).
-  // Not reset on stage or actor changes because it does not need to be — the
-  // board ignores a highlight that is not in the current hand.
+  // The board's one hover-highlighted cell: the hand tile whose panel twin
+  // the pointer is on. Pass-and-play only lights cells this way (owner,
+  // hotseat pass — and hotseat only); online keeps its always-on badges via
+  // `autoHighlight` below. Not reset on stage or actor changes because it
+  // does not need to be — the board ignores a highlight that is not in the
+  // current hand.
   const [hoverTile, setHoverTile] = useState<Coord | null>(null);
 
   // The panel shows the same seat the board does — one resolution of "whose
@@ -208,6 +210,7 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
           hqTiles={foundingTiles(state)}
           landed={lastPlacedTile(state)}
           highlight={hoverTile}
+          autoHighlight={viewerId !== undefined}
           onCellClick={placeTile}
         />
       </div>
