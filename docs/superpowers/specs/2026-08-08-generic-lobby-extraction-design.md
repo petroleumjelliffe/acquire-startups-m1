@@ -18,11 +18,11 @@ projection, segments, drafts/undo, corrections — stays per-game. It is nearly 
 too, but generalizing it would bake this game's segment/draft model in as the required
 shape for every future game, and no second game exists to check that against.
 
-**Packaging ruling: extract in place, package later.** The lobby lives in this repo
-behind a test-enforced import boundary. No npm package, no monorepo, no second repo
-until game #2 exists — at which point extraction is a `git mv` plus a packaging
-decision made with real requirements in hand. The severing work (the couplings below)
-is identical under every packaging option; only the overhead differs.
+**Packaging ruling: extract in place, lift at the join point.** The lobby lives in
+this repo behind a test-enforced import boundary. No npm package, no monorepo, no
+second repo until game #2 actually consumes it — see "Game #2 and the lift" below.
+The severing work (the couplings below) is identical under every packaging option;
+only the overhead differs.
 
 **UI ruling: headless contract plus a themeable default kit.** The headless layer
 (`useLobbyRoom`, connection, identity, protocol types) is the contract. The existing
@@ -137,9 +137,40 @@ the theme.
   the server, two browsers — because by-hand passes are what find bugs here, and this
   refactor walks straight through Phase 4's territory.
 
+## Game #2 and the lift
+
+A second game repo exists (2026-08-08): pure JS, pass-and-play only, due a React
+update next. That makes it the lobby's first real second consumer — but not soon,
+and not as its first step. Two independent tracks:
+
+- **Track A (this repo):** turn-order-draw merges and deploys, then the extraction
+  above. Unchanged by game #2's existence — the seam gets severed here, where the
+  test suite and the by-hand discipline can prove nothing broke.
+- **Track B (game #2's repo):** the React/Vite port, **pass-and-play first, no
+  online**, with its own brainstorm and spec in that repo. The port's one obligation
+  to the lobby is mirroring this repo's layering — a pure `engine/` with no React,
+  components under `src/game/`, everything derived from replayed state — because
+  that shape is what the lobby plugs into. Same growth path Acquire itself took.
+
+**The join point:** when game #2 is ready for online, the three lobby directories
+move out of this repo into their shared home and both games point at it. Leading
+candidate: **shared TypeScript source via git** (submodule or git dependency) rather
+than a published npm package — both repos are Vite+TS and compile the lobby source
+directly, so a two-consumer, one-owner library needs no build/publish pipeline. The
+final call is made at the lift, with game #2's real needs in hand; the in-place
+extraction keeps the lift cheap by keeping the lobby dirs self-contained, which the
+import-boundary test already forces.
+
+**Deferred until the lift, kept visible:** hosting. A second Render service is a
+second paid `starter` instance; the alternative — both games' servers in one
+process — creeps toward the hosted-lobby-service model this design rejected. Also
+concrete now, not hypothetical: both games will share the GitHub Pages origin, so
+the `identity.ts` key namespace (above) is required, not precautionary.
+
 ## Out of scope
 
 - Generalizing the game transport (intents, projection, corrections, segments).
 - Any storage interface beyond the two roster snapshot functions.
-- Publishing, monorepo conversion, or a second repo.
+- Publishing, monorepo conversion, or a second repo (until the lift).
+- Game #2's React port itself — its own brainstorm and spec, in its own repo.
 - Any wire or behavior change visible to a player.
