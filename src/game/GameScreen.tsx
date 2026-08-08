@@ -85,15 +85,16 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
    * Whose private state the screen shows — their tiles on the board, their
    * shares in the hand zone.
    *
-   * Online that is always me: my own device, my own hand, at every stage
-   * including the turn-order draw. Pass-and-play keeps its own rule, which is
-   * the actor at every stage but the draw: seat one presses that button for
-   * the table rather than taking a turn, and showing their hand put six of
-   * their tiles on a shared board before play began.
+   * Nobody's, until the draw has decided who goes first — online as much as
+   * pass-and-play (owner ruling): a hand highlighted under the draw button
+   * reads as a turn already begun, whichever device it is on. After that,
+   * online shows me and pass-and-play shows the actor.
    */
-  const viewer = viewerId === undefined
-    ? (state.stage === 'draw' ? undefined : actor)
-    : state.players.find((p) => p.id === viewerId);
+  const viewer = state.stage === 'draw'
+    ? undefined
+    : viewerId === undefined
+      ? actor
+      : state.players.find((p) => p.id === viewerId);
 
   /** Nobody is "up" until the draw has decided who is. */
   const turnKnown = state.stage !== 'draw';

@@ -183,6 +183,25 @@ describe('GameScreen at the turn-order draw', () => {
     fireEvent.click(screen.getByRole('button', { name: /draw your tile/i }));
     expect(screen.getByText(/pass to/i)).toBeInTheDocument();
   });
+
+  /**
+   * Online is the same gate, not a different one. The first cut showed the
+   * viewer their own hand here ("my device, my hand, always"), and the owner
+   * found what that does on a real board: six highlighted tiles under a draw
+   * button, reading as a turn already begun.
+   */
+  it('puts no hand on the board before the draw, online included', () => {
+    // Not the button count — at the draw the tiles are inert either way. The
+    // leak was the *highlight*: six cells marked as the viewer's hand.
+    const { container } = render(<GameScreen session={atDraw()} viewerId="p1" />);
+    expect(container.querySelector('[data-board="grid"]')).not.toBeNull();
+    expect(container.querySelectorAll('[data-tile-state="hand"]')).toHaveLength(0);
+  });
+
+  it('names no player in the hand zone before the draw, online included', () => {
+    render(<GameScreen session={atDraw()} viewerId="p1" />);
+    expect(screen.queryByText(/'s hand/i)).toBeNull();
+  });
 });
 
 it('marks nobody as the active seat before the draw', () => {
