@@ -50,7 +50,7 @@ export function isWireIntent(wire: unknown): wire is WireIntent {
   const w = wire as Record<string, unknown>;
 
   switch (w.type) {
-    case 'startGame':
+    case 'drawTurnOrderTile':
     case 'declareEnd':
     case 'endTurn':
       return true;
@@ -89,7 +89,7 @@ export function isWireIntent(wire: unknown): wire is WireIntent {
  * its correction, silently narrow the equivalence proof to cover less than
  * it claims, and mispredict on the client — with no test failing either way.
  */
-export const DRAWS = new Set<WireIntent['type']>(['endTurn', 'tradeInDeadTiles', 'startGame']);
+export const DRAWS = new Set<WireIntent['type']>(['endTurn', 'tradeInDeadTiles', 'drawTurnOrderTile']);
 
 /**
  * Strips identity for the wire — the exact inverse of `server/room.ts`'s
@@ -212,9 +212,16 @@ export interface RosterMessage {
  *
  * 2 (2026-08-07): `renamePlayer` and `leaveSeat` — the lobby's own-row edit,
  * and giving your seat up, from the Lobby Flow design. The first bump this
- * constant ever took, hours after it landed.
+ * constant ever took, hours after it landed. Its shape was corrected once more
+ * before deploying (`name` became optional) *without* a further bump, because
+ * v2 was not live yet and no client spoke it.
+ *
+ * 3 (2026-08-08): `startGame` out, `drawTurnOrderTile` in. The opening draw is
+ * now one player's own move rather than one intent that drew for the whole
+ * table. Unlike the v2 correction above this is a true cutover — v2 *is*
+ * deployed — so every open client takes the stale-client screen once.
  */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /**
  * `name` is optional on both, and that is a correction to v2 rather than a v3:

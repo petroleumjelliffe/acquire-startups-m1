@@ -260,12 +260,29 @@ const MEASURE = `(async () => {
   for (let i = 0; i < 4; i += 1) await click(/add player/i, 'add player');
 
   await click(/start game/i, 'start game');
-  // No curtain before the draw: it is a gate in front of the game and nobody's
-  // hand is on screen yet. The handoff after it is unconditional, because seat
-  // one pressed the button for the table and the winner's hand is about to
-  // appear — so this is a plain click, not a conditional one.
-  await click(/draw for turn order/i, 'draw for turn order');
-  await click(/^start$/i, 'start (curtain, first turn)');
+
+  // The opening is one draw *per player*, with a curtain between each — the
+  // draw takes a turn like any other move. This walk plays six-handed, so that
+  // is six draws and five or six curtains.
+  //
+  // Both counts are possible, which is why the curtain click is conditional:
+  // if the last drawer happens to win their own draw the actor never changes,
+  // no hand-off is wanted, and no curtain appears. An unconditional click here
+  // would fail on whichever seeds produce that, intermittently — which is
+  // precisely the kind of thing this gate is supposed to be free of.
+  //
+  // No curtain in front of the *first* draw either: seat one is holding the
+  // device, having just pressed Start game.
+  for (let i = 0; i < 8; i += 1) {
+    const draw = byText(/draw your tile/i);
+    if (!draw) break;
+    draw.click();
+    await wait(300);
+    await clickIfPresent(/^start$/i);
+  }
+  if (byText(/draw your tile/i)) {
+    throw new Error('the turn-order draw never finished — still asking for a tile');
+  }
 
   const stages = { play: geometry() };
   const zoneFloors = { play: floors() };
@@ -495,11 +512,15 @@ const WAITING_PANEL = `(() => {
   };
 })()`;
 
-// The curtain lives behind the setup screen *and* behind the turn-order draw:
-// a game has to be started and drawn for before there is a curtain to measure.
-// The draw itself raises no curtain — it is a gate in front of the game and
-// shows nobody's hand — so the first one appears when play is handed to
-// whoever won it.
+// The curtain lives behind the setup screen *and* behind the first turn-order
+// draw: a game has to be started and one tile drawn before there is a curtain
+// to measure.
+//
+// This used to say the draw "raises no curtain — it is a gate in front of the
+// game", which stopped being true when the draw became one move per player.
+// The first curtain now appears as soon as seat one has drawn, because the
+// draw has passed to seat two and somebody has to hand the device over. That
+// makes it earlier and more reliable to reach than it was, not less.
 const START_GAME = `(async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const find = (re) => [...document.querySelectorAll('button')].find((b) => re.test(b.innerText));
@@ -508,7 +529,7 @@ const START_GAME = `(async () => {
   if (!btn) throw new Error('no start game button');
   btn.click();
   await wait(400);
-  const draw = find(/draw for turn order/i);
+  const draw = find(/draw your tile/i);
   if (!draw) throw new Error('no draw button after starting');
   draw.click();
   await wait(500);

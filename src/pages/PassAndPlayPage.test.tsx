@@ -36,20 +36,27 @@ describe('PassAndPlayPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /start game/i }));
 
     expect(screen.getByTestId('game-surface')).toBeInTheDocument();
-    // The draw is a gate in front of the game: no curtain, because nobody's
-    // hand is on screen yet for a curtain to protect.
-    expect(screen.getByRole('button', { name: /draw for turn order/i })).toBeInTheDocument();
+    // No curtain in front of the *first* draw: seat one is holding the device,
+    // having just pressed Start game.
+    expect(screen.getByRole('button', { name: /draw your tile/i })).toBeInTheDocument();
     expect(screen.queryByText(/pass to/i)).toBeNull();
   });
 
   it('reaches the first turn without wedging at the draw stage', () => {
     renderLobby();
     fireEvent.click(screen.getByRole('button', { name: /start game/i }));
-    fireEvent.click(screen.getByRole('button', { name: /draw for turn order/i }));
 
-    // The draw always hands off, whoever won it: seat one pressed the button
-    // for the table, so the winner's hand still has to be revealed to them.
-    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
+    // Every seat draws now, with a curtain between each. Driven as a loop
+    // rather than a fixed sequence because who wins the draw is seed-dependent:
+    // if the last drawer wins, the actor never changes and there is no final
+    // curtain to click, and a hardcoded sequence would fail on half the seeds.
+    for (let i = 0; i < 6; i += 1) {
+      const draw = screen.queryByRole('button', { name: /draw your tile/i });
+      if (!draw) break;
+      fireEvent.click(draw);
+      const start = screen.queryByRole('button', { name: /^start$/i });
+      if (start) fireEvent.click(start);
+    }
 
     expect(screen.getByText(/place a tile/i)).toBeInTheDocument();
   });

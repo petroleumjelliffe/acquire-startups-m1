@@ -56,13 +56,28 @@ function Harness({
 }
 
 describe('useTurnPanel', () => {
-  it('asks seat one to open the game while the stage is draw', () => {
+  it('asks the current drawer for their own tile, not seat one for everyone else', () => {
     const session = createGameSession({ seed: 'az-1', names: ['Alex', 'Sam'] });
     const dispatch = vi.fn();
     render(<Harness session={session} dispatch={dispatch} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /draw for turn order/i }));
-    expect(dispatch).toHaveBeenCalledWith({ type: 'startGame', playerId: 'p1' });
+    fireEvent.click(screen.getByRole('button', { name: /draw your tile/i }));
+    expect(dispatch).toHaveBeenCalledWith({ type: 'drawTurnOrderTile', playerId: 'p1' });
+  });
+
+  it('shows the tiles already drawn, and how many seats are still to come', () => {
+    const session = createGameSession({ seed: 'az-1', names: ['Alex', 'Sam', 'Jo'] });
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p1' });
+    session.reveal();
+
+    render(<Harness session={session} dispatch={() => {}} />);
+
+    // Derived from the state the engine wrote, never hardcoded: the drawn tile
+    // is read back rather than asserted as a literal.
+    const drawn = session.getView().state.turnOrderDraws![0];
+    expect(screen.getByText('Alex')).toBeInTheDocument();
+    expect(screen.getByTitle(drawn.tile)).toBeInTheDocument();
+    expect(screen.getByText(/2 still to draw/i)).toBeInTheDocument();
   });
 
   it('prompts for a tile during play', () => {

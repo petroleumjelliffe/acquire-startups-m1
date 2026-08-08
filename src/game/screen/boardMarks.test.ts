@@ -65,7 +65,7 @@ describe('ownerBadges', () => {
     // catch that, so this drives the real opening.
     const session = createGameSession({ seed: 'badge-draw', names: ['Alex', 'Sam'] });
     const opener = session.getView().actorId!;
-    session.dispatch({ type: 'startGame', playerId: opener });
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: opener });
 
     const state = session.getView().state;
     expect(state.log.length, 'the draw logged nothing to guard against').toBeGreaterThan(0);

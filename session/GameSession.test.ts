@@ -234,8 +234,8 @@ describe('liquidation segments', () => {
   });
 });
 
-describe('the turn-order draw is a gate, not a turn', () => {
-  /** An opening where the authored bag decides who wins the draw. */
+describe('the turn-order draw takes a turn like any other move', () => {
+  /** An opening where the authored bag decides who draws what, in seat order. */
   function drawGame(bag: string[]) {
     return buildFixture({
       players: [{ name: 'Alex', hand: ['H8'] }, { name: 'Sam', hand: ['C4'] }],
@@ -244,35 +244,96 @@ describe('the turn-order draw is a gate, not a turn', () => {
     });
   }
 
-  it('raises the curtain after the draw even when seat one wins it', () => {
-    // p1 draws E5, p2 draws B4 — the highest coordinate wins, so seat one
-    // takes the turn and the actor id never changes. The curtain must rise
-    // anyway: whoever pressed the button did it for the table, and the
-    // winner's hand has not been seen by anyone yet.
+  it('does not curtain the first draw, which seat one takes holding the device', () => {
     const session = createGameSession({ state: drawGame(['E5', 'B4']) });
+
     expect(session.getView().awaitingReveal).toBe(false);
+    expect(session.getView().actorId).toBe('p1');
+  });
 
-    session.dispatch({ type: 'startGame', playerId: 'p1' });
+  it('raises the curtain between draws, so the next player can be handed the device', () => {
+    const session = createGameSession({ state: drawGame(['E5', 'B4']) });
 
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p1' });
+
+    // Still in the draw — this is the hand-off *to the second drawer*, not to
+    // the winner, and it is the thing the owner asked for.
+    expect(session.getView().state.stage).toBe('draw');
+    expect(session.getView().actorId).toBe('p2');
+    expect(session.getView().awaitingReveal).toBe(true);
+  });
+
+  it('hands over to the winner when the last drawer is not the winner', () => {
+    // p1 draws E5, p2 draws B4 — the highest coordinate wins, so seat one
+    // takes the first turn and the device has to travel back.
+    const session = createGameSession({ state: drawGame(['E5', 'B4']) });
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p1' });
+    session.reveal();
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p2' });
+
+    expect(session.getView().state.stage).toBe('play');
     expect(session.getView().state.turnIndex).toBe(0);
     expect(session.getView().actorId).toBe('p1');
     expect(session.getView().awaitingReveal).toBe(true);
   });
 
-  it('raises the curtain after the draw when another seat wins it', () => {
-    // p1 draws B4, p2 draws E5 — the higher tile takes the turn.
+  it('does not curtain the winner against themselves when they drew last', () => {
+    // p1 draws B4, p2 draws E5 — seat two draws the higher tile and plays
+    // immediately. The device is already in their hands, so a curtain here
+    // would ask them to pass it to themselves. This is the case the old
+    // `leftDraw` special case got wrong by construction.
     const session = createGameSession({ state: drawGame(['B4', 'E5']) });
-    session.dispatch({ type: 'startGame', playerId: 'p1' });
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p1' });
+    session.reveal();
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p2' });
 
+    expect(session.getView().state.stage).toBe('play');
     expect(session.getView().state.turnIndex).toBe(1);
     expect(session.getView().actorId).toBe('p2');
-    expect(session.getView().awaitingReveal).toBe(true);
+    expect(session.getView().awaitingReveal).toBe(false);
   });
 
-  it('leaves nothing of the draw undoable once play has begun', () => {
+  it('leaves nothing of the draw undoable, since each draw is its own segment', () => {
     const session = createGameSession({ state: drawGame(['E5', 'B4']) });
-    session.dispatch({ type: 'startGame', playerId: 'p1' });
+
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p1' });
+    // The segment closed the instant the actor moved on, so the draw that just
+    // happened is already behind the boundary — a random reveal cannot be
+    // taken back.
     expect(session.getView().undoableSteps).toEqual([]);
+
+    session.reveal();
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p2' });
+    expect(session.getView().undoableSteps).toEqual([]);
+  });
+
+  /**
+   * The case with no actor change at all, which is where this went wrong.
+   *
+   * Seat two draws the higher tile and plays on, so `getCurrentActor` never
+   * moves. Found in a browser: the panel offered `↺ undo` on the final draw,
+   * because the draw stayed inside the still-open segment. Not exploitable —
+   * undo restores the bag too, so the re-draw is identical — but the design
+   * says a drawn tile cannot be taken back, and it could.
+   *
+   * The same close is what makes the *table* see the result: `server/room.ts`
+   * derives its commit from `segmentStart` moving, so without it the turn order
+   * would sit in the winner's private draft until their whole first turn ended.
+   */
+  it('closes the segment when the draw resolves even if the actor never changes', () => {
+    const session = createGameSession({ state: drawGame(['B4', 'E5']) });
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p1' });
+    session.reveal();
+
+    const before = session.getView().segmentStart;
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p2' });
+    const after = session.getView();
+
+    expect(after.actorId).toBe('p2');       // unchanged, which is the point
+    expect(after.segmentStart).toBeGreaterThan(before);
+    expect(after.undoableSteps).toEqual([]);
+    // ...and still no curtain, because p2 is holding the device already.
+    expect(after.awaitingReveal).toBe(false);
   });
 });
 

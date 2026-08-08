@@ -110,11 +110,15 @@ export function createGameSession(init: SessionInit): GameSession {
   let segmentStart: number = state.nextStepId;
   let previousSegmentStart: number | undefined;
   // A session opens behind the curtain, because it opens on somebody's hand.
-  // The one exception is the turn-order draw: it is a gate in front of the
-  // game rather than anyone's turn, no player's tiles or shares are on screen
-  // during it, and so there is nothing to hide and nobody to hide it from.
+  //
+  // The exception is the *first* turn-order draw. Seat one draws first, and in
+  // pass-and-play seat one is whoever just pressed Start game and is still
+  // holding the device — a curtain there would ask them to hand it to
+  // themselves. Every draw after the first is a real hand-off and gets its
+  // curtain from the ordinary actor-change rule below. (Owner ruling,
+  // 2026-08-08: a curtain *between* draws.)
   let awaitingReveal = state.stage !== 'draw';
-  /** Whether the game is still in front of the turn-order draw. */
+  /** Whether the game is still inside the opening turn-order draw. */
   let drawPending = state.stage === 'draw';
 
   // Cached so `getView()` is referentially stable between changes —
@@ -147,19 +151,32 @@ export function createGameSession(init: SessionInit): GameSession {
    */
   function syncSegment(): void {
     const next = getCurrentActor(state);
-    // Leaving the draw always closes a segment, even when seat one wins their
-    // own draw and the actor id is unchanged. Seat one pressed the button for
-    // the table; the segment that follows belongs to the winner as a *player*,
-    // and their hand has not been seen by anyone yet. Without this the winner's
-    // tiles appeared in front of whoever happened to be holding the device.
+    const actorChanged = next !== actorId;
+    // Leaving the turn-order draw closes a segment even when the actor does
+    // not change, which happens whenever the last drawer wins their own draw.
+    //
+    // Two things go wrong without it, and a by-hand pass found both:
+    //   - the draw stays inside the open segment, so the panel offers `undo`
+    //     on a random reveal. (Not exploitable — undo restores the bag too, so
+    //     the re-draw is identical — but the design says a drawn tile cannot
+    //     be taken back, and it could.)
+    //   - `server/room.ts` derives its commit from `segmentStart` moving, so
+    //     the whole table would not see who won until the winner had finished
+    //     their entire first turn. The turn order is public the moment it
+    //     exists.
     const leftDraw = drawPending && state.stage !== 'draw';
     drawPending = state.stage === 'draw';
-    if (next === actorId && !leftDraw) return;
+    if (!actorChanged && !leftDraw) return;
 
     actorId = next;
     previousSegmentStart = segmentStart;
     segmentStart = state.nextStepId;
-    awaitingReveal = true;
+    // The curtain is narrower than the segment close, and this is the only
+    // place they differ. It exists to hand the device to somebody else, so it
+    // rises only when somebody else is actually being waited on. A last drawer
+    // who wins their own draw keeps acting and keeps the device — curtaining
+    // them would be asking them to pass it to themselves.
+    if (actorChanged) awaitingReveal = true;
     for (const key of [...store.keys()]) {
       if (key < segmentStart) store.delete(key);
     }

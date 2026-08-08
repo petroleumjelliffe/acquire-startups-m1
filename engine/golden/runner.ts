@@ -3,6 +3,7 @@ import type { Coord, GameState } from '../gameTypes';
 import type { GoldenGame, StateAssertion } from './types';
 import { applyIntent, IllegalIntentError } from '../intents';
 import { getStartupSize } from '../gameHelpers';
+import { getCurrentActor } from '../actor';
 import { finalScore } from '../endGame';
 import { buildFixture } from './fixtures';
 
@@ -38,6 +39,9 @@ export function assertState(
   }
   if (a.currentPlayer !== undefined) {
     expect(state.players[state.turnIndex]?.id, at('currentPlayer')).toBe(a.currentPlayer);
+  }
+  if (a.actor !== undefined) {
+    expect(getCurrentActor(state), at('actor')).toBe(a.actor);
   }
   for (const [id, cash] of Object.entries(a.cash ?? {})) {
     expect(player(state, id).cash, at(`cash ${id}`)).toBe(cash);

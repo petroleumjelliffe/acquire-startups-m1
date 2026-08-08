@@ -4,10 +4,31 @@ import { buildFixture } from './golden/fixtures';
 import { createInitialGame } from './gameInit';
 
 describe('getCurrentActor', () => {
-  it('is seat one before turn order exists', () => {
+  it('is seat one before anyone has drawn', () => {
     const state = createInitialGame('seed-a', ['Alex', 'Sam']);
     expect(state.stage).toBe('draw');
     expect(getCurrentActor(state)).toBe('p1');
+  });
+
+  /**
+   * The draw takes a turn like any other move, so the actor has to move
+   * through it — and because this function *is* the segment seam, that one
+   * answer is what gives the draw its curtain, its hand-off and the server's
+   * per-draw commit, with nothing else to invent.
+   *
+   * The cursor is the length of `turnOrderDraws`: seat N+1 draws next.
+   */
+  it('moves to the next seat as each player draws', () => {
+    const state = createInitialGame('seed-a', ['Alex', 'Sam', 'Jordan']);
+
+    state.turnOrderDraws = [{ playerId: 'p1', tile: 'B11' }];
+    expect(getCurrentActor(state)).toBe('p2');
+
+    state.turnOrderDraws = [
+      { playerId: 'p1', tile: 'B11' },
+      { playerId: 'p2', tile: 'H11' },
+    ];
+    expect(getCurrentActor(state)).toBe('p3');
   });
 
   it('is the active player during their own stages', () => {

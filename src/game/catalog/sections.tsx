@@ -131,6 +131,8 @@ const G1_FOUND = goldenState('G1', 1);
 const G1_BUY = goldenState('G1', 2);
 const G13_TIED = goldenState('G13', 1);
 const G2_MERGER = goldenState('G2', 1);
+/** The opening after seat one's draw: still `stage: 'draw'`, seat two to act. */
+const G17_MID_DRAW = goldenState('G17', 1);
 const G5_SOLE = goldenState('G5', 1);
 const G9_END = goldenState('G9', 2);
 const G10_END = goldenState('G10', 1);
@@ -152,10 +154,15 @@ const MESSLA_PRICE = getSharePrice(G1_BUY, 'Messla');
  * page, for the price of one more catalog card — reusing the same golden
  * state as its "my turn" neighbour so the two are comparable pixel for pixel.
  */
-function TurnPanelDemo({ state, canAct }: { state: GameState; canAct: boolean }) {
+function TurnPanelDemo(
+  { state, canAct, actorId }: { state: GameState; canAct: boolean; actorId?: string },
+) {
   const view: SessionView = {
     state,
-    actorId: active(state).id,
+    // `players[turnIndex]` for every ordinary step, but overridable: during the
+    // turn-order draw `turnIndex` is still its initial 0 and means nothing —
+    // the actor is whoever the draw has reached.
+    actorId: actorId ?? active(state).id,
     awaitingReveal: false,
     undoableSteps: [],
     segmentStart: state.nextStepId,
@@ -655,6 +662,16 @@ export const SECTIONS: CatalogSection[] = [
         kind: 'wide',
         fixture: fromGolden('G1', 2),
         node: <TurnPanelDemo state={G1_BUY} canAct={false} />,
+      },
+      {
+        // The opening, part-way through: seat one has drawn and seat two is
+        // up. Carried here because a new step with no catalog entry is exactly
+        // how the clipped away-dot went unseen for a whole phase — the catalog
+        // is where a state gets looked at rather than merely tested.
+        label: 'panel · mid-draw (seat one has drawn)',
+        kind: 'wide',
+        fixture: fromGolden('G17', 1),
+        node: <TurnPanelDemo state={G17_MID_DRAW} canAct actorId="p2" />,
       },
       {
         label: 'panel · mid-merger (the worst squeeze)',

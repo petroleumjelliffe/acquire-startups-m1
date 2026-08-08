@@ -42,7 +42,14 @@ const NAMES = ['Alex', 'Sam', 'Jordan'];
  * legacy `resolveInitialDraw` loses count.
  */
 function newGame(seed: string): GameState {
-  return applyIntent(createInitialGame(seed, NAMES), { type: 'startGame', playerId: 'p1' });
+  // Every seat draws, because the opening is now one intent *per player* — a
+  // single draw leaves the game in `stage: 'draw'` waiting on seat two, and
+  // every invariant below would then be measuring a game that never started.
+  const dealt = createInitialGame(seed, NAMES);
+  return dealt.players.reduce(
+    (state, p) => applyIntent(state, { type: 'drawTurnOrderTile', playerId: p.id }),
+    dealt,
+  );
 }
 
 /** A cheap deterministic picker: shuffles by seed+salt and takes the head. */

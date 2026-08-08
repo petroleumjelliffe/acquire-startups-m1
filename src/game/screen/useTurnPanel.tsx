@@ -164,21 +164,56 @@ export function useTurnPanel(
   ) : null;
 
   if (state.stage === 'draw') {
+    // Everyone draws, one at a time, in seat order. `getCurrentActor` is what
+    // moves the turn along, so this step needs to say only two things: whose
+    // draw it is, and what has been drawn so far.
+    const draws = state.turnOrderDraws ?? [];
+    const drawn = draws.map((d) => ({
+      ...d,
+      name: state.players.find((p) => p.id === d.playerId)?.name ?? d.playerId,
+    }));
+    const remaining = state.players.length - draws.length;
+
     return {
       staging: idleStaging,
       active: (
         <ActiveStep
           label={stageLabel(state.stage)}
-          body={<span className="text-[13px] text-gray-600">Draw for turn order — highest tile plays first.</span>}
+          body={
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[13px] text-gray-600">
+                One tile each — the highest plays first.
+              </span>
+              {/* Derived, never hardcoded: the tiles come from the state that
+                  the engine wrote, so this cannot drift from the board. */}
+              {drawn.length > 0 && (
+                <ul data-draw-list className="flex flex-col gap-1">
+                  {drawn.map((d) => (
+                    <li key={d.playerId} className="flex items-center gap-1.5 text-[13px]">
+                      <span className="min-w-0 flex-1 truncate text-gray-600">{d.name}</span>
+                      {/* The same atom the log uses for a tile token, so a
+                          drawn tile reads identically wherever it appears. */}
+                      <Tile coord={d.tile} state="filled" />
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <span className="text-[12px] text-gray-500">
+                {remaining > 0
+                  ? `${remaining} still to draw`
+                  : 'Everyone has drawn.'}
+              </span>
+            </div>
+          }
           button={
             <>
               {canAct && (
                 <button
                   type="button"
-                  onClick={() => actorId && dispatch({ type: 'startGame', playerId: actorId })}
+                  onClick={() => actorId && dispatch({ type: 'drawTurnOrderTile', playerId: actorId })}
                   className="m-0 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                 >
-                  Draw for turn order
+                  Draw your tile
                 </button>
               )}
               {waiting}

@@ -773,12 +773,32 @@ describe('discard pile', () => {
   });
 });
 
-describe('startGame', () => {
-  it('turns a fresh game into a playable position', () => {
+describe('drawTurnOrderTile', () => {
+  /** Every seat draws, in order, leaving the game at the position play starts from. */
+  const drawAll = (state: GameState): GameState =>
+    state.players.reduce(
+      (s, p) => applyIntent(s, { type: 'drawTurnOrderTile', playerId: p.id }),
+      state,
+    );
+
+  it('stays in the draw until the last seat has drawn', () => {
     const state = createInitialGame('open-1', ['Alex', 'Sam', 'Jo']);
     expect(state.stage).toBe('draw');
 
-    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+    const afterOne = applyIntent(state, { type: 'drawTurnOrderTile', playerId: 'p1' });
+    expect(afterOne.stage).toBe('draw');
+    expect(afterOne.turnOrderDraws).toHaveLength(1);
+
+    const afterTwo = applyIntent(afterOne, { type: 'drawTurnOrderTile', playerId: 'p2' });
+    expect(afterTwo.stage).toBe('draw');
+
+    const afterThree = applyIntent(afterTwo, { type: 'drawTurnOrderTile', playerId: 'p3' });
+    expect(afterThree.stage).toBe('play');
+    expect(afterThree.turnOrderDraws).toHaveLength(3);
+  });
+
+  it('turns a fresh game into a playable position once everyone has drawn', () => {
+    const next = drawAll(createInitialGame('open-1', ['Alex', 'Sam', 'Jo']));
 
     expect(next.stage).toBe('play');
     // One starting tile per player, placed and unclaimed.
@@ -790,7 +810,7 @@ describe('startGame', () => {
   it('takes the starting tiles out of the bag rather than returning them', () => {
     const state = createInitialGame('open-1', ['Alex', 'Sam', 'Jo']);
     const before = state.bag.length;
-    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+    const next = drawAll(state);
 
     expect(next.bag).toHaveLength(before - 3);
     const placedCoords = Object.entries(next.board)
@@ -799,43 +819,81 @@ describe('startGame', () => {
     for (const coord of placedCoords) expect(next.bag).not.toContain(coord);
   });
 
-  it('preserves tile conservation across the opening', () => {
-    const state = createInitialGame('open-2', ['Alex', 'Sam']);
-    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+  it('preserves tile conservation at every step of the opening, not just the end', () => {
+    let state = createInitialGame('open-2', ['Alex', 'Sam', 'Jo']);
+    const total = (s: GameState) =>
+      Object.values(s.board).filter((c) => c.placed).length
+      + s.players.reduce((n, p) => n + p.hand.length, 0)
+      + s.bag.length + s.discarded.length;
 
-    const placed = Object.values(next.board).filter((c) => c.placed).length;
-    const inHands = next.players.reduce((n, p) => n + p.hand.length, 0);
-    expect(placed + inHands + next.bag.length + next.discarded.length).toBe(108);
+    expect(total(state)).toBe(108);
+    for (const p of state.players) {
+      state = applyIntent(state, { type: 'drawTurnOrderTile', playerId: p.id });
+      // Checked after *each* draw: the legacy opening pushed drawn tiles back
+      // onto the bag, counting them twice, and a total taken only at the end
+      // can be right while an intermediate state is not.
+      expect(total(state)).toBe(108);
+    }
   });
 
   it('gives the turn to whoever drew the highest coordinate', () => {
     // Highest letter, then highest number — so I12 beats A1. `compareTiles`
     // orders row-then-column ascending, which makes the winner the last entry.
+    // This game reverses tabletop Acquire deliberately; see doDrawTurnOrderTile.
     const state = createInitialGame('open-3', ['Alex', 'Sam', 'Jo']);
     const drawnInOrder = state.bag.slice(0, 3);
     const highest = [...drawnInOrder].sort(compareTiles).at(-1)!;
     const expectedIndex = drawnInOrder.indexOf(highest);
 
-    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
+    const next = drawAll(state);
     expect(next.turnIndex).toBe(expectedIndex);
+    // And the record agrees with the outcome: the winner is the seat whose own
+    // recorded draw is the highest tile.
+    const winner = [...next.turnOrderDraws!].sort((a, b) => compareTiles(a.tile, b.tile)).at(-1)!;
+    expect(next.players[next.turnIndex].id).toBe(winner.playerId);
   });
 
-  it('logs the draw so the step stack can narrate it', () => {
+  it('narrates each draw as its own step, and announces the winner at the end', () => {
     const state = createInitialGame('open-4', ['Alex', 'Sam']);
-    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
-    expect(next.log.map((e) => e.phase)).toContain('Drew for turn order');
+
+    const afterOne = applyIntent(state, { type: 'drawTurnOrderTile', playerId: 'p1' });
+    // Its own step, attributed to the drawer. Not cosmetic: `pushLog` is what
+    // advances `nextStepId`, and the segment machinery is built on step ids —
+    // a silent draw left the undo range and the server's commit boundary with
+    // nothing to move past.
+    expect(afterOne.log.map((e) => e.phase)).toEqual(['Drew for turn order']);
+    expect(afterOne.log.at(-1)!.playerId).toBe('p1');
+    // Nobody plays first yet — the order is unknown until the last tile lands.
+    expect(afterOne.log.map((e) => e.phase)).not.toContain('Turn order');
+
+    const next = applyIntent(afterOne, { type: 'drawTurnOrderTile', playerId: 'p2' });
+    expect(next.log.map((e) => e.phase))
+      .toEqual(['Drew for turn order', 'Drew for turn order', 'Turn order']);
+    // Unattributed on purpose. `stepsOf` prefixes an entry with its player,
+    // and renders "You" for the viewer's own — so an attributed "Turn order"
+    // reads as "YOU TURN ORDER". It is a fact about the table, not a move
+    // anyone made, so the winner is named in the detail instead.
+    expect(next.log.at(-1)!.playerId).toBeUndefined();
+    const detail = next.log.at(-1)!.detail.map((t) => ('text' in t ? t.text : '')).join('');
+    expect(detail).toContain(next.players[next.turnIndex].name);
+    expect(detail).toContain('plays first');
   });
 
   it('is rejected once the game is under way', () => {
-    const state = createInitialGame('open-5', ['Alex', 'Sam']);
-    const started = applyIntent(state, { type: 'startGame', playerId: 'p1' });
-    expect(() => applyIntent(started, { type: 'startGame', playerId: 'p1' }))
+    const started = drawAll(createInitialGame('open-5', ['Alex', 'Sam']));
+    expect(() => applyIntent(started, { type: 'drawTurnOrderTile', playerId: 'p1' }))
       .toThrow(IllegalIntentError);
   });
 
-  it('is rejected from a seat other than the first', () => {
-    const state = createInitialGame('open-6', ['Alex', 'Sam']);
-    expect(() => applyIntent(state, { type: 'startGame', playerId: 'p2' }))
+  it('is rejected from any seat but the one whose draw it is', () => {
+    const state = createInitialGame('open-6', ['Alex', 'Sam', 'Jo']);
+    // Seat two cannot jump the queue...
+    expect(() => applyIntent(state, { type: 'drawTurnOrderTile', playerId: 'p2' }))
+      .toThrow(IllegalIntentError);
+
+    // ...and seat one cannot draw twice.
+    const afterOne = applyIntent(state, { type: 'drawTurnOrderTile', playerId: 'p1' });
+    expect(() => applyIntent(afterOne, { type: 'drawTurnOrderTile', playerId: 'p1' }))
       .toThrow(IllegalIntentError);
   });
 });
@@ -862,14 +920,19 @@ describe('merger payout payload', () => {
   });
 });
 
-describe('startGame and the undo indicator', () => {
+describe('the turn-order draw and the undo indicator', () => {
   it('does not mark a starting tile as the player last placement', () => {
     // `lastPlacedTile` means "the tile placed this turn, still undoable": the
     // board draws it with a selection ring and keeps it clickable so it can be
     // taken back. A turn-order tile is neither — marking it made the opening
     // board show a phantom undoable tile that rejected the click it invited.
-    const state = createInitialGame('open-7', ['Alex', 'Sam', 'Jo']);
-    const next = applyIntent(state, { type: 'startGame', playerId: 'p1' });
-    expect(next.players.every((p) => p.lastPlacedTile === undefined)).toBe(true);
+    let state = createInitialGame('open-7', ['Alex', 'Sam', 'Jo']);
+    for (const p of state.players) {
+      state = applyIntent(state, { type: 'drawTurnOrderTile', playerId: p.id });
+      // Checked after every draw, not only at the end: a draw that set the
+      // field would be visible mid-draw and could still be cleared by the time
+      // the last tile lands.
+      expect(state.players.every((pl) => pl.lastPlacedTile === undefined)).toBe(true);
+    }
   });
 });

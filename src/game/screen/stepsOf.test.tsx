@@ -66,7 +66,7 @@ describe('the draw is hidden, not deleted', () => {
     // state has ever contained a turn-order draw to assert against.
     const session = createGameSession({ seed: 'hidden-phase', names: ['Alex', 'Sam'] });
     const opener = session.getView().actorId!;
-    session.dispatch({ type: 'startGame', playerId: opener });
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: opener });
 
     const state = session.getView().state;
     expect(

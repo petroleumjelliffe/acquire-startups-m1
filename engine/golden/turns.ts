@@ -198,13 +198,33 @@ const G17: GoldenGame = {
   },
   steps: [
     {
-      name: 'seat one opens the game; the higher tile takes the first turn',
-      intent: { type: 'startGame', playerId: 'p1' },
+      // Each seat draws its own tile, in order, and the draw passes the turn
+      // like any other move — so after Alex draws, the game is still in the
+      // draw and it is Sam's turn to act, not Sam's turn to *play*.
+      name: 'seat one draws its own tile, and the draw passes to seat two',
+      intent: { type: 'drawTurnOrderTile', playerId: 'p1' },
+      then: {
+        stage: 'draw',
+        // `actor`, not `currentPlayer`: turn order does not exist yet, so
+        // `turnIndex` is still its initial 0 and means nothing. What has moved
+        // is who the rules are waiting on — which is the whole point of the
+        // change, and the seam the curtain and the server's commit hang off.
+        actor: 'p2',
+        boardOwner: { B4: null },
+        // Each draw narrates itself. No order is announced yet — that waits
+        // for the last tile.
+        logPhases: ['Drew for turn order'],
+      },
+    },
+    {
+      name: 'the last draw resolves the order; the higher tile takes the first turn',
+      intent: { type: 'drawTurnOrderTile', playerId: 'p2' },
       then: {
         stage: 'play',
         currentPlayer: 'p2',
+        actor: 'p2',
         boardOwner: { E5: null, B4: null },
-        logPhases: ['Drew for turn order'],
+        logPhases: ['Drew for turn order', 'Turn order'],
       },
     },
     {

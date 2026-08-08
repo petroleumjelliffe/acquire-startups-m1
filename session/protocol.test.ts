@@ -25,7 +25,7 @@ const WIRE_INTENT_TYPES: Record<WireIntent['type'], true> = {
   tradeInDeadTiles: true,
   declareEnd: true,
   endTurn: true,
-  startGame: true,
+  drawTurnOrderTile: true,
 };
 
 describe('WireIntent', () => {
@@ -81,7 +81,7 @@ describe('event names', () => {
 
 describe('DRAWS is the one definition of which intents draw from the bag', () => {
   it('names exactly the three whose result a projected client cannot compute', () => {
-    expect([...DRAWS].sort()).toEqual(['endTurn', 'startGame', 'tradeInDeadTiles']);
+    expect([...DRAWS].sort()).toEqual(['drawTurnOrderTile', 'endTurn', 'tradeInDeadTiles']);
   });
 
   it('holds only real intent types', () => {

@@ -18,8 +18,14 @@ import type { GameState } from './gameTypes';
 export function getCurrentActor(state: GameState): string | null {
   if (state.stage === 'end') return null;
 
-  // Turn order does not exist yet, so seat one opens the game.
-  if (state.stage === 'draw') return state.players[0]?.id ?? null;
+  // The opening draw is taken one player at a time, in seat order, and the
+  // number of draws recorded so far is the cursor. Because this function is
+  // the segment seam, this single line is what makes the draw behave like any
+  // other move: the curtain rises between draws, each draw is its own commit
+  // on the server, and the toast names whoever the table is waiting on.
+  if (state.stage === 'draw') {
+    return state.players[state.turnOrderDraws?.length ?? 0]?.id ?? null;
+  }
 
   if (state.stage === 'mergerLiquidation') {
     const ctx = state.mergerContext;

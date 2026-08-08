@@ -12,7 +12,16 @@ export interface FixtureSpec {
 
 export interface StateAssertion {
   stage?: Stage;
+  /** `players[turnIndex]` — whose *turn* it is. Meaningless before turn order exists. */
   currentPlayer?: string;
+  /**
+   * `getCurrentActor` — whose input the rules are waiting on, which is not
+   * always whose turn it is: a liquidating shareholder, or a seat part-way
+   * through the opening turn-order draw. It is also the segment seam, so this
+   * is the field that pins the curtain, the undo range and the server's commit
+   * boundary to the rules rather than to an implementation.
+   */
+  actor?: string;
   cash?: Record<string, number>;
   shares?: Record<string, Record<string, number>>;
   chainSize?: Record<string, number>;

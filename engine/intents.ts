@@ -21,7 +21,7 @@ import {
  * fixed by the roadmap spec — do not rename them.
  */
 export type Intent =
-  | { type: 'startGame';           playerId: string }
+  | { type: 'drawTurnOrderTile';   playerId: string }
   | { type: 'placeTile';           playerId: string; coord: Coord }
   | { type: 'chooseFoundingBrand'; playerId: string; startupId: StartupId }
   | { type: 'chooseSurvivor';      playerId: string; startupId: StartupId }
@@ -376,45 +376,95 @@ function doDeclareEnd(state: GameState, intent: Extract<Intent, { type: 'declare
 }
 
 /**
- * Opens the game: one tile each for turn order, highest coordinate goes first.
+ * One player's own turn-order draw.
+ *
+ * Each seat draws in order and the order is resolved when the last tile lands.
+ * This replaced `startGame`, which drew for *everybody* inside one intent so
+ * that one player pressed one button and the game was already running — nobody
+ * else acted. Reported by the owner: *"the draw to go first was meant to pass
+ * turn like any other move."*
+ *
+ * The turn-passing itself is not implemented here. `getCurrentActor` reads
+ * `turnOrderDraws.length` as a cursor, and because that function is the segment
+ * seam, the curtain, the hand-off, the toast and the server's per-draw commit
+ * all follow from it with nothing added.
  *
  * The drawn tiles stay on the board as unclaimed starting tiles, exactly as in
  * Acquire, and they leave the bag for good. The legacy `resolveInitialDraw`
  * marks them placed *and* pushes them back onto the bag, which counts them
  * twice — `checkInvariants`' tile conservation catches that, and nothing
  * currently runs that code. Do not reproduce it here.
- *
- * Only seat one may open the game: turn order does not exist yet, so there is
- * no "current player" to check against, and something has to be the authority.
  */
-function doStartGame(state: GameState, intent: Extract<Intent, { type: 'startGame' }>): void {
+function doDrawTurnOrderTile(
+  state: GameState,
+  intent: Extract<Intent, { type: 'drawTurnOrderTile' }>,
+): void {
   requireStage(state, 'draw');
-  if (state.players[0]?.id !== intent.playerId) reject('notYourTurn', 'only seat one opens the game');
 
-  const drawn = state.players.map((p) => {
-    const tile = state.bag.shift();
-    if (!tile) reject('shareCountMismatch', 'bag exhausted during the opening draw');
-    state.board[tile] = { placed: true };
-    // Deliberately NOT `p.lastPlacedTile = tile`, which is what the legacy
-    // `resolveInitialDraw` does. That field means "the tile placed this turn,
-    // still undoable": the board gives it a selection ring and keeps it
-    // clickable so it can be taken back. A turn-order tile is neither, and
-    // marking it put a phantom undoable tile on the opening board that
-    // rejected the very click it invited.
-    return { player: p, tile };
-  });
+  const draws = state.turnOrderDraws ?? (state.turnOrderDraws = []);
+  const drawer = state.players[draws.length];
+  // Not "seat one may open the game" any more: it is whoever the draw has
+  // reached. Same shape as every other intent's actor guard, which is what
+  // makes a draw a turn.
+  if (!drawer || drawer.id !== intent.playerId) {
+    reject('notYourTurn', 'it is not your turn to draw');
+  }
+
+  const tile = state.bag.shift();
+  if (!tile) reject('shareCountMismatch', 'bag exhausted during the opening draw');
+  state.board[tile] = { placed: true };
+  // Deliberately NOT `drawer.lastPlacedTile = tile`, which is what the legacy
+  // `resolveInitialDraw` does. That field means "the tile placed this turn,
+  // still undoable": the board gives it a selection ring and keeps it
+  // clickable so it can be taken back. A turn-order tile is neither, and
+  // marking it put a phantom undoable tile on the opening board that
+  // rejected the very click it invited.
+  draws.push({ playerId: drawer.id, tile });
+
+  // Every draw is its own step, attributed to whoever drew it.
+  //
+  // Not cosmetic: `pushLog` is what assigns and advances `nextStepId`, and the
+  // segment machinery is built on step ids. A draw that narrated nothing left
+  // the undo range and the server's commit boundary with no step to move past,
+  // so a closed segment still reported its draw as undoable and `room.ts` and
+  // `GameSession` disagreed about whether a commit had happened. Both of those
+  // showed up the moment the draw became a turn.
+  pushLog(state, 'Drew for turn order', [
+    tok.text(`${drawer.name} `),
+    tok.tile(tile),
+  ], drawer.id);
+
+  // Still going round the table; there is no order to announce yet.
+  if (draws.length < state.players.length) return;
 
   // Highest letter, then highest number, takes the first turn — I12 beats A1.
   // `compareTiles` orders row-then-column ascending, so the winner is the last
   // entry. (Tabletop Acquire gives it to the tile *closest* to A1; this game
   // reverses that deliberately.)
-  const sorted = [...drawn].sort((a, b) => compareTiles(b.tile, a.tile));
-  state.turnIndex = state.players.findIndex((p) => p.id === sorted[0].player.id);
+  //
+  // Ties are impossible: tiles are unique and `compareTiles` totally orders
+  // them. Written down so nobody adds a defensive tie-break that can never run.
+  const nameOf = (playerId: string) =>
+    state.players.find((p) => p.id === playerId)?.name ?? playerId;
+  const sorted = [...draws].sort((a, b) => compareTiles(b.tile, a.tile));
+  const winner = sorted[0];
+  state.turnIndex = state.players.findIndex((p) => p.id === winner.playerId);
 
-  pushLog(state, 'Drew for turn order', sorted.flatMap((d, i) => [
-    tok.text(i === 0 ? `${d.player.name} ` : `, ${d.player.name} `),
-    tok.tile(d.tile),
-  ]), intent.playerId);
+  // The winner is named rather than merely arrived at, as its own step. With a
+  // curtain between draws the table has just passed the device around several
+  // times, and the last draw would otherwise slide silently into somebody's
+  // turn with no moment saying who won or why. (Owner ruling, 2026-08-08.)
+  // Deliberately **unattributed**. `stepsOf` prefixes an entry with its
+  // player — "You" when it is the viewer's — so an attributed phase has to
+  // read after a name. "Plays first" attributed to the winner rendered as
+  // "YOU PLAYS FIRST", seen in a browser. This is a fact about the table
+  // rather than a move anyone made, so it carries no `playerId` and the
+  // winner is named in the detail instead.
+  pushLog(state, 'Turn order', [
+    tok.text(`${nameOf(winner.playerId)} drew highest `),
+    tok.tile(winner.tile),
+    tok.text(' and plays first'),
+  ]);
 
   state.stage = 'play';
 }
@@ -428,7 +478,7 @@ function doStartGame(state: GameState, intent: Extract<Intent, { type: 'startGam
 export function applyIntent(state: GameState, intent: Intent): GameState {
   const next = structuredClone(state);
   switch (intent.type) {
-    case 'startGame':           doStartGame(next, intent); break;
+    case 'drawTurnOrderTile':   doDrawTurnOrderTile(next, intent); break;
     case 'placeTile':           doPlaceTile(next, intent); break;
     case 'chooseFoundingBrand': doChooseFoundingBrand(next, intent); break;
     case 'chooseSurvivor':      doChooseSurvivor(next, intent); break;

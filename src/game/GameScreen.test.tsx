@@ -165,15 +165,22 @@ describe('GameScreen at the turn-order draw', () => {
     expect(hand.textContent).not.toMatch(/\$6,000/);
   });
 
-  it('goes straight to the draw with no curtain in the way', () => {
+  it('goes straight to the first draw with no curtain in the way', () => {
+    // Seat one draws first, and in pass-and-play seat one is whoever just
+    // pressed Start game and is still holding the device. A curtain here would
+    // ask them to hand it to themselves.
     render(<GameScreen session={atDraw()} />);
     expect(screen.queryByText(/pass to/i)).toBeNull();
-    expect(screen.getByRole('button', { name: /draw for turn order/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /draw your tile/i })).toBeInTheDocument();
   });
 
-  it('hands to the winner behind the curtain once the draw is done', () => {
+  it('raises the curtain between draws, so the device can be passed on', () => {
+    // The owner's ruling, and the reason the draw is a turn at all: after seat
+    // one draws it is seat two's draw, and somebody has to be told to hand the
+    // device over. Deterministic regardless of who wins — the actor always
+    // moves from seat one to seat two here.
     render(<GameScreen session={atDraw()} />);
-    fireEvent.click(screen.getByRole('button', { name: /draw for turn order/i }));
+    fireEvent.click(screen.getByRole('button', { name: /draw your tile/i }));
     expect(screen.getByText(/pass to/i)).toBeInTheDocument();
   });
 });

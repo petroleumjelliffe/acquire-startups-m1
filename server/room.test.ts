@@ -190,13 +190,25 @@ describe('beginning a game', () => {
  * passed without exercising the room at all.
  *
  * The first reframing collapsed a segment close onto an actor change alone.
- * That over-reaches: leaving the turn-order draw closes a segment even when
- * the actor is unchanged, because seat one presses the button for the table,
- * and what follows belongs to the winner as a *player* — a distinction
- * `session/GameSession.ts:117-119` (`leftDraw`) draws on purpose. The corpus
- * never happens to exercise it with a stable actor across that boundary, so
- * the first version passed today and would have broken silently once Task 6
- * drove `begin` + `startGame` end to end.
+ * That over-reached *at the time*, because leaving the turn-order draw closed a
+ * segment even with the actor unchanged: seat one pressed one button for the
+ * whole table, so what followed belonged to the winner as a *player* and their
+ * hand had been seen by nobody.
+ *
+ * As of 2026-08-08 the draw is one intent *per player*, and the rule survives
+ * with its reason replaced — which is the third time this comment has been
+ * rewritten by the same question, so it is worth stating precisely.
+ *
+ * A segment still closes when the draw resolves even if the actor is unchanged
+ * (the last drawer winning their own draw). It is no longer about revealing a
+ * hand: it is that this room derives `commit` from the segment closing, so
+ * without it the turn order — public the instant it exists — would stay inside
+ * the winner's private draft until they finished their entire first turn.
+ *
+ * The *curtain* is what narrowed. `GameSession` raises it only on a real actor
+ * change, because its job is handing the device to somebody else and the last
+ * drawer already has it. Curtain and commit are no longer the same event, and
+ * G17 is the golden that pins the difference.
  *
  * The coupling itself is what deserves pinning. Every privacy and staleness
  * guarantee in this phase rests on it, and a `dispatch` that committed early
@@ -234,14 +246,14 @@ describe('a commit and a segment close are the same event', () => {
         }
         expect(delivery.kind, `${where} — unexpected rejection`).not.toBe('rejected');
 
-        const changed = room.actorId() !== actorBefore;
-        // A segment closes two ways, not one. The actor changing is the usual
-        // one. The other is leaving the turn-order draw, which closes a segment
-        // even when seat one wins its own draw and the actor is unchanged: seat
-        // one pressed the button for the table, and what follows belongs to the
-        // winner as a player. `session/GameSession.ts` owns that rule.
-        const leftDraw = stageBefore === 'draw' && room.draft().stage !== 'draw';
-        const closed = changed || leftDraw;
+        // A segment closes two ways: the actor changes, or the turn-order draw
+        // resolves. The second matters only when the last drawer wins their own
+        // draw, and it is not about hand-offs — the *curtain* is narrower and
+        // stays put in that case. It is about the table: this room derives its
+        // commit from the segment closing, so without it nobody would see who
+        // won the draw until the winner finished their whole first turn.
+        const closed = room.actorId() !== actorBefore
+          || (stageBefore === 'draw' && room.draft().stage !== 'draw');
 
         if (closed) segmentCloses++;
         if (delivery.kind === 'commit') commits++;

@@ -112,6 +112,25 @@ export interface GameState {
   stage: Stage;
   players: Player[];
   turnIndex: number;
+  /**
+   * The opening turn-order draw, filled in seat order during `stage: 'draw'`.
+   *
+   * Its **length is the cursor** — seat N+1 draws next — which is what makes
+   * `getCurrentActor` move through the draw, and therefore what gives the draw
+   * a curtain, a hand-off and a per-draw server commit for free.
+   *
+   * Kept rather than cleared once play begins: it is the record of who drew
+   * what, which a recap would read, and it costs nothing.
+   *
+   * Deliberately not `player.lastPlacedTile` — that field means "placed this
+   * turn, still undoable", and the board gives it a selection ring and keeps it
+   * clickable. Phase 2 shipped that bug once; see the comment in
+   * `doDrawTurnOrderTile`.
+   *
+   * Public information: the tiles land on the board as unclaimed starting
+   * tiles anyway, so no projection has to strip this.
+   */
+  turnOrderDraws?: { playerId: string; tile: Coord }[];
   board: Record<Coord, TileCell>;
   bag: Coord[];
   /** dead tiles traded in and permanently out of play; `placed + hands + bag + discarded` is always 108 */
