@@ -1,10 +1,38 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { BASE_PATH } from "./basePath";
+import { APP_COLORS } from "./src/game/tokens";
 
 export default defineConfig(({ command }) => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Substitutes the PWA placeholders in index.html.
+    //
+    // __THEME_COLOR__ comes from the same token the manifest generator reads
+    // (APP_COLORS in src/game/tokens.ts), so a palette change — the Aqua
+    // Titanium reskin rewrites that file — flows into both without either
+    // being typed by hand. Safe to import here: tokens.ts depends only on
+    // engine/, which is Node-clean by construction.
+    //
+    // __PWA_BASE__ exists because Vite's own %BASE_URL% inserts the base
+    // *verbatim*: with base '/acquire-startups-m1' it produced
+    // href="/acquire-startups-m1manifest.webmanifest" — no slash. This one is
+    // normalized to always end in exactly one slash, in dev and build alike.
+    //
+    // replaceAll, not replace: the first __THEME_COLOR__ in the file is in
+    // the comment explaining it, and .replace() substituted the comment and
+    // left the actual meta tag carrying the placeholder. Caught by grepping
+    // dist, which is why the verification step exists.
+    {
+      name: "pwa-placeholders-from-tokens",
+      transformIndexHtml: (html) =>
+        html
+          .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
+          .replaceAll("__PWA_BASE__", `${command === "build" ? BASE_PATH : ""}/`),
+    },
+  ],
   server: { port: 5173 },
-  base: command === 'build' ? "/acquire-startups-m1" : "/",
+  base: command === 'build' ? BASE_PATH : "/",
   test: {
     globals: true,
     environment: 'jsdom',

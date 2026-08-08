@@ -3,8 +3,11 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./App";
 import "./styles/index.css";
 
-// Use base path for GitHub Pages in production
-const basename = import.meta.env.PROD ? '/acquire-startups-m1' : '/';
+// The router's basename comes from Vite's own BASE_URL, which the config
+// builds from the one copy of the path in `basePath.ts` — this file used to
+// hold a second hardcoded copy. BASE_URL carries a trailing slash
+// ('/acquire-startups-m1/'); the router wants none.
+const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <BrowserRouter basename={basename}>

@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Acquire — Multiplayer Board Game</title>
 
+    <!-- PWA. The manifest is generated at build time from src/game/tokens.ts
+         (scripts/generate-manifest.ts) — the theme-color below is the same
+         token; if it ever disagrees with the manifest, the generator is right.
+         __PWA_BASE__ is substituted by the same plugin, slash-normalized. -->
+    <link rel="manifest" href="__PWA_BASE__manifest.webmanifest" />
+    <!-- __THEME_COLOR__ is substituted by vite.config.ts from APP_COLORS —
+         the same token the manifest generator reads, so the two cannot
+         disagree and neither is typed by hand. -->
+    <meta name="theme-color" content="__THEME_COLOR__" />
+    <link rel="icon" href="__PWA_BASE__icons/icon-192.png" type="image/png" />
+    <!-- iOS installs read these, not the manifest. -->
+    <link rel="apple-touch-icon" href="__PWA_BASE__icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Acquire" />
+
     <!-- Start Single Page Apps for GitHub Pages -->
     <script type="text/javascript">
       // Single Page Apps for GitHub Pages

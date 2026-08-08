@@ -36,3 +36,26 @@ const TICKERS = new Map<string, string>(AVAILABLE_STARTUPS.map((s) => [s.id, s.t
 export function tickerFor(id: BrandKey): string {
   return id === 'Cash' ? '$$' : TICKERS.get(id) ?? id;
 }
+
+/**
+ * The app's chrome, as real colour values.
+ *
+ * `BRAND_CLASSES` above is Tailwind class names, which is right for
+ * components and useless for anything outside the CSS pipeline — the PWA
+ * manifest wants hex. These are the two colours the installed app shows the
+ * OS: `theme` is the primary action blue (Tailwind blue-600) and `background`
+ * is the page ground (gray-50) painted behind the splash while the shell
+ * loads.
+ *
+ * The manifest is *generated* from these at build time
+ * (`scripts/generate-manifest.ts`) — never hand-copied — so a reskin that
+ * retargets this object flows into installed apps on the next build. If you
+ * are the reskin: change the values here and you are done; do not touch the
+ * generator.
+ */
+export const APP_COLORS = {
+  /** Primary action colour — Tailwind blue-600 today. */
+  theme: '#2563eb',
+  /** Page ground — Tailwind gray-50 today. */
+  background: '#f9fafb',
+} as const;
