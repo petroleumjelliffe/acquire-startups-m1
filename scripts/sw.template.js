@@ -48,9 +48,19 @@ self.addEventListener('fetch', (event) => {
   // Navigations: network-first, so a deploy is picked up on the next load
   // when online, falling back to the cached shell when not. The SPA has one
   // shell; every route falls back to the same document.
+  //
+  // The fallback covers a *response* failure, not only a thrown fetch: a
+  // static host with no SPA fallback answers a deep link with 404, and the
+  // first version of this handler passed that 404 straight through — caught
+  // when the test mount (python http.server) did exactly that. On GitHub
+  // Pages the 404.html redirect script papers over it when online; serving
+  // the cached shell here is faster than that dance and works on any host.
   if (event.request.mode === 'navigate') {
+    const shell = () => caches.match(`${BASE}index.html`);
     event.respondWith(
-      fetch(event.request).catch(() => caches.match(`${BASE}index.html`)),
+      fetch(event.request)
+        .then((res) => (res.ok ? res : shell().then((hit) => hit ?? res)))
+        .catch(() => shell()),
     );
     return;
   }

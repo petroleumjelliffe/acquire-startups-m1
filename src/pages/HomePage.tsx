@@ -3,9 +3,16 @@
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useOnline } from '../pwa/useOnline';
 
 export function HomePage() {
   const navigate = useNavigate();
+  // An installed app can genuinely be offline, and the honest split is the
+  // whole PWA design: Pass & Play works with no network, Online cannot — the
+  // server is the authority and there is deliberately no local fallback. So
+  // Online is not offered as though it would work, with the same wording the
+  // device-offline pill already uses. One vocabulary, not two.
+  const online = useOnline();
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -17,14 +24,17 @@ export function HomePage() {
           {/* Online Multiplayer */}
           <button
             onClick={() => navigate('/online')}
-            className="w-full px-6 py-5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-left group"
+            disabled={!online}
+            className="w-full px-6 py-5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-left group disabled:cursor-not-allowed disabled:bg-gray-400"
           >
             <div className="flex items-start gap-4">
               <span className="text-3xl">🌐</span>
               <div className="flex-1">
                 <div className="font-bold text-xl mb-1">Online</div>
-                <div className="text-blue-100 text-sm">
-                  Each player joins from their own device. Share a room link to play together remotely.
+                <div className={`text-sm ${online ? 'text-blue-100' : 'text-gray-100'}`}>
+                  {online
+                    ? 'Each player joins from their own device. Share a room link to play together remotely.'
+                    : 'No network — waiting for this device to reconnect.'}
                 </div>
               </div>
             </div>
