@@ -10,7 +10,10 @@
 
 ## Global Constraints
 
-- Branch off `revamp/online-lobby-mockup` (it already dropped board headers, matching the mockup) — name it `revamp/aqua-titanium-reskin`.
+- Branch off **`main`** — name it `revamp/aqua-titanium-reskin`. (This plan originally said to
+  branch off `revamp/online-lobby-mockup`, which was merged and deployed on 2026-08-07; `main` has
+  carried the headerless board ever since, plus the turn-order draw (v3) and the per-draw panel
+  state, which Task 8's sweep should include.)
 - **Skin only.** The mockup's *layout* inventions — the ticker strip, right-hand ACTIVITY feed, header player chips row — are **out of scope**. The existing GameScreen layout, panel zone order (`stepstack → active → staging → hand → players`), and slot semantics stay exactly as they are.
 - **The panel has exactly one animation** (active-zone height via `panel/StepReveal`). This plan adds **zero** transitions/transforms. If a step to "polish" tempts you to animate gloss, don't.
 - Panel-height stability: no zone may change height without gaining a row. New paint must not change box heights — pad/border deltas must be compensated in the same class.
@@ -19,7 +22,13 @@
 - Font stack everywhere on the game screen: `'Lucida Grande', 'Trebuchet MS', Verdana, sans-serif`. No monospace anywhere (mockup's explicit rule).
 - Blue stays reserved for hand/selection, green for cash — the brand gradient map must not use either as a brand hue.
 - Semantics carried by outlines must survive: the blue `outline` for placed-this-turn, brand `ring` group outlines on chains, the 🚫 blocked overlay, `data-tile-state` / `data-slot` / `data-board` attributes (tests and verify-layout read them).
-- Verify in a real browser (`/catalog`, `/scenarios`); jsdom sees no layout. `npm run typecheck`, `npx vitest run`, `npx vite build`, `npm run check:bundle`, `npm run verify:layout` all green before merge (verify:layout green is weak evidence — run it twice).
+- Verify in a real browser (`/catalog`, `/scenarios` — **dev server only**; as of the PWA plan's
+  Task 1 they are not in production builds); jsdom sees no layout. `npm run typecheck`,
+  `npx vitest run`, `npx vite build`, `npm run check:bundle`, `npm run verify:layout` all green
+  before merge. (This bullet used to say a green verify:layout is weak evidence — that was fixed
+  on 2026-08-08; the flakiness was the gate's own rounding, and green is ordinary evidence now.
+  One real consequence for *this* branch: the gate compares zone heights with a 1px tolerance, so
+  new paint must keep every box height within 1px, not merely "compensated".)
 - `prefers-reduced-motion` behaviour is unchanged (nothing new animates, so nothing new to guard).
 
 ## Design tokens (extracted from the mockup — copy these verbatim)
@@ -81,7 +90,7 @@
 - [ ] **Step 1: Create the branch**
 
 ```bash
-git checkout revamp/online-lobby-mockup && git checkout -b revamp/aqua-titanium-reskin
+git checkout main && git pull && git checkout -b revamp/aqua-titanium-reskin
 ```
 
 - [ ] **Step 2: Write `src/styles/aqua.css`**
@@ -326,11 +335,30 @@ and in `brandPaint` keep the `ring-[3px] ${brandClasses.ring}` group outline but
 
 - [ ] **Step 1:** Full suite + typecheck + build + check:bundle + verify:layout (twice) — all green, outputs read, not assumed.
 - [ ] **Step 2:** By-hand browser pass (the thing that actually finds bugs here): `/catalog` end-to-end scroll; `/scenarios` merger state; one full two-browser turn cycle via `npm run dev:all` including a refresh mid-turn (presence + resume must still render correctly under the new paint). Screenshot the board, panel, and lobby against the mockup side by side.
-- [ ] **Step 3:** Review the whole branch diff (`git diff revamp/online-lobby-mockup...HEAD`) for: any new `transition`/`transform`/`animation`; any interpolated class name; any changed `data-*` attribute; any component whose box size changed. CLAUDE.md's rule exists because both of Phase 4's worst bugs spanned tasks.
-- [ ] **Step 4:** Use superpowers:requesting-code-review, then superpowers:finishing-a-development-branch. Note the merge dependency: this branch stacks on `revamp/online-lobby-mockup` (protocol v2), so it merges *after* that branch, or as part of it.
+- [ ] **Step 3:** Review the whole branch diff (`git diff main...HEAD`) for: any new `transition`/`transform`/`animation`; any interpolated class name; any changed `data-*` attribute; any component whose box size changed. CLAUDE.md's rule exists because both of Phase 4's worst bugs spanned tasks.
+- [ ] **Step 4:** Use superpowers:requesting-code-review, then superpowers:finishing-a-development-branch. (The old merge dependency on `revamp/online-lobby-mockup` is gone — that branch merged on 2026-08-07. This branch stands alone off `main`.)
 
 ## Self-review notes
 
 - Spec coverage: mockup elements deliberately **not** implemented — ticker strip, ACTIVITY feed, header chips row, "TURN 14" indicator, stacked/fanned share cards with ×N badges — all layout, all out of scope per the reskin brief; the *paint* of every one of them is covered by the recipes.
 - Fixed inline: an earlier draft borrowed the mockup's blue chain gradient for a brand — removed; blue stays selection-only.
 - Type consistency: `grad` is the only new token field; every consumer spelled `BRAND_CLASSES[brand].grad`.
+
+## Working alongside the PWA branch (added 2026-08-08)
+
+`revamp/pwa` ([2026-08-08-pwa.md](./2026-08-08-pwa.md)) may run in parallel. The full conflict
+analysis is in the PWA design spec; the short version for this branch:
+
+- **`tokens.ts` is safe to rewrite freely.** The PWA *reads* it through a build-time manifest
+  generator and hand-copies nothing, so this branch's palette flows into the installed app's
+  theme colour on the next build. Do not add manifest-related values here; the generator derives
+  them.
+- **`StaleClient.tsx` is the one shared file.** The PWA adds an `Update now` button to it; Task 8's
+  sweep may restyle it. Whoever merges second reapplies — it is a small, mechanical conflict.
+- **Merge order, if sequential: this branch first**, so the manifest generator's first run picks up
+  the final palette and nobody has to remember to regenerate.
+
+**Optional Task 0:** [../specs/2026-08-07-catalog-design-sync-design.md](../specs/2026-08-07-catalog-design-sync-design.md)
+— sync the real catalog states into the design project before skinning, so the reskin is judged
+against the states the catalog protects rather than the mockup's invented happy path. Designed,
+not built; this plan works with or without it.
