@@ -1,7 +1,31 @@
 # The turn-order draw passes the turn — design
 
 **Date:** 2026-08-07
-**Status:** designed, not built. Owner ruled "design now, build after the lobby" (2026-08-07).
+**Status:** **built 2026-08-08** on `revamp/turn-order-draw` (`fd6dd0c`), unmerged. 776 tests, five
+gates green, driven by hand in pass-and-play six-handed and online across two clients.
+
+> **Both open rulings were made** (owner, 2026-08-08): a curtain rises **between** draws — but not
+> in front of the first, where seat one is already holding the device — and the winner **is
+> announced**, as its own unattributed `Turn order` step.
+>
+> **Three things this design did not anticipate**, all found in a browser and none by the suite:
+>
+> 1. **The draw has to narrate itself.** `pushLog` is what advances `nextStepId`, and the segment
+>    machinery is built on step ids — so a draw that logged nothing left the undo range and the
+>    commit boundary with no step to move past. Every draw is now its own step.
+> 2. **"YOU PLAYS FIRST".** `stepsOf` prefixes an entry with its player and says "You" for the
+>    viewer, so an attributed phase must read after a name. The announcement is unattributed.
+> 3. **The claim "undo falls out" below was wrong.** It holds only when the actor changes. When the
+>    *last* drawer wins their own draw the actor never moves, so the draw stayed inside the open
+>    segment and the panel offered `↺ undo` on a random reveal — and, worse, `server/room.ts`
+>    derives its commit from the segment closing, so the table would not have seen the result until
+>    the winner finished their entire first turn. Leaving the draw now closes the segment; the
+>    curtain stays narrower. **Curtain and commit are no longer the same event**, which is a
+>    genuinely new distinction in this codebase.
+>
+> One thing the design got right and is worth keeping: `DRAWS` **is** covered. Removing
+> `drawTurnOrderTile` from it fails all three consumers, contradicting the protocol comment's
+> prediction that it would fail silently.
 **Found by:** the owner's by-hand pass — *"the draw to go first was meant to pass turn like any
 other move and then update the turn order once complete. right now it happens instantaneously."*
 

@@ -100,16 +100,35 @@ an interval and then invites you to attribute it to whatever you assumed.
 The GH Pages bundle hash needs the same discipline — it served the old file for ~90 seconds. Read
 the version back before believing either half.
 
-**The next finding to build is the turn-order draw** — it resolves instantly for everyone instead
-of passing the turn. Designed, not built: `specs/2026-08-07-turn-order-draw-design.md` and
-`plans/2026-08-07-turn-order-draw.md`. It is protocol **v3** and wants its own branch off `main`.
+**The turn-order draw is built, on `revamp/turn-order-draw` — unmerged, and protocol v3.** Each
+player draws their own tile in seat order; the order resolves when the last one lands. `startGame`
+is gone, replaced by `drawTurnOrderTile`. Almost none of it is new machinery: `getCurrentActor`
+returns `players[turnOrderDraws.length]` during the draw, and because that function is the segment
+seam, the curtain, the hand-off, the toast and the server's per-draw commit all follow from it.
+Design and plan: `specs/2026-08-07-turn-order-draw-design.md`,
+`plans/2026-08-07-turn-order-draw.md`.
 
-**Still open: Stage 3** — the layout gate's flakiness, with a live lead: `verify-layout.mjs`
-drives a *persistent* Chrome profile, so every run depends on run history; Stage 2 tripped over
-exactly that when the gate's own saved game broke its next run. The PWA's two stated gates
-(persistence, protocol version) both now exist. A spectator seat and a panel-only phone view are
-wanted together, and are their own design pass. Presence still has two open findings from Stage 0:
-the away dot rides a roster row designed to clip, and final scoring has no presence at all.
+Two owner rulings landed: a curtain rises **between** draws but not in front of the first (seat one
+is already holding the device), and the winner is **announced** as its own step rather than merely
+arrived at.
+
+**Curtain and commit are no longer the same event, and that is the subtle part.** Leaving the draw
+closes a segment even when the actor does not change — which happens whenever the last drawer wins
+their own draw — because `server/room.ts` derives its commit from `segmentStart` moving, and
+without it the table would not see who won until the winner finished their whole first turn. The
+*curtain* stays narrower and rises only on a real actor change, since its job is handing the device
+to somebody else. `server/room.test.ts` pins the difference on G17.
+
+**Merging it is a second cutover.** Prod speaks v2; every open tab takes the stale-client screen
+once.
+
+**Stage 3 is diagnosed but not solved** — see the `verify:layout` note under Commands. Twenty
+consecutive runs came back green, so the flakiness never reproduced; two real run-history hazards
+were found and removed, but neither was ever shown to turn a run red, so the caveat stands. The
+PWA's two stated gates (persistence, protocol version) both now exist. A spectator seat and a
+panel-only phone view are wanted together, and are their own design pass. Presence still has two
+open findings from Stage 0: the away dot rides a roster row designed to clip, and final scoring has
+no presence at all.
 
 **Dev surfaces:** `/catalog` is every component state; `/scenarios` loads any golden-game state and
 plays on from it, which is how to reach a merger in two clicks rather than several minutes.
@@ -127,7 +146,7 @@ before starting work.
 | `src/game/` | The new component layer (Phase 1b). Pure, props-in, styled through `tokens.ts`. |
 | `src/game/catalog/` | `/catalog` route — every component state, mostly replayed from golden games. The acceptance surface. Also `/scenarios`: any golden-game state, playable on from that point. Both lazily routed so the golden data stays out of the main chunk. |
 | `session/` | Shared between client and server (Phase 3a). `GameSession` — the local draft/session model — and `protocol.ts`'s wire types (`WireIntent`, `StateMessage`, …). No React, no transport. |
-| `src/net/` | The client's half of the wire (Phase 3b). `NetworkSession` — a `GameSession` whose authority is the server: six intents apply optimistically, three (`endTurn`, `tradeInDeadTiles`, `startGame`) wait on a `correction`. `connection.ts` is the socket.io transport, opened lazily on online routes only. `identity.ts` keeps a per-room `{ playerId, token, name }` in `localStorage` so a refresh rejoins the same seat. |
+| `src/net/` | The client's half of the wire (Phase 3b). `NetworkSession` — a `GameSession` whose authority is the server: six intents apply optimistically, three (`endTurn`, `tradeInDeadTiles`, `drawTurnOrderTile`) wait on a `correction`. `connection.ts` is the socket.io transport, opened lazily on online routes only. `identity.ts` keeps a per-room `{ playerId, token, name }` in `localStorage` so a refresh rejoins the same seat. |
 | `server/` | Express + Socket.io. Authoritative over intents as of Phase 3a — runs `applyIntent`, projects state per player before broadcast, rejects out-of-turn/illegal intents. `store.ts` (Phase 4) persists a room's roster, rejoin tokens and last committed state; `rooms.restore()` seats them at boot, before `listen`, forcing every seat disconnected. `recovery.test.ts` kills a server and reboots it against the same store. The XState layer is deleted. |
 | `src/pages/` | Routes. `/room/:roomId` is the online game; `useRoom` (in `src/net/`) owns its `connecting → joining → lobby → playing` phase machine, plus `error`, `gone` and `stale`. (`needName` is gone — nothing asks for a name any more.) |
 | `prototype/` | The buildless design lab the component layer was ported from. Reference, not a build target. |
