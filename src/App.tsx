@@ -1,5 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
 import { OnlineLobbyPage } from "./pages/OnlineLobbyPage";
 import { JoinRoomPage } from "./pages/JoinRoomPage";
@@ -71,6 +71,13 @@ export default function App() {
           }
         />
       )}
+
+      {/* No URL renders a white screen. Found by installing on a phone from
+          the dev server: the manifest's start_url is the prod base path, the
+          dev router had no route there, and React rendered nothing at all —
+          an installed app whose first impression was a blank page. Unknown
+          paths go home instead. */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

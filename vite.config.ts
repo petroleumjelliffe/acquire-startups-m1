@@ -40,6 +40,23 @@ export default defineConfig(({ command }) => ({
         html
           .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
           .replaceAll("__PWA_BASE__", `${command === "build" ? BASE_PATH : ""}/`),
+      // The generated manifest carries the *prod* start_url and scope, but
+      // the dev server serves the app at '/'. Installing from a dev LAN URL
+      // — which the owner did, first thing — produced an app that opened
+      // /acquire-startups-m1/ against a router with no route there: a white
+      // screen as the install's first impression. Dev rewrites the manifest
+      // to its own origin's shape; the built file is untouched.
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url?.split("?")[0] !== "/manifest.webmanifest") return next();
+          const raw = readFileSync(join(__dirname, "public", "manifest.webmanifest"), "utf8");
+          const manifest = JSON.parse(raw) as { start_url: string; scope: string };
+          manifest.start_url = "/";
+          manifest.scope = "/";
+          res.setHeader("Content-Type", "application/manifest+json");
+          res.end(JSON.stringify(manifest, null, 2));
+        });
+      },
     },
     // Writes dist/sw.js after the build, from scripts/sw.template.js.
     //

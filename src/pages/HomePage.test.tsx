@@ -47,3 +47,21 @@ describe('the mode chooser and the network', () => {
     expect(screen.queryByText(/no network/i)).toBeNull();
   });
 });
+
+describe('no URL renders a white screen', () => {
+  /**
+   * The failure this pins: the owner installed the app on a phone from the
+   * dev server; the manifest's start_url is the prod base path; the dev
+   * router had no route there and React rendered *nothing*. A blank page is
+   * never an acceptable answer to a URL — unknown paths go home.
+   */
+  it('redirects an unknown path to the mode chooser', async () => {
+    const { default: App } = await import('../App');
+    render(
+      <MemoryRouter initialEntries={['/acquire-startups-m1/']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText(/choose your game mode/i)).toBeInTheDocument();
+  });
+});
