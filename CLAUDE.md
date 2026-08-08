@@ -76,19 +76,24 @@ join gets `RoomRefused` and a retry.
 therefore free to change. **That window is now closed** — v2 is live, so the next wire change is a
 v3 bump and a second cutover.
 
-**Render's build is fast — 24 seconds for the v2 deploy** (`dep-d9r7rjn40ujc73asrblg`, live about a
-minute after it started). Any older note claiming ~6 or ~12 minutes is measuring *waiting*, not
-building.
+**A Render deploy is ~40 seconds, push to live** — measured end to end on 2026-08-08
+(`dep-d9r8a0rncjis7391usa0`): push returned 01:23:14, the deploy fired one second later, the build
+finished at 01:23:32 and it was live at 01:23:53. **39 seconds.** Any note claiming ~6 or ~12
+minutes is measuring waiting, not deploying, and is wrong.
 
-**Check that the deploy actually fired before timing it.** The v2 deploy shows
-`trigger: "manual"`: auto-deploy was broken, the push at 00:41 UTC started nothing, and the eleven
-minutes before someone deployed by hand got written up as deploy duration. Auto-deploy was repaired
-on 2026-08-08 (`autoDeploy: yes`, `autoDeployTrigger: commit`), but **no push has been observed
-firing one since**, so treat it as unverified until one is. `mcp__render__list_deploys` gives the
-trigger and the real timings; `/health` alone cannot tell "still building" from "never started".
+**Auto-deploy is on and verified** (`autoDeploy: yes`, `autoDeployTrigger: commit`) — repaired by
+the owner on 2026-08-08 after it was found broken, and confirmed by a push that produced a
+`trigger: "new_commit"` deploy one second later.
 
-The GH Pages bundle hash is the same discipline — it served the old file for ~90 seconds. Read the
-version back before believing either half.
+**Check that a deploy fired before timing one.** The v2 deploy is `trigger: "manual"`: the push
+before it started nothing at all, and the eleven idle minutes before a human deployed by hand got
+written up as deploy duration, along with a "silent /health window" that was really a gap in the
+polling loop. `mcp__render__list_deploys` reports the trigger and the true timings; **`/health`
+alone cannot tell "still building" from "never started"**, so polling it until it changes measures
+an interval and then invites you to attribute it to whatever you assumed.
+
+The GH Pages bundle hash needs the same discipline — it served the old file for ~90 seconds. Read
+the version back before believing either half.
 
 **The next finding to build is the turn-order draw** — it resolves instantly for everyone instead
 of passing the turn. Designed, not built: `specs/2026-08-07-turn-order-draw-design.md` and
