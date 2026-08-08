@@ -210,6 +210,12 @@ export function createNetworkSession(
       // Nothing to reveal: this device shows one player's own state, always.
     },
 
+    conceal() {
+      // Nothing to conceal, for the same reason: the curtain is a
+      // pass-the-device concept, and online nobody else's hand is ever on
+      // this screen to protect.
+    },
+
     connectionLost() {
       pending = false;
       rejection = { code: 'notConnected', message: 'Disconnected. Reconnecting…' };

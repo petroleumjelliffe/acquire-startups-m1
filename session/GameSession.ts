@@ -78,6 +78,15 @@ export interface GameSession {
    */
   undoThen(stepId: number, intent: Intent): void;
   reveal(): void;
+  /**
+   * Re-raises the curtain without touching the segment — the inverse of
+   * `reveal()`, for when the device leaves the current player's hands with
+   * the actor unchanged. Concretely: the installed app is backgrounded
+   * mid-turn and later reopened, possibly by somebody else. A fresh launch
+   * gets its curtain from session construction; a living page never
+   * remounts, so it needs this said explicitly.
+   */
+  conceal(): void;
 }
 
 export type SessionInit = { seed: string; names: string[] } | { state: GameState };
@@ -229,6 +238,11 @@ export function createGameSession(init: SessionInit): GameSession {
 
     reveal() {
       awaitingReveal = false;
+      invalidate();
+    },
+
+    conceal() {
+      awaitingReveal = true;
       invalidate();
     },
   };

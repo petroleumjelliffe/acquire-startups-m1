@@ -5,6 +5,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOnline } from '../pwa/useOnline';
 import { useUpdateReady } from '../pwa/update';
+import { isInstalledApp } from '../pwa/installed';
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -67,7 +68,11 @@ export function HomePage() {
           Both modes support 2–6 players
         </div>
 
-        {update.ready && (
+        {/* Installed app only. In a tab this is noise — a refresh gets the
+            new build through the network-first worker — but the installed app
+            has no refresh gesture, so this is its one way in. (Owner, from
+            the first real install.) */}
+        {isInstalledApp() && update.ready && (
           <button
             type="button"
             onClick={update.apply}

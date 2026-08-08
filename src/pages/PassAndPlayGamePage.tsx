@@ -50,6 +50,23 @@ export function PassAndPlayGamePage() {
     });
   }, [session]);
 
+  // Backgrounding the device raises the curtain (owner, from the first real
+  // install: coming back to the app showed the hand sitting open). Raised on
+  // *hidden*, not on return — by the time the app is visible again it may be
+  // in someone else's hands, and a curtain raised then would flash the hand
+  // first. Session construction covers fresh launches; this covers the
+  // living page that never remounts. Pass-and-play only by construction:
+  // online plays through NetworkSession, whose conceal() is a no-op because
+  // that screen only ever shows the viewer's own seat.
+  useEffect(() => {
+    if (!session) return;
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') session.conceal();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [session]);
+
   if (!session) return <Navigate to="/pass-and-play" replace />;
 
   return (

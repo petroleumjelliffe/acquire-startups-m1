@@ -107,3 +107,27 @@ describe('when a save is written', () => {
     expect(load()!.state.board.A1.placed).toBe(true);
   });
 });
+
+describe('backgrounding the device raises the curtain', () => {
+  /**
+   * Found on the first real install: backgrounding the app mid-turn and
+   * returning showed the hand sitting open. A fresh launch gets its curtain
+   * from session construction; a living page never remounts, so the
+   * visibility change is the moment the device left the player's hands.
+   */
+  it('shows the pass-to curtain after the page is hidden and shown again', () => {
+    save(midGame());
+    renderAt('/pass-and-play/game');
+    // Mid-turn: session construction raised the curtain; lower it as the
+    // player would.
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
+    expect(screen.queryByText(/pass to/i)).toBeNull();
+
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    fireEvent(document, new Event('visibilitychange'));
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+    fireEvent(document, new Event('visibilitychange'));
+
+    expect(screen.getByText(/pass to/i)).toBeInTheDocument();
+  });
+});

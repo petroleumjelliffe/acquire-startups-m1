@@ -286,6 +286,7 @@ function frozen(view: SessionView): GameSession {
     undoTo: () => {},
     undoThen: () => {},
     reveal: () => {},
+    conceal: () => {},
   };
 }
 

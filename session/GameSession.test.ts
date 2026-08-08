@@ -423,3 +423,34 @@ describe('segmentStart', () => {
     expect(view.undoableSteps.length).toBeGreaterThan(0);
   });
 });
+
+describe('conceal', () => {
+  /**
+   * The inverse of reveal(), for the moment the device leaves the current
+   * player's hands without the actor changing: the owner backgrounded the
+   * installed app mid-turn, came back, and the hand was sitting there open —
+   * a fresh launch re-raises the curtain via session construction, but
+   * returning to a living page never remounts. Whoever picks the device up
+   * should meet "Pass to X", not somebody's tiles.
+   */
+  it('re-raises the curtain without disturbing the segment', () => {
+    const session = createGameSession({ seed: 'conceal-1', names: ['Alex', 'Sam'] });
+    session.dispatch({ type: 'drawTurnOrderTile', playerId: 'p1' });
+    session.reveal();
+    const before = session.getView();
+    expect(before.awaitingReveal).toBe(false);
+
+    session.conceal();
+
+    const after = session.getView();
+    expect(after.awaitingReveal).toBe(true);
+    // Nothing but the curtain moved: same actor, same segment, same undo.
+    expect(after.actorId).toBe(before.actorId);
+    expect(after.segmentStart).toBe(before.segmentStart);
+    expect(after.undoableSteps).toEqual(before.undoableSteps);
+
+    // And reveal() still lowers it, so the pair round-trips.
+    session.reveal();
+    expect(session.getView().awaitingReveal).toBe(false);
+  });
+});
