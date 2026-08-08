@@ -8,11 +8,11 @@
 // here. Prose stays placeholder-free.)
 /* eslint-disable no-undef */
 
-const CACHE = 'acquire-8986f6548646';
+const CACHE = 'acquire-a1f2b05502ed';
 const BASE = '/acquire-startups-m1/';
 const PRECACHE = [
   "/acquire-startups-m1/assets/index-59a53fea.css",
-  "/acquire-startups-m1/assets/index-e01aefcc.js",
+  "/acquire-startups-m1/assets/index-c4299356.js",
   "/acquire-startups-m1/icons/apple-touch-icon.png",
   "/acquire-startups-m1/icons/icon-192.png",
   "/acquire-startups-m1/icons/icon-512.png",
