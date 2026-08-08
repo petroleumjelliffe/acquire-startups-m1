@@ -10,20 +10,86 @@
 
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
+import { createServer } from 'node:net';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import WebSocket from 'ws';
 
 const CHROME = process.env.CHROME_PATH
   ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const VITE_PORT = 5199;
-const CDP_PORT = 9333;
 const VIEWPORTS = [768, 1440];
+
+// Both ports and the Chrome profile are per-run, and that is deliberate.
+//
+// This gate used to pin port 5199, port 9333 and a *persistent* profile at
+// /tmp/acquire-verify-layout-profile, which made every run depend on how the
+// previous one ended. Two mechanisms were demonstrated on 2026-08-08:
+//
+//   - Chrome's singleton lock. A second Chrome on the same `--user-data-dir`
+//     exits immediately and leaves the first one holding the debugging port.
+//     `waitFor` cannot tell them apart, so a surviving browser from an
+//     interrupted run silently becomes the browser this run measures.
+//   - `vite --strictPort`. A surviving vite on the fixed port makes this run's
+//     vite fail to bind — silently, since it is spawned with `stdio: 'ignore'`
+//     — and `waitFor` then succeeds against the *old* one. If that one belongs
+//     to a different checkout, this gate measures the wrong tree while
+//     reporting green, which is the project's oldest footgun one level up.
+//
+// Neither was ever shown to turn a run red, so this is hazard removal rather
+// than a fix for the long-standing flakiness — which remains unexplained. Do
+// not read a green run as evidence that it was.
+let vitePort = 0;
+let cdpPort = 0;
+let profileDir = '';
 
 const children = [];
 function cleanup() {
   for (const child of children) { try { child.kill('SIGTERM'); } catch { /* already gone */ } }
+  // Best-effort: a leftover temp profile is harmless, unlike a leftover
+  // *shared* one, which was the whole problem.
+  if (profileDir) { try { rmSync(profileDir, { recursive: true, force: true }); } catch { /* fine */ } }
 }
 process.on('exit', cleanup);
 process.on('SIGINT', () => { cleanup(); process.exit(130); });
+
+/**
+ * A port the OS just told us was free. Racy in principle, unshared in practice.
+ *
+ * Asynchronous because `listen` is: `server.address()` is null until the
+ * listening callback fires, which is exactly what the first version of this
+ * got wrong.
+ */
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.on('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const { port } = server.address();
+      server.close(() => { resolve(port); });
+    });
+  });
+}
+
+/**
+ * Chrome's actual debugging port, read from the profile rather than assumed.
+ *
+ * Launched with `--remote-debugging-port=0`, Chrome picks a free port itself
+ * and writes it to `DevToolsActivePort`. That removes the collision entirely:
+ * there is no fixed port for a stale browser to still be holding.
+ */
+function readDevToolsPort(dir, tries = 100) {
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      const first = readFileSync(join(dir, 'DevToolsActivePort'), 'utf8').split('\n')[0].trim();
+      if (first) return Number(first);
+    } catch { /* not written yet */ }
+    // Synchronous on purpose: this runs before the event loop has anything
+    // else to do, and a spin here is simpler than threading a promise through.
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
+  }
+  throw new Error('Chrome never wrote DevToolsActivePort');
+}
 
 async function waitFor(url, label, tries = 60) {
   for (let i = 0; i < tries; i += 1) {
@@ -450,24 +516,30 @@ const START_GAME = `(async () => {
 })()`;
 
 async function main() {
-  children.push(spawn('npx', ['vite', '--port', String(VITE_PORT), '--strictPort'], {
+  // `--strictPort` is kept, and now it means what it says: the port was free a
+  // moment ago and is this run's alone, so a bind failure is a real error
+  // rather than a stale server this run would silently adopt.
+  vitePort = await freePort();
+  children.push(spawn('npx', ['vite', '--port', String(vitePort), '--strictPort'], {
     stdio: 'ignore', detached: false,
   }));
-  await waitFor(`http://localhost:${VITE_PORT}/`, 'vite');
+  await waitFor(`http://localhost:${vitePort}/`, 'vite');
 
+  profileDir = mkdtempSync(join(tmpdir(), 'acquire-verify-layout-'));
   children.push(spawn(CHROME, [
     '--headless=new',
-    `--remote-debugging-port=${CDP_PORT}`,
-    '--user-data-dir=/tmp/acquire-verify-layout-profile',
+    '--remote-debugging-port=0',
+    `--user-data-dir=${profileDir}`,
     '--no-first-run',
     'about:blank',
   ], { stdio: 'ignore' }));
-  await waitFor(`http://127.0.0.1:${CDP_PORT}/json/version`, 'chrome');
+  cdpPort = readDevToolsPort(profileDir);
+  await waitFor(`http://127.0.0.1:${cdpPort}/json/version`, 'chrome');
 
   const failures = [];
 
   for (const width of VIEWPORTS) {
-    const targets = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json/list`)).json();
+    const targets = await (await fetch(`http://127.0.0.1:${cdpPort}/json/list`)).json();
     const page = targets.find((t) => t.type === 'page');
     const { ws, ready, send, evaluate } = connect(page.webSocketDebuggerUrl);
     await ready;
@@ -476,7 +548,7 @@ async function main() {
     await send('Emulation.setDeviceMetricsOverride', {
       width, height: 900, deviceScaleFactor: 1, mobile: false,
     });
-    await send('Page.navigate', { url: `http://localhost:${VITE_PORT}/pass-and-play` });
+    await send('Page.navigate', { url: `http://localhost:${vitePort}/pass-and-play` });
     await sleep(2000);
 
     // Pass-and-play persists to localStorage as of Stage 2, and this
@@ -502,7 +574,7 @@ async function main() {
     // longer gets there — the game the curtain check just started is *saved*
     // now, and the lobby would offer Continue — so the save is cleared first.
     await evaluate('localStorage.clear()');
-    await send('Page.navigate', { url: `http://localhost:${VITE_PORT}/pass-and-play` });
+    await send('Page.navigate', { url: `http://localhost:${vitePort}/pass-and-play` });
     await sleep(1500);
 
     const m = await evaluate(MEASURE);
@@ -696,7 +768,7 @@ async function main() {
 
     // The not-my-turn waiting panel — see `WAITING_PANEL`, above, for why
     // this is a catalog page rather than a second `/pass-and-play` walk.
-    await send('Page.navigate', { url: `http://localhost:${VITE_PORT}/catalog` });
+    await send('Page.navigate', { url: `http://localhost:${vitePort}/catalog` });
     await sleep(1500);
     const wp = await evaluate(WAITING_PANEL);
 

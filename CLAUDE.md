@@ -129,7 +129,7 @@ before starting work.
 | `session/` | Shared between client and server (Phase 3a). `GameSession` — the local draft/session model — and `protocol.ts`'s wire types (`WireIntent`, `StateMessage`, …). No React, no transport. |
 | `src/net/` | The client's half of the wire (Phase 3b). `NetworkSession` — a `GameSession` whose authority is the server: six intents apply optimistically, three (`endTurn`, `tradeInDeadTiles`, `startGame`) wait on a `correction`. `connection.ts` is the socket.io transport, opened lazily on online routes only. `identity.ts` keeps a per-room `{ playerId, token, name }` in `localStorage` so a refresh rejoins the same seat. |
 | `server/` | Express + Socket.io. Authoritative over intents as of Phase 3a — runs `applyIntent`, projects state per player before broadcast, rejects out-of-turn/illegal intents. `store.ts` (Phase 4) persists a room's roster, rejoin tokens and last committed state; `rooms.restore()` seats them at boot, before `listen`, forcing every seat disconnected. `recovery.test.ts` kills a server and reboots it against the same store. The XState layer is deleted. |
-| `src/pages/` | Routes. `/room/:roomId` is the online game; `useRoom` (in `src/net/`) owns its `connecting → joining → needName → lobby → playing` phase machine, plus `error` and `gone`. |
+| `src/pages/` | Routes. `/room/:roomId` is the online game; `useRoom` (in `src/net/`) owns its `connecting → joining → lobby → playing` phase machine, plus `error`, `gone` and `stale`. (`needName` is gone — nothing asks for a name any more.) |
 | `prototype/` | The buildless design lab the component layer was ported from. Reference, not a build target. |
 
 **Root-level `*.md` are history, not guidance.** `MULTIPLAYER_ARCHITECTURE.md` and
@@ -159,10 +159,28 @@ npm run verify:layout  # drives a real Chrome over CDP — see the caveat below
   stray `window.` or `localStorage` there is a production crash that a single jsdom suite could
   never catch. `session/nodeEnvironment.test.ts` asserts that boundary; don't add root-level
   `setupFiles` (vitest 4 merges the array into both projects, silently disarming it).
-- **`npm run verify:layout` is intermittently flaky**, project-wide and pre-existing, and nobody has
-  explained it. Treat a green run as weak evidence until someone does. It needs Chrome at
+- **`npm run verify:layout` is intermittently flaky**, project-wide and pre-existing, and **still
+  unexplained** — the caveat stands. Treat a green run as weak evidence. It needs Chrome at
   `CHROME_PATH` (defaults to the macOS app bundle) and drives pass-and-play only — presence and
   online states are not on its path.
+
+  Stage 3 (2026-08-08) ruled out more than it found. **Twenty consecutive runs came back green**, so
+  it did not reproduce at all. Of four candidate mechanisms: the persistent-profile `localStorage`
+  lead the plan was built around is **dead** (Stage 2's `clear()` already covered it); the
+  first-page-wins target selection is **dead** (exactly one `type: page` target on a fresh profile
+  *and* on the real 285MB one); Chrome's **singleton lock is real** — a second Chrome on the same
+  `--user-data-dir` exits and leaves the first holding the port — but a run driving the stale
+  browser still passed, because the script navigates and clears storage anyway. A **stale
+  `vite --strictPort`** was found the same way and is the more dangerous of the two, since a
+  surviving vite from another checkout would let this gate measure the wrong tree while reporting
+  green.
+
+  Both hazards are now removed — per-run `mkdtemp` profile, per-run vite port, and
+  `--remote-debugging-port=0` read back from `DevToolsActivePort` — which is why two gates can run
+  concurrently, and they do. **That is hazard removal, not a fix**: neither mechanism was ever shown
+  to turn a run red, so nothing here explains the flakiness, and a green run is no more meaningful
+  than it was. The remaining suspect is the fixed `sleep`s, which survived a concurrent double-load
+  run without failing.
 - **Before any by-hand pass, check which tree is serving.** Vite silently moves to the next free
   port when another checkout already holds 5173, and a Phase 4 round was measured against `main`
   before anyone noticed.
