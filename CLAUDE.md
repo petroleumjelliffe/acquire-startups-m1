@@ -76,10 +76,19 @@ join gets `RoomRefused` and a retry.
 therefore free to change. **That window is now closed** — v2 is live, so the next wire change is a
 v3 bump and a second cutover.
 
-**A deploy is ~12 minutes, not the ~6 the older notes claim**, and `/health` goes *silent* for
-around 6½ minutes mid-restart rather than erroring — so a single poll that gives up reads as a
-failed deploy. Read the version back before believing it; the same goes for the GH Pages bundle
-hash, which served the old file for the first 90 seconds.
+**Render's build is fast — 24 seconds for the v2 deploy** (`dep-d9r7rjn40ujc73asrblg`, live about a
+minute after it started). Any older note claiming ~6 or ~12 minutes is measuring *waiting*, not
+building.
+
+**Check that the deploy actually fired before timing it.** The v2 deploy shows
+`trigger: "manual"`: auto-deploy was broken, the push at 00:41 UTC started nothing, and the eleven
+minutes before someone deployed by hand got written up as deploy duration. Auto-deploy was repaired
+on 2026-08-08 (`autoDeploy: yes`, `autoDeployTrigger: commit`), but **no push has been observed
+firing one since**, so treat it as unverified until one is. `mcp__render__list_deploys` gives the
+trigger and the real timings; `/health` alone cannot tell "still building" from "never started".
+
+The GH Pages bundle hash is the same discipline — it served the old file for ~90 seconds. Read the
+version back before believing either half.
 
 **The next finding to build is the turn-order draw** — it resolves instantly for everyone instead
 of passing the turn. Designed, not built: `specs/2026-08-07-turn-order-draw-design.md` and

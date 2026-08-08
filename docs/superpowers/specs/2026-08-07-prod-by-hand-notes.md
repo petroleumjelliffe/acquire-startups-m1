@@ -19,11 +19,27 @@ Player 2 in a named isolated one. Room `XMWHPD`.
 | `/health` | `protocolVersion: 1` | `protocolVersion: 2` | 20:53:14 |
 | GH Pages bundle | `index-e6b51d00.js` | `index-ac2efd0b.js` | 20:54:19 |
 
-**Render took ~12 minutes, not the ~6 the continuation plan predicts.** Pushed at ~20:41, v2 at
-20:53. `/health` answered `protocolVersion: 1` throughout, then **stopped answering at all for
-~6½ minutes** (a gap between polls at 20:45:07 and 20:51:53) before returning v2 — so the restart
-window is silent rather than erroring, and a check that polls once and gives up would conclude the
-deploy had failed. GitHub Pages took ~90 seconds and served the old bundle for the first two polls.
+GitHub Pages took ~90 seconds and served the old bundle for the first two polls.
+
+### A correction, recorded because the mistake is the interesting part
+
+The first version of this note said "Render took ~12 minutes, not the ~6 the continuation plan
+predicts", and that `/health` "stopped answering at all for ~6½ minutes" mid-restart. **Both were
+wrong**, and the Render API says so:
+
+- The deploy that made prod v2 is `dep-d9r7rjn40ujc73asrblg`, `trigger: **manual**`, built
+  `00:52:30 → 00:52:54` — **24 seconds**, live by 00:53:27. The push at 00:41 fired *nothing*,
+  because auto-deploy was broken (fixed by the owner immediately afterwards). The "12 minutes" was
+  the wait for a human to notice, timed as though it were a build.
+- The "silent window" was a **gap in the polling loop itself** (00:45:07 → 00:51:53), not the
+  server. The samples on either side both answered `protocolVersion: 1` normally. Nothing was ever
+  observed failing to answer.
+
+The rule this broke is already in `CLAUDE.md` — *a measurement you did not measure is the same
+defect* — and it broke in a new way worth naming: **`/health` cannot distinguish "still building"
+from "never started"**. Polling an endpoint until it changes measures the interval, and then
+invites you to attribute it to whatever you assumed was happening. `list_deploys` reports the
+trigger and the real timings; it is the thing to read before claiming a duration.
 
 ## Scenario 1 — refresh mid-turn ✅
 
