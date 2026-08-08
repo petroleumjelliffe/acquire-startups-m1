@@ -163,11 +163,13 @@ Small carried items, each riding whichever stage touches its file rather than be
 - **A library of finished games.** Out of scope, but Stage 2's format ruling keeps it possible.
 - **The prod by-hand pass.** Still owed from Phase 4. It is a separate errand from Stage 0 and
   should not be folded into it — Stage 0 needs a dev-only seeding route that must never reach prod.
-- **A durable `RoomStore` backend** — newly *feasible*, still not scheduled. **Amended 2026-08-08:**
-  the paragraph below assumes a *free* instance, which cannot have a disk. The service is actually on
-  Render's paid `starter` plan and simply has **no disk attached** — so the cheapest durable option
-  may be attaching one and keeping the file store exactly as it is, with no second `RoomStore`
-  implementation written at all. Price that against Key Value/Postgres before building either.
+- ~~**A durable `RoomStore` backend**~~ — **done 2026-08-08, and it was one line.** The paragraph
+  below assumes a *free* instance, which cannot have a disk. The service is on Render's paid
+  `starter` plan, which can: a 1 GB disk at `/var/data` plus `GAMES_DIR=/var/data/games` made the
+  **existing file store** durable. No Key Value, no Postgres, no second `RoomStore` implementation.
+  A room was created on prod, a deploy triggered, and it came back — `✓ Restored 1 room(s)`.
+  See `CLAUDE.md`'s Environment section. **The plan was not wrong; it outlived its assumption**,
+  which is worth checking against every other item here that was scoped against "Render free".
   (2026-08-07, post-Stage-1) re-confirmed the accepted limit: a Render restart still loses every
   room, because persistence writes to a disk that resets. The Render MCP connector is now set up,
   so provisioning a Render Key Value store or Postgres and writing the second `RoomStore`

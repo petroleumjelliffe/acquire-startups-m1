@@ -259,18 +259,31 @@ Client on GitHub Pages under the base path `/acquire-startups-m1` (hardcoded in 
 to `http://<current hostname>:3001` in dev — the hostname, not `localhost`, so a phone on the LAN
 works. The server reads `PORT` (3001) and writes rooms to `server/games/`, gitignored.
 
-**Rooms are lost on restart because no disk is attached, not because of the plan.** The service runs
-`numInstances: 1` with no `disk` in its details, so `server/games/` lives on the instance's
-ephemeral filesystem and every deploy or restart empties it. The gone-room ending is still the
-normal case in prod.
+**Rooms are durable as of 2026-08-08, and the gone-room ending is no longer the normal case.** A
+1 GB disk (`dsk-d9rafvlbedkc73coe2k0`) is mounted at **`/var/data`**, and `GAMES_DIR` — set on the
+service — points the store at `/var/data/games`. Proven, not assumed: a real two-browser room was
+created on prod, a deploy was triggered, the boot logged **`✓ Restored 1 room(s)`**, and a browser
+reload came back to the same mid-draw state with both seats. Every prior boot in this service's log
+history shows `Server listening` with no restore line, because there was never anything to restore.
 
-**That makes the durable-`RoomStore` item smaller than it was written up as.** It is queued as
-"provision Key Value or Postgres and write a second `RoomStore` implementation", which was the right
-plan for a *free* instance that cannot have a disk. A `starter` instance can: attaching one would
-make the **existing file store** durable with no second implementation at all. `store.ts` staying an
-interface is still worth it, but it may not need to be exercised. Worth pricing both before
-building either — a disk pins the service to recreate-style deploys and one instance, which it
-already is.
+**The durable-`RoomStore` epic turned out to be one line.** It was queued as "provision Key Value or
+Postgres and write a second `RoomStore` implementation" — the right plan for a *free* instance,
+which cannot have a disk. This service is on `starter`, which can, and the file store was always
+durable: it was writing to the instance's ephemeral filesystem. No second implementation exists and
+none is needed. `store.ts` staying an interface is still worth it; it simply did not have to be
+exercised. **The plan was not wrong, it outlived its assumption** — worth re-reading any queued item
+that was scoped against "Render free".
+
+**Two consequences that are now live and were not before:**
+
+- **`.bad` quarantine files are never evicted.** [store.ts:212](server/store.ts#L212) skips any name
+  not ending `.json`, so a quarantined save is never read, never aged out, never deleted. That was
+  invisible while restarts wiped the disk. It is slow (only genuinely unparseable saves quarantine —
+  protocol skew is a *skip*, and those still age out) but unbounded, and it is the deferred Stage 1
+  sweep item finally becoming real.
+- **The gone-room copy and the 7-day eviction policy were both written for an ephemeral world**, and
+  neither has been revisited. A disk-backed service pins to one instance and recreate deploys, which
+  this already was.
 
 **Being a paid instance also means it does not spin down.** Free instances sleep after inactivity;
 `starter` does not. This is Render's documented behaviour rather than something measured here (it
