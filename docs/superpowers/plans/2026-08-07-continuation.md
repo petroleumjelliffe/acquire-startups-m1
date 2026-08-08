@@ -73,6 +73,12 @@ Stage 2 proved the mechanism when the gate's own saved game broke its next run.
   and the carry-forwards — that caveat is quoted in four documents and every one should be
   retired or reaffirmed on evidence.
 
+> **Done 2026-08-08, and the lead above was wrong.** The persistent profile was not the cause; the
+> cause was the gate rounding each zone's height before summing and comparing exactly, so
+> fractional heights near `.5` shifted a sum by 1px with no layout change. Retired on evidence, as
+> this bullet asked. The profile and port hazards were removed anyway. See `CLAUDE.md` under
+> Commands and the closed Stage 3 section in the sequencing spec.
+
 ## Step 3 — the decision queue (owner picks, none scheduled)
 
 In recommended order:

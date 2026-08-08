@@ -145,9 +145,20 @@ that could never fail. Worth treating it as one.
 
   The redirect still stands and is now better supported: the hole is `/catalog`, which has no away
   state, not `verify-layout.mjs`, which drives pass-and-play where presence is absent by design.
-- **`npm run verify:layout` is intermittently flaky**, project-wide and pre-existing. Every "five
+- ~~**`npm run verify:layout` is intermittently flaky**, project-wide and pre-existing. Every "five
   gates green" claim in this phase is weaker than it reads until that is understood. It should stop
-  counting as evidence until someone explains it.
+  counting as evidence until someone explains it.~~
+
+  **Explained and fixed, 2026-08-08 — and this phase's "five gates green" claims stand.** It was
+  never the app. The gate rounded each zone's height to the nearest pixel and then compared sums
+  exactly, so fractional heights sitting near `.5` flipped a sum by 1px with no layout change.
+  Heights are raw now, compared against a 1px tolerance. See `CLAUDE.md`'s note under Commands.
+
+  Worth noting against this bullet specifically: it is the **first** written appearance of the
+  caveat (`37b8139`), and it already described the problem as "pre-existing" without a failure
+  shape, a seed, or a run behind it. It was then quoted forward through five phases. The lesson is
+  the one this repo already applies to tests — a claim nobody has reproduced is not evidence, and
+  that cuts both ways.
 
 ## Still carried from earlier phases
 

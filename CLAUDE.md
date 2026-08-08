@@ -180,28 +180,35 @@ npm run verify:layout  # drives a real Chrome over CDP — see the caveat below
   stray `window.` or `localStorage` there is a production crash that a single jsdom suite could
   never catch. `session/nodeEnvironment.test.ts` asserts that boundary; don't add root-level
   `setupFiles` (vitest 4 merges the array into both projects, silently disarming it).
-- **`npm run verify:layout` is intermittently flaky**, project-wide and pre-existing, and **still
-  unexplained** — the caveat stands. Treat a green run as weak evidence. It needs Chrome at
+- **`npm run verify:layout`'s flakiness is explained and fixed** (2026-08-08). It needs Chrome at
   `CHROME_PATH` (defaults to the macOS app bundle) and drives pass-and-play only — presence and
   online states are not on its path.
 
-  Stage 3 (2026-08-08) ruled out more than it found. **Twenty consecutive runs came back green**, so
-  it did not reproduce at all. Of four candidate mechanisms: the persistent-profile `localStorage`
-  lead the plan was built around is **dead** (Stage 2's `clear()` already covered it); the
-  first-page-wins target selection is **dead** (exactly one `type: page` target on a fresh profile
-  *and* on the real 285MB one); Chrome's **singleton lock is real** — a second Chrome on the same
-  `--user-data-dir` exits and leaves the first holding the port — but a run driving the stale
-  browser still passed, because the script navigates and clears storage anyway. A **stale
-  `vite --strictPort`** was found the same way and is the more dangerous of the two, since a
-  surviving vite from another checkout would let this gate measure the wrong tree while reporting
-  green.
+  **It was the gate's own arithmetic, not the app.** Each zone's height was rounded to the nearest
+  pixel and *then* summed and compared exactly. Layout heights are fractional — a real run reports
+  `staging: 173.5`, `net: 16.5`, `hand: 117.5` — so a value sitting near `.5` rounds up on one run
+  and down on the next, and the `stepstack+active` sum could differ by 1px (2px worst case) with no
+  layout change whatsoever. Caught at last as
+  `1440px: stepstack+active grew 550px -> 551px`, once in 15 runs.
 
-  Both hazards are now removed — per-run `mkdtemp` profile, per-run vite port, and
-  `--remote-debugging-port=0` read back from `DevToolsActivePort` — which is why two gates can run
-  concurrently, and they do. **That is hazard removal, not a fix**: neither mechanism was ever shown
-  to turn a run red, so nothing here explains the flakiness, and a green run is no more meaningful
-  than it was. The remaining suspect is the fixed `sleep`s, which survived a concurrent double-load
-  run without failing.
+  Heights are now captured **raw**, compared through `moved()` against `EPSILON_PX = 1`, and
+  rounded only for the message. The tolerance sits far below every real defect this gate has caught
+  — the Phase 1b reservation was 6px, the holdings floor 4px, the unstuck history 40px+ — and that
+  was verified rather than assumed: shrinking the holdings floor from 68px to 64px still fails at
+  both widths with the original message.
+
+  **Treat a green run as ordinary evidence now.** Five phases of "weaker than it reads" were
+  standing on a bug in the measurement, and no document ever recorded a failure shape — the belief
+  was quoted forward, not the observation. Worth remembering: the caveat's first appearance
+  (`37b8139`, 2026-08-07) already called it "pre-existing" with nothing behind it.
+
+  Two run-history hazards were removed on the way and are worth keeping removed, though neither
+  ever turned a run red: Chrome's singleton lock (a second Chrome on the same `--user-data-dir`
+  exits, leaving the first holding the port) and a stale `vite --strictPort` (a survivor from
+  another checkout would let this gate measure the wrong tree while reporting green). Each run now
+  gets a `mkdtemp` profile, its own vite port, and `--remote-debugging-port=0` read back from
+  `DevToolsActivePort`, so two gates can run concurrently. Cost: ~25% slower per run (33–35s vs
+  25–29s), because no profile is reused.
 - **Before any by-hand pass, check which tree is serving.** Vite silently moves to the next free
   port when another checkout already holds 5173, and a Phase 4 round was measured against `main`
   before anyone noticed.

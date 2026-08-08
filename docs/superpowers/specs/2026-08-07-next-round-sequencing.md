@@ -125,7 +125,32 @@ card, `End game`, and `New Game` discarding with a confirmation the mockup does 
 rules change; and whether the new storage module reuses `src/net/identity.ts`'s conventions or says
 why not.
 
-## Stage 3 — The layout gate
+## Stage 3 — The layout gate — **CLOSED 2026-08-08**
+
+> **It was the gate's own arithmetic.** Each zone's height was rounded to the nearest pixel and
+> *then* summed and compared exactly. Layout heights are fractional (`staging: 173.5`,
+> `net: 16.5`, `hand: 117.5` in a real run), so a height near `.5` rounds up on one run and down on
+> the next, and the `stepstack+active` sum shifts by 1px — 2px worst case — with no layout change
+> at all. Caught as `1440px: stepstack+active grew 550px -> 551px`, once in 15 runs.
+>
+> Fixed by capturing heights raw and comparing against a 1px tolerance, rounding only for the
+> message. Verified in both directions: the flake stopped, and a deliberately re-broken holdings
+> floor (68px → 64px, the real 4px defect this gate once caught) still fails at both widths with
+> the original wording.
+>
+> **The stated fear was right, and pointed the wrong way.** "A gate nobody can explain is the same
+> defect one level up" — true, and the defect was in the gate. What the diagnosis actually cost was
+> mostly spent elsewhere: two run-history hazards were found and removed (Chrome's singleton lock, a
+> stale `vite --strictPort`) and *neither* was the cause. Worth keeping anyway; they let two gates
+> run concurrently, which is how the reproduction became affordable.
+>
+> **The uncomfortable part.** The caveat's first written appearance already called the problem
+> "project-wide and pre-existing" with no failure shape, no seed and no run behind it, and it was
+> quoted forward through five phases — weakening every "five gates green" claim in all of them on
+> the strength of a belief nobody had reproduced. This repo insists a test prove it can fail; the
+> same standard was never applied to the claim that a gate was broken.
+
+The section as it stood:
 
 `npm run verify:layout` is intermittently flaky, project-wide and pre-existing. This is not a
 feature bug and that is the point: in a repo that has caught eleven hollow gates by insisting on

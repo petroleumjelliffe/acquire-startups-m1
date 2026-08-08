@@ -129,9 +129,13 @@ generator runs — which is why it must stay a one-command, idempotent operation
 
 ## Caveats, stated up front
 
-- **Second Chrome-driving script.** The first one is famously flaky. Mitigations are designed in
-  (fresh profile, pinned width, fonts-ready wait), but treat the generator as rerunnable tooling,
-  not a CI gate, until it has a boring track record.
+- **Second Chrome-driving script.** The first one was *believed* famously flaky; on 2026-08-08 the
+  cause turned out to be the gate's own pixel rounding, not Chrome — see `CLAUDE.md` under
+  Commands. So the risk this bullet guards against is smaller than it looked, and the designed
+  mitigations point the wrong way: a fresh profile is worth having (it removes a real run-history
+  hazard) but it was never what made runs disagree. **The transferable lesson is the opposite one:
+  compare measurements with a tolerance, and never round before comparing.** Still fair to treat the
+  generator as rerunnable tooling rather than a CI gate until it has a track record.
 - **Fidelity limits.** Screenshots capture one state at one width; hover/focus/active variants
   need their own catalog cards to be seen at all (the catalog already leans this way — e.g.
   staging renders one card per step deliberately).

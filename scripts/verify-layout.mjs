@@ -113,10 +113,37 @@ function connect(wsUrl) {
   });
 
   const ready = new Promise((resolve) => ws.on('open', resolve));
+
+  /**
+   * Every CDP call is bounded, and that is the second half of this gate's
+   * "flakiness".
+   *
+   * A reply resolves its promise by id. With no timeout, a reply that never
+   * comes hangs the run *forever* — and the walk makes that reachable: pressing
+   * Start game navigates to /pass-and-play/game, so an evaluate in flight
+   * across that navigation has its execution context destroyed and its reply
+   * lost. Observed 2026-08-08: one run sat for 24 minutes with Chrome and vite
+   * both healthy and the machine idle, having printed nothing.
+   *
+   * A hang is worse than a failure — it never goes red, it just never
+   * finishes, which reads to a human as "the gate is flaky again" and to CI as
+   * a timeout with no output. This turns it into a named error.
+   *
+   * 60s is far above a healthy call (the whole MEASURE walk runs in ~15s) and
+   * far below the wait it replaces.
+   */
+  const CALL_TIMEOUT_MS = 60000;
   const send = (method, params = {}) =>
-    new Promise((resolve) => {
+    new Promise((resolve, reject) => {
       const myId = (id += 1);
-      pending.set(myId, resolve);
+      const timer = setTimeout(() => {
+        pending.delete(myId);
+        reject(new Error(
+          `CDP ${method} (id ${myId}) never replied within ${CALL_TIMEOUT_MS}ms — ` +
+          `the execution context was probably destroyed by a navigation mid-call`,
+        ));
+      }, CALL_TIMEOUT_MS);
+      pending.set(myId, (msg) => { clearTimeout(timer); resolve(msg); });
       ws.send(JSON.stringify({ id: myId, method, params }));
     });
   const evaluate = async (expression) => {
@@ -176,11 +203,20 @@ const MEASURE = `(async () => {
     return false;
   };
 
+  // Raw heights, deliberately NOT rounded here.
+  //
+  // Rounding each zone and *then* comparing is what made this gate flaky for
+  // five phases. Two zones each rounded by up to 0.5px give a sum carrying up
+  // to 1px of error, so two byte-identical layouts could differ by up to 2px
+  // in the stepstack+active comparison — observed as
+  // "stepstack+active grew 550px -> 551px", a failure with no real layout
+  // change behind it at all. Rounding happens once, at the message, and every
+  // comparison uses a sub-pixel tolerance instead.
   const geometry = () => {
     const out = {};
     for (const el of document.querySelectorAll('[data-slot], [data-zone]')) {
       const key = el.getAttribute('data-slot') ?? el.getAttribute('data-zone');
-      out[key] = Math.round(el.getBoundingClientRect().height);
+      out[key] = el.getBoundingClientRect().height;
     }
     return out;
   };
@@ -205,7 +241,10 @@ const MEASURE = `(async () => {
         [...el.children].map((c) => Math.round(c.getBoundingClientRect().bottom)),
       );
       out[key] = {
-        height: Math.round(el.getBoundingClientRect().height),
+        // Raw, for the same reason as the geometry helper above: rounding
+        // before comparing invents 1px differences no layout change caused.
+        // (No backticks in here — this whole block is a template literal.)
+        height: el.getBoundingClientRect().height,
         min: Math.round(parseFloat(getComputedStyle(el).minHeight) || 0),
         rows: rowEdges.size,
         // A reservation smaller than the content it holds clips it. This is
@@ -433,6 +472,31 @@ const MEASURE = `(async () => {
 // reuses the same exemption.
 const SPACER_PAIR = ['stepstack', 'active'];
 
+/**
+ * How much a height may differ before it counts as having moved.
+ *
+ * Layout heights are fractional, and comparing them exactly is what made this
+ * gate intermittently fail for five phases with nobody able to explain it. The
+ * failure finally caught on 2026-08-08 read
+ * `stepstack+active grew 550px -> 551px`: two zones, each rounded to the
+ * nearest pixel before being summed, so a sum could shift by 1px with no
+ * layout change at all — and by 2px in the worst case, since each rounding
+ * contributes up to half a pixel and there are two of them on each side.
+ *
+ * Rounding is gone (heights are captured raw), and this covers what remains:
+ * genuine sub-pixel wobble from fractional flex sizing. It is deliberately far
+ * below every real defect this gate has ever caught — the Phase 1b under-sized
+ * reservation was 6px, the holdings shift 4px, the unstuck history 40px+ — so
+ * nothing it was built to find can hide underneath it.
+ */
+const EPSILON_PX = 1;
+
+/** Whether two heights differ by more than sub-pixel noise. */
+const moved = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) > EPSILON_PX;
+
+/** Heights are raw floats now; round only where a human reads them. */
+const px = (n) => Math.round(n ?? 0);
+
 const CURTAIN = `(() => {
   const surface = document.querySelector('[data-testid="game-surface"]');
   const curtain = document.querySelector('[data-testid="curtain"]');
@@ -468,7 +532,11 @@ const WAITING_PANEL = `(() => {
     const out = {};
     for (const el of fig.querySelectorAll('[data-slot], [data-zone]')) {
       const key = el.getAttribute('data-slot') ?? el.getAttribute('data-zone');
-      out[key] = Math.round(el.getBoundingClientRect().height);
+      // Raw — see the geometry helper in MEASURE. These are compared against
+      // each other and against the walk's own zones, so they must round the
+      // same way, which is to say not at all until the message.
+      // (No backticks in here — this whole block is a template literal.)
+      out[key] = el.getBoundingClientRect().height;
     }
     return out;
   };
@@ -710,7 +778,7 @@ async function main() {
         if (z.overflows) {
           failures.push(
             `${width}px: at ${stage} zone "${key}" clips its own content ` +
-            `(${z.height}px tall, reservation ${z.min}px)`,
+            `(${px(z.height)}px tall, reservation ${z.min}px)`,
           );
         }
       }
@@ -725,9 +793,9 @@ async function main() {
       for (const [key, z] of Object.entries(after)) {
         const was = before[key];
         if (!was || !z.mayGrow) continue;
-        if (z.height !== was.height && z.rows === was.rows) {
+        if (moved(z.height, was.height) && z.rows === was.rows) {
           failures.push(
-            `${width}px: zone "${key}" changed ${was.height}px -> ${z.height}px between ` +
+            `${width}px: zone "${key}" changed ${px(was.height)}px -> ${px(z.height)}px between ` +
             `${floorStages[0]} and ${stage} without gaining a row — that is jitter, ` +
             `not growth (${was.rows} rows both times)`,
           );
@@ -753,27 +821,30 @@ async function main() {
         // not jitter. They may never get *shorter* than they started, which
         // would be the same jump in reverse.
         if (growable.has(key)) {
-          if (current[key] < baseline[key]) {
+          if (baseline[key] - current[key] > EPSILON_PX) {
             failures.push(
-              `${width}px: growable zone "${key}" shrank ${baseline[key]}px -> ${current[key]}px ` +
+              `${width}px: growable zone "${key}" shrank ${px(baseline[key])}px -> ${px(current[key])}px ` +
               `between ${stageNames[0]} and ${name}`,
             );
           }
           continue;
         }
-        if (current[key] !== baseline[key]) {
+        if (moved(current[key], baseline[key])) {
           failures.push(
-            `${width}px: zone "${key}" moved ${baseline[key]}px -> ${current[key]}px ` +
+            `${width}px: zone "${key}" moved ${px(baseline[key])}px -> ${px(current[key])}px ` +
             `between ${stageNames[0]} and ${name}`,
           );
         }
       }
       // The spacer pair absorbs growth elsewhere in the column, so it is only
       // meaningful to compare when nothing growable actually grew.
-      const grew = [...growable].some((k) => (current[k] ?? 0) !== (baseline[k] ?? 0));
-      if (!grew && sumOf(current) !== sumOf(baseline)) {
+      const grew = [...growable].some((k) => moved(current[k], baseline[k]));
+      // The comparison that used to flake. Both sides are sums of raw heights
+      // now, differenced once, against a sub-pixel tolerance — rather than
+      // sums of independently-rounded values compared exactly.
+      if (!grew && moved(sumOf(current), sumOf(baseline))) {
         failures.push(
-          `${width}px: stepstack+active grew ${sumOf(baseline)}px -> ${sumOf(current)}px ` +
+          `${width}px: stepstack+active grew ${px(sumOf(baseline))}px -> ${px(sumOf(current))}px ` +
           `between ${stageNames[0]} and ${name} — the panel resized`,
         );
       }
@@ -784,7 +855,13 @@ async function main() {
       `\n         board ${m.board ? Math.round(m.board.width) + 'x' + Math.round(m.board.height) : 'none'}` +
       `\n         finalOverlay: ${JSON.stringify(m.finalOverlay)}` +
       `\n         step reveal ${JSON.stringify(m.stepRise)}` +
-      `\n         ` + stageNames.map((n) => `${n} ${JSON.stringify(m.stages[n])}`).join('\n         '),
+      // Rounded for reading only. The comparisons above use the raw values.
+      `\n         ` + stageNames.map((n) => {
+        const rounded = Object.fromEntries(
+          Object.entries(m.stages[n]).map(([k, v]) => [k, px(v)]),
+        );
+        return `${n} ${JSON.stringify(rounded)}`;
+      }).join('\n         '),
     );
 
     // The not-my-turn waiting panel — see `WAITING_PANEL`, above, for why
@@ -812,11 +889,11 @@ async function main() {
       // not apply to that.
       const emptyHoldings = m.stages?.play?.holdings;
       const heldHoldings = wp.merger?.holdings;
-      if (emptyHoldings && heldHoldings && emptyHoldings !== heldHoldings) {
+      if (emptyHoldings && heldHoldings && moved(emptyHoldings, heldHoldings)) {
         failures.push(
-          `${width}px: the holdings zone is ${emptyHoldings}px with no shares and ` +
-          `${heldHoldings}px holding one — the floor is short by ` +
-          `${heldHoldings - emptyHoldings}px, so taking your first share shifts every ` +
+          `${width}px: the holdings zone is ${px(emptyHoldings)}px with no shares and ` +
+          `${px(heldHoldings)}px holding one — the floor is short by ` +
+          `${px(heldHoldings - emptyHoldings)}px, so taking your first share shifts every ` +
           `zone below it`,
         );
       }
@@ -856,19 +933,20 @@ async function main() {
         if (!(key in wp.waiting)) {
           failures.push(
             `${width}px: waiting-panel is missing zone "${key}" entirely ` +
-            `(present at ${wp.myTurn[key]}px on the my-turn baseline)`,
+            `(present at ${px(wp.myTurn[key])}px on the my-turn baseline)`,
           );
           continue;
         }
-        if (wp.myTurn[key] !== wp.waiting[key]) {
+        if (moved(wp.myTurn[key], wp.waiting[key])) {
           failures.push(
-            `${width}px: waiting-panel zone "${key}" is ${wp.waiting[key]}px vs ` +
-            `${wp.myTurn[key]}px on the my-turn baseline — going inert moved a zone ` +
+            `${width}px: waiting-panel zone "${key}" is ${px(wp.waiting[key])}px vs ` +
+            `${px(wp.myTurn[key])}px on the my-turn baseline — going inert moved a zone ` +
             `it should not have`,
           );
         }
       }
-      if (sumOf(wp.waiting) === 0) {
+      // Raw floats now, so "collapsed" is a threshold rather than exact zero.
+      if (sumOf(wp.waiting) < 1) {
         failures.push(`${width}px: the waiting panel's stepstack+active pair collapsed to 0px`);
       }
     }
