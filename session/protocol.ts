@@ -106,6 +106,21 @@ export function toWire(intent: Intent): WireIntent {
   return wire as WireIntent;
 }
 
+/**
+ * Everything the engine can refuse, plus the refusals the engine knows nothing
+ * about.
+ *
+ * Undo is not an intent — it never reaches `applyIntent` — so
+ * `IllegalIntentCode` has no word for "that step belongs to a segment you no
+ * longer own".
+ *
+ * The rest of what this file adds is `LobbyRejectionCode` — `notConnected`,
+ * `noSuchRoom`, `seatRefused`, `versionMismatch` — documented in
+ * `lobby/protocol.ts`, where those refusals live now that the lobby is
+ * game-agnostic.
+ *
+ * Adding these here keeps `engine/` untouched.
+ */
 export type RejectionCode =
   | IllegalIntentCode
   | 'undoOutOfSegment'
@@ -148,11 +163,14 @@ export interface StateMessage {
 /**
  * What "the wire" currently is.
  *
- * Bump this when the shape of anything in this file changes: `WireIntent`,
- * `StateMessage`, `RejectionCode`, `JoinedMessage`, `RosterMessage`,
- * `CLIENT_EVENTS` or `SERVER_EVENTS`. This file owns all of them, which is why
- * the constant lives here and nowhere else — it is the only place that knows
- * what "changed" means.
+ * Bump this when the shape of anything on either half of the wire changes:
+ * `WireIntent`, `StateMessage`, `RejectionCode`, `UndoMessage`,
+ * `GAME_CLIENT_EVENTS` or `GAME_SERVER_EVENTS` here, or `JoinedMessage`,
+ * `RosterMessage`, `CreateRoomMessage`, `JoinRoomMessage`,
+ * `RenamePlayerMessage`, `LOBBY_CLIENT_EVENTS` or `LOBBY_SERVER_EVENTS` in
+ * `lobby/protocol.ts`. This constant is the one thing both files share, which
+ * is why it lives here rather than in either half alone — it is the only
+ * place that knows what "changed" means for the wire as a whole.
  *
  * Skew runs in **both** directions in this deployment. The client ships to
  * GitHub Pages and the server to Render, independently, so either can be the
@@ -173,10 +191,6 @@ export interface StateMessage {
  * now one player's own move rather than one intent that drew for the whole
  * table. Unlike the v2 correction above this is a true cutover — v2 *is*
  * deployed — so every open client takes the stale-client screen once.
- *
- * This constant now explicitly covers both halves of the wire: the game half
- * in this file and the lobby half in `lobby/protocol.ts`. A shape change in
- * either bumps the one number both sides compare.
  */
 export const PROTOCOL_VERSION = 3;
 
