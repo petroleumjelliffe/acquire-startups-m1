@@ -71,21 +71,36 @@ correctness gate.
 `server/lobby/rooms.ts` becomes generic by making the room's game payload opaque and
 inverting the three places it reaches into the game today:
 
-- **Lifecycle.** The lobby owns `'lobby' | 'playing' | 'over'` and the roster
-  broadcast. `beginGame` stays a lobby event — the host check and the lifecycle check
-  are lobby rules — but what beginning *does* is injected: the game supplies an
+- **Lifecycle.** The canonical `'lobby' | 'playing' | 'over'` type moves to
+  `lobby/protocol.ts`, and the lobby's room contract *requires* a `lifecycle()`
+  method it reads — for the roster broadcast and its own guards. It does not own a
+  lifecycle field: `GameRoom` already derives `over` from its own state
+  (`stage === 'end'`), and a lobby API call for something the room knows first-hand
+  would be ceremony. (Corrected 2026-08-08 — the first draft said "the game flips
+  `playing → over` through a lobby API call", written from memory of the code rather
+  than the code.) `beginGame` stays a lobby event — the host check and the lifecycle
+  check are lobby rules — but what beginning *does* is injected: the game supplies an
   `onBegin(room)` callback that builds initial game state (today: entering the
-  turn-order draw). The game flips `playing → over` through a lobby API call when
-  scoring ends.
+  turn-order draw).
 - **Seat bindings.** The lobby owns the socket↔seat binding — it is what tokens and
   rejoin produce. The game's `intent`/`undo` handlers ask the lobby "whose seat is
   this socket" instead of sharing a map. `server/index.ts` stays the composition
   root, wiring both halves onto one socket.io instance.
-- **Persistence stays a game concern.** `store.ts` does not move. The lobby exposes
-  `snapshotRoster(room)` / `restoreSeats(room, snapshot)`; the game's store keeps
-  writing one record per room (roster + tokens + game state), calling those at save
-  and at boot exactly where it does today. No storage interface is invented for a
-  single implementer.
+- **Persistence stays a game concern.** `store.ts` does not move. The game's store
+  keeps writing one record per room (roster + tokens + game state) exactly where it
+  does today; `players` is on the lobby's room contract, so the copy-in and
+  copy-out are the one-line maps already living in `persist` and `restore`. No
+  storage interface is invented for a single implementer. (The first draft proposed
+  `snapshotRoster`/`restoreSeats` helpers — cut 2026-08-08 by this spec's own rule:
+  an interface with one caller each.)
+- **Two behaviors cross the boundary as-is, flagged rather than redesigned.**
+  The honor-system name reclaim (same name takes an abandoned mid-game seat) is an
+  owner ruling for *this* game's trust model; as a generic default it means knowing
+  a room code and a display name captures a seat in any future game. And the lobby
+  will emit some rejection codes with game-flavored names — `beginGame`'s host
+  refusal is `notYourTurn` — because the codes are wire contract and this refactor
+  is wire-neutral. Both are correct today and both go on the lift's re-ask list
+  below, not into config surface nobody uses yet.
 
 ## The client seam
 
@@ -108,15 +123,27 @@ inverting the three places it reaches into the game today:
 
 ## The UI kit and theming
 
-The components lose their imports of the game's `tokens.ts`. Theming goes through
-**CSS custom properties, not a theme prop**: each component reads a small deliberate
-set of `--lobby-*` variables (accent, surface, radius — on the order of a dozen) with
-working fallbacks. This game sets them once at its mount point by mapping `tokens.ts`
-onto them; a future game themes the same components with one CSS block, or forks the
-UI and keeps the headless layer. Copy takes one parameter — the game's display name —
-for the few strings that say what is being joined; the rest is already game-neutral.
-The seat emoji set from the lobby design ships as the default kit's, overridable via
-the theme.
+Corrected against the actual files (2026-08-08; the first draft assumed `tokens.ts`
+imports that do not exist). The components' real game couplings are exactly two:
+`PLAYER_EMOJI` from `engine/startups` in `LobbyCard.tsx`, and the Tailwind accent
+blues (`bg-blue-600`/`hover:bg-blue-700`) on the primary buttons. So:
+
+- **The emoji set is injected**: `RoomLobby` takes a `seatEmoji(seat)` function as a
+  prop; the game passes one built on `PLAYER_EMOJI`, a future game passes its own.
+- **Theming goes through CSS custom properties, not a theme prop** — but only the
+  variables with a consumer today: `--lobby-accent`, `--lobby-accent-strong`,
+  `--lobby-on-accent`, each with the current blue as its working fallback, read via
+  Tailwind arbitrary values. An un-themed consumer renders today's UI pixel for
+  pixel; a future game themes with one CSS block, or forks the UI and keeps the
+  headless layer. The set grows when a variable gains a consumer, not before.
+- **No copy parameter.** Verified: no string in any moving component names the game.
+  A `gameName` parameter arrives with the first string that needs it.
+
+**Known debts ship with the kit, as findings against it:** the away dot rides a
+roster row designed to clip, and final scoring has no presence at all (both open
+Stage 0 findings). Extraction does not fix them and must not wait for them — but the
+kit's first consumer inherits them, so they stay on the books as the kit's, not the
+game's.
 
 ## Testing and migration
 
@@ -126,16 +153,29 @@ the theme.
 - **The gate is the existing suite**, unchanged: `goldenSocket`, `clientOverWire`,
   `recovery`, `lobbySeat`, the page tests — green with no assertion edits. Tests move
   with their files.
-- **Two new tests:** the import-boundary test (proven by breaking it), and the
+- **Three new tests:** the import-boundary test (proven by breaking it); the
   phase-ranking test on the game's thin `useRoom` (`gone`/`stale` outrank `playing`
-  before the session is disposed).
+  before the session is disposed); and a **stub-consumer test** — the registry and
+  the hook types driven by a dummy room that is not `GameRoom`. The boundary test
+  proves *decoupled*; only a second consumer proves *generic*, and thirty lines of
+  stub is the cheapest way to have one before the lift instead of discovering an
+  accidentally Acquire-shaped abstraction during it.
+- **`lobby/README.md` is written at extraction time, not lift time** — one page
+  addressed to game #2's author: the room contract, the two hooks, the three theme
+  variables, the identity `appId` rule, and the reclaim caveat. The knowledge is at
+  its freshest during the extraction and decays from there; the file doubles as the
+  genericity checklist.
 - **Migration order inside the branch:** protocol split first (types only, everything
   still compiles) → server (`rooms.ts` → `server/lobby/` + the `onBegin` inversion)
   → client (`useLobbyRoom` + wrapper) → UI move + theming → boundary test last, since
   it can only pass once everything above it is done.
 - **A by-hand pass at the end** — create, join, rename, leave, refresh-rejoin, kill
-  the server, two browsers — because by-hand passes are what find bugs here, and this
-  refactor walks straight through Phase 4's territory.
+  the server, two browsers, **and the token-lost reclaim**: clear one browser's
+  stored identity mid-game and rejoin by retyping the same name. That path is the
+  least-tested behavior crossing the boundary and the one the honor reclaim exists
+  for; the rest of the pass only ever exercises the token-present rejoin. By-hand
+  passes are what find bugs here, and this refactor walks straight through Phase 4's
+  territory.
 
 ## Game #2 and the lift
 
@@ -161,11 +201,23 @@ final call is made at the lift, with game #2's real needs in hand; the in-place
 extraction keeps the lift cheap by keeping the lobby dirs self-contained, which the
 import-boundary test already forces.
 
-**Deferred until the lift, kept visible:** hosting. A second Render service is a
-second paid `starter` instance; the alternative — both games' servers in one
-process — creeps toward the hosted-lobby-service model this design rejected. Also
-concrete now, not hypothetical: both games will share the GitHub Pages origin, so
-the `identity.ts` key namespace (above) is required, not precautionary.
+**Deferred until the lift — the re-ask list.** Each of these is a decision that
+gets better with game #2's real needs in hand, and worse if rediscovered mid-lift:
+
+- **Hosting.** A second Render service is a second paid `starter` instance; the
+  alternative — both games' servers in one process — creeps toward the
+  hosted-lobby-service model this design rejected.
+- **The identity namespace is required, not precautionary** (and lands now, in the
+  extraction): both games will share the GitHub Pages origin's `localStorage`.
+- **The honor-reclaim policy.** Generic default today; game #2 decides whether
+  same-name seat capture fits its trust model, and a flag arrives then if not.
+- **The game-flavored rejection codes** (`notYourTurn` from the lobby's `beginGame`,
+  `wrongStage`, `unknownIntent`). Renaming them is a wire change, so it costs a
+  protocol bump — the lift, which already forces each game to re-pin its version,
+  is the natural moment.
+- **Reconnect/backoff configurability.** The socket options are hardcoded with this
+  game's deploy-survival rationale; exposing them on `LobbyConnectionOptions` is
+  cheap if game #2 wants different behavior, and clutter before then.
 
 ## Out of scope
 

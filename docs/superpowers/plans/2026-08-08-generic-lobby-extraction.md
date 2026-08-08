@@ -10,7 +10,13 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-08-generic-lobby-extraction-design.md`
 
-## Recorded deviations from the spec (surface to owner at review)
+## Spec alignment (2026-08-08)
+
+The four items below began as deviations this plan's reconnaissance forced, plus a
+review's findings; **the spec has since been amended to match them** (same date), and
+gained three requirements this plan carries: a stub-consumer genericity test and
+`lobby/README.md` (Task 8), and the token-lost reclaim leg of the by-hand pass
+(Task 9). The list stays as the record of what changed and why.
 
 1. **The components never imported `tokens.ts`.** The spec's theming section assumed they did. Their styling is Tailwind utilities; the only game import is `PLAYER_EMOJI` in `LobbyCard.tsx`. So theming here is: invert `PLAYER_EMOJI` into a prop, and route the **accent color family only** (the `blue-600`/`blue-700` buttons) through three CSS variables with fallbacks. Not the spec's "on the order of a dozen" — the other colors are neutral grays with no game identity, and inventing variables with no consumer is YAGNI.
 2. **No `gameName` copy parameter.** Verified: no string in any moving component names the game (checked `RoomGone`, `StaleClient`, `RoomRefused`, `RoomLobby`, `LobbyCard`, `JoinRoomCard`, `ConnectionStrip`). The parameter is deferred until a string needs it.
@@ -779,13 +785,15 @@ git add -A && git commit -m "refactor(lobby): the lobby UI moves to src/lobby/ui
 
 ---
 
-### Task 8: The import boundary, enforced and proven
+### Task 8: The boundary proven, the stub consumer, and the README
 
 **Files:**
 - Create: `lobby/importBoundary.test.ts` (node project — Task 1 already added the glob)
+- Create: `server/lobby/genericConsumer.test.ts`
+- Create: `lobby/README.md`
 
 **Interfaces:**
-- Consumes: the final layout of Tasks 1–7. This task is last on purpose: the test can only pass once everything above is done.
+- Consumes: the final layout of Tasks 1–7. This task is last on purpose: the boundary test can only pass once everything above is done.
 
 - [ ] **Step 1: Write the test**
 
@@ -838,10 +846,110 @@ Expected: PASS (and the file-count guard proves the walk found the tree).
 Add `import type { WireIntent } from '../session/protocol';` to the top of `lobby/protocol.ts`. Run the test again.
 Expected: FAIL, naming `lobby/protocol.ts imports ../session/protocol`. Then break it from the *other* side too: add `import { PLAYER_EMOJI } from '../../../engine/startups';` to `src/lobby/ui/LobbyCard.tsx`, run, watch it fail naming that file. **Read both failure outputs — do not proceed on green memory.** Revert both edits, run once more, green.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Write the failing stub-consumer test**
+
+The boundary test proves *decoupled*; this proves *generic* — the registry driven by a room that is not `GameRoom`, so an accidentally Acquire-shaped abstraction goes red here instead of during the lift.
+
+```ts
+// server/lobby/genericConsumer.test.ts
+// A room that is not GameRoom. If the lobby's generics ever grow a requirement
+// only GameRoom satisfies, this file is what goes red — before the lift does.
+import { createLobbyRegistry, seatPlayer, type LobbyRoomLike, type SeatHolder } from './rooms.js';
+import type { LobbyHooks } from './handlers.js';
+import type { Lifecycle } from '../../lobby/protocol.js';
+
+interface StubRoom extends LobbyRoomLike { begun: boolean }
+
+function makeStub(id: string, players: SeatHolder[]): StubRoom {
+  const lifecycle: Lifecycle = 'lobby';
+  return { id, players, lifecycle: () => lifecycle, begun: false };
+}
+
+// Compile-time proof the hook types instantiate over a non-GameRoom room.
+const _hooks: LobbyHooks<StubRoom> = {
+  protocolVersion: 1,
+  onBegin: (room) => { room.begun = true; },
+  onSeated: () => {},
+};
+void _hooks;
+
+describe('the registry over a room that is not GameRoom', () => {
+  it('creates, seats the host, and names an unnamed second seat by number', () => {
+    const registry = createLobbyRegistry<StubRoom>(makeStub);
+    const { room, player: host } = registry.create('Ada');
+    expect(host.isHost).toBe(true);
+    expect(host.name).toBe('Ada');
+
+    const seated = registry.join(room.id);
+    expect(seated?.player.name).toBe('Player 2');
+    expect(registry.get(room.id)?.players).toHaveLength(2);
+  });
+
+  it('a rejoin must present the seat\'s own token', () => {
+    const registry = createLobbyRegistry<StubRoom>(makeStub);
+    const { room, player } = registry.create('Ada');
+    expect(registry.join(room.id, undefined, player.id, 'wrong-token')).toBeNull();
+    expect(registry.join(room.id, undefined, player.id, player.token)?.player.id).toBe(player.id);
+  });
+
+  it('adopt replaces whatever holds the id', () => {
+    const registry = createLobbyRegistry<StubRoom>(makeStub);
+    const replacement = makeStub('ABC123', [seatPlayer(0, 'Bee')]);
+    registry.adopt(replacement);
+    expect(registry.get('ABC123')).toBe(replacement);
+  });
+});
+```
+
+Run: `npx vitest run server/lobby/genericConsumer.test.ts` — expected to pass immediately **only if** Tasks 2–3 kept the generics honest; a compile error here is a real finding (the abstraction leaked `GameRoom`), fix the leak, not the test.
+
+- [ ] **Step 5: Write `lobby/README.md`** — the page game #2's author reads at the lift
+
+```markdown
+# The lobby
+
+Rooms, seats, join/rejoin tokens, presence, rename/leave — game-agnostic, shared
+by every game in this family. Three pieces: `lobby/` (wire types, node-safe),
+`server/lobby/` (seating registry + socket handlers), `src/lobby/` (headless
+React client + default UI under `ui/`).
+
+## What your game provides
+
+- **A room**: anything with `id`, `players: SeatHolder[]`, and `lifecycle()`
+  returning `'lobby' | 'playing' | 'over'`. Pass a `makeRoom(id, players)`
+  factory to `createLobbyRegistry`.
+- **Two hooks** for `createLobbyHandlers`: `onBegin(room)` — host pressed start,
+  lobby has validated host + lifecycle; begin your game, call
+  `wiring.broadcastRoster(room)`, send your own state. `onSeated(room, playerId)`
+  — a socket was seated (join or rejoin); send them your game's state if one is
+  running.
+- **Your protocol version** (`protocolVersion` on the hooks and on
+  `createLobbyConnection`) — the lobby has no version of its own; your game's
+  number covers both halves of the wire.
+- **An `appId`** for `createIdentityStore` — the `localStorage` namespace. Games
+  share the origin; a duplicated appId lets one game's seat tokens shadow
+  another's.
+- **A seat-emoji function** for `RoomLobby` (`seatEmoji(seat) => string | null`),
+  and optionally a theme: `--lobby-accent`, `--lobby-accent-strong`,
+  `--lobby-on-accent` (defaults render the reference blue).
+
+## What the lobby decides for you (re-ask at the lift if it doesn't fit)
+
+- **The honor reclaim**: mid-game, a join with a disconnected seat's exact name
+  takes that seat (token rotated). Right for a trusted table; a trust model
+  where name + room code must not capture a seat needs a flag that does not
+  exist yet.
+- Some rejection codes carry game-flavored names (`notYourTurn` for "not the
+  host") — wire legacy; renaming costs a protocol bump.
+- Reconnect/backoff socket options are fixed (infinite retries, 500ms–5s).
+```
+
+- [ ] **Step 6: Full suite, then commit**
+
+Run: `npm run typecheck && npx vitest run`
 
 ```bash
-git add -A && git commit -m "test(lobby): the import boundary is a test, proven by breaking it twice"
+git add -A && git commit -m "test(lobby): boundary proven by breaking it; a stub consumer proves the generics; README for game #2"
 ```
 
 ---
@@ -870,6 +978,7 @@ Run: `git diff main...HEAD` and read it end to end, hunting specifically for sea
 5. Refresh the actor mid-draft — it comes back to the open draft (the `resume` path through `onSeated`).
 6. Kill the server process; both browsers show the connection pill; restart it (`npm run dev:server`); both rejoin their seats and the game continues.
 7. Navigate to a made-up room code — `RoomGone` by name, and Back works.
+8. **The token-lost reclaim** (the least-tested path crossing the boundary): mid-game, in the second browser's devtools, delete **both** its `acquire.room.<code>` and `acquire.name` localStorage keys, then refresh. (Deleting only the room key lets the auto-join silently reclaim via the remembered name — worth seeing once, but it skips the screen this leg exists for.) The nameless join is refused → `RoomRefused`; retype a *wrong* name and watch it get refused again; retype the seat's *exact* name — it takes the old seat back, token rotated, and play continues.
 
 Any deviation from today's behavior is a finding: record it in the plan doc's margin, fix, re-run the relevant leg.
 
