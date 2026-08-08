@@ -69,12 +69,20 @@ export interface Connection {
 function createConnection(): Connection {
   const socket: Socket = io(SERVER_URL, {
     transports: ['websocket'],
-    // Stated rather than inherited, because this deployment's worst case is
-    // longer than the default connect timeout. A sleeping Render free
-    // instance takes ~30s to wake, so the *first* attempt times out at 20s
-    // and it is the retry that actually lands. Relying on a default for the
-    // behaviour that makes cold starts work at all is how it silently stops
-    // working when a dependency changes its mind.
+    // Stated rather than inherited, so the reconnect behaviour is this file's
+    // decision and not a dependency's default.
+    //
+    // The original justification was a cold start: "a sleeping Render free
+    // instance takes ~30s to wake, so the first attempt times out at 20s and
+    // it is the retry that actually lands." **That premise is wrong** — the
+    // service is on Render's paid `starter` plan (confirmed 2026-08-08), and
+    // paid instances do not spin down. There is no routine 30s wake to
+    // survive.
+    //
+    // The settings stay anyway, because what they actually buy is surviving a
+    // *deploy* — the instance restarts, every socket drops, and infinite
+    // retries with a capped backoff are what bring the room back. That is a
+    // real event on every push, unlike the cold start this was written for.
     reconnection: true,
     reconnectionAttempts: Infinity,
     reconnectionDelay: 500,

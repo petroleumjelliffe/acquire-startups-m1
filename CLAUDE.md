@@ -38,11 +38,16 @@ shows the pill on one side and **the away dot on the other — observed on prod 
 The draft also stayed private across the drop: the other player's board read `C2: empty` while it
 was held uncommitted.
 
-**Still owed:** the cold-start copy ruling (the prod pass was *device-offline*, which has its own
-honest wording; the unresolved case is **online-but-unreachable**), a recovery *time* — the
-reconnect beat the first 500ms sample, so there is still no number — and the clipped away dot,
-which needs five or six seats. The prod pass was heads-up, so the disconnected player was the
-**actor** and rotation kept them visible, which is the case that already worked.
+**Still owed:** a recovery *time* — the reconnect beat the first 500ms sample, so there is still no
+number — and the clipped away dot, which needs five or six seats. The prod pass was heads-up, so the
+disconnected player was the **actor** and rotation kept them visible, which is the case that already
+worked.
+
+**The cold-start copy ruling may not be owed at all.** It was raised against copy for a server
+*waking up*, which assumed a free instance that sleeps. The service is on `starter` and does not
+sleep (see Environment, below), so the routine cold start the copy was written for does not happen.
+What remains is **online-but-unreachable** — a deploy restart, or Render being down — which is a
+different sentence and a rarer one. Re-ask the question before answering the old version of it.
 
 **Continuing from another machine? Start at `plans/2026-08-07-continuation.md`** — it holds the
 verify-merge-deploy steps for the pending branch, the machine-setup gotchas, and the queue.
@@ -212,10 +217,25 @@ npm run verify:layout  # drives a real Chrome over CDP — see the caveat below
 ## Environment and deployment
 
 Client on GitHub Pages under the base path `/acquire-startups-m1` (hardcoded in `vite.config.ts` and
-`src/main.tsx`); server on Render free. `VITE_SERVER_URL` points the client at a server, defaulting
+`src/main.tsx`); server on Render, service `srv-d3klnhnfte5s73diht90`, **plan `starter`** (paid) —
+*not* free, whatever older notes say. `VITE_SERVER_URL` points the client at a server, defaulting
 to `http://<current hostname>:3001` in dev — the hostname, not `localhost`, so a phone on the LAN
 works. The server reads `PORT` (3001) and writes rooms to `server/games/`, gitignored.
 
-**Render free's disk is ephemeral**, so a restart there loses every room *even though persistence
-works*. The gone-room ending is the normal case in prod, not an edge case — `server/store.ts` is a
-`RoomStore` interface precisely so a durable backend can be swapped in without a redesign.
+**Rooms are lost on restart because no disk is attached, not because of the plan.** The service runs
+`numInstances: 1` with no `disk` in its details, so `server/games/` lives on the instance's
+ephemeral filesystem and every deploy or restart empties it. The gone-room ending is still the
+normal case in prod.
+
+**That makes the durable-`RoomStore` item smaller than it was written up as.** It is queued as
+"provision Key Value or Postgres and write a second `RoomStore` implementation", which was the right
+plan for a *free* instance that cannot have a disk. A `starter` instance can: attaching one would
+make the **existing file store** durable with no second implementation at all. `store.ts` staying an
+interface is still worth it, but it may not need to be exercised. Worth pricing both before
+building either — a disk pins the service to recreate-style deploys and one instance, which it
+already is.
+
+**Being a paid instance also means it does not spin down.** Free instances sleep after inactivity;
+`starter` does not. This is Render's documented behaviour rather than something measured here (it
+would take a 15-minute idle window to observe), but it is why the cold-start story below is
+suspect.

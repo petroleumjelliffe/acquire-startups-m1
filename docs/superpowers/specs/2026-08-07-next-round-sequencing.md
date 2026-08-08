@@ -163,7 +163,11 @@ Small carried items, each riding whichever stage touches its file rather than be
 - **A library of finished games.** Out of scope, but Stage 2's format ruling keeps it possible.
 - **The prod by-hand pass.** Still owed from Phase 4. It is a separate errand from Stage 0 and
   should not be folded into it — Stage 0 needs a dev-only seeding route that must never reach prod.
-- **A durable `RoomStore` backend** — newly *feasible*, still not scheduled. The prod smoke check
+- **A durable `RoomStore` backend** — newly *feasible*, still not scheduled. **Amended 2026-08-08:**
+  the paragraph below assumes a *free* instance, which cannot have a disk. The service is actually on
+  Render's paid `starter` plan and simply has **no disk attached** — so the cheapest durable option
+  may be attaching one and keeping the file store exactly as it is, with no second `RoomStore`
+  implementation written at all. Price that against Key Value/Postgres before building either.
   (2026-08-07, post-Stage-1) re-confirmed the accepted limit: a Render restart still loses every
   room, because persistence writes to a disk that resets. The Render MCP connector is now set up,
   so provisioning a Render Key Value store or Postgres and writing the second `RoomStore`
