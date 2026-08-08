@@ -53,6 +53,9 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
           connected={room.status === 'open'}
           presence={presence}
           onExit={leave}
+          // Same control as pass-and-play's; online it is the leave flow —
+          // the socket closes and the seat survives for a rejoin.
+          onBack={leave}
         />
       </>
     );

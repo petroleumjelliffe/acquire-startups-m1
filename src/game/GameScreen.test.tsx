@@ -394,3 +394,27 @@ describe('GameScreen with a viewer who is not the actor', () => {
     expect(screen.queryByRole('button', { name: /end turn/i })).toBeNull();
   });
 });
+
+describe('the back control', () => {
+  /**
+   * The installed app has no browser chrome, so the game view needed its own
+   * way back (owner, from the first real install). It floats in the board
+   * margin — the owner's explicit placement: "upper left in margin next to
+   * board, not a whole empty row above it" — so it must not add layout.
+   */
+  it('floats in the margin when onBack is given, and calls it', () => {
+    const onBack = vi.fn();
+    render(<GameScreen session={createGameSession({ state: playable() })} onBack={onBack} />);
+
+    const back = screen.getByRole('button', { name: /back to the lobby/i });
+    // Absolutely positioned: in the margin, not a row of its own.
+    expect(back.className).toMatch(/absolute/);
+    fireEvent.click(back);
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders no back control when the route did not provide one', () => {
+    render(<GameScreen session={createGameSession({ state: playable() })} />);
+    expect(screen.queryByRole('button', { name: /back to the lobby/i })).toBeNull();
+  });
+});

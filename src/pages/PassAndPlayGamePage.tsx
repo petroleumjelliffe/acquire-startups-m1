@@ -80,6 +80,10 @@ export function PassAndPlayGamePage() {
         navigate('/pass-and-play');
       }}
       onExit={() => navigate('/')}
+      // The floating back in the board margin — the installed app has no
+      // browser chrome. To the pass-and-play lobby, whose Continue card is
+      // this same game: leaving is never losing it.
+      onBack={() => navigate('/pass-and-play')}
     />
   );
 }

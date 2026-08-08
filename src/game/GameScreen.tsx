@@ -62,9 +62,11 @@ export interface GameScreenProps {
   onEndGame?: () => void;
   /** Leave the game entirely. Omitted when nothing is hosting the screen. */
   onExit?: () => void;
+  /** The floating back control in the board margin. Absent = no control. */
+  onBack?: () => void;
 }
 
-export function GameScreen({ session, viewerId, connected = true, presence, onEndGame, onExit }: GameScreenProps) {
+export function GameScreen({ session, viewerId, connected = true, presence, onEndGame, onExit, onBack }: GameScreenProps) {
   const view = useGameSession(session);
   const { state, actorId, awaitingReveal, undoableSteps, pending } = view;
 
@@ -167,6 +169,23 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
       data-testid="game-surface"
       className="relative flex h-screen w-full overflow-hidden bg-gray-50"
     >
+      {/* The way back, for the installed app — standalone chrome has no
+          browser back (owner, from the first real install). Floated in the
+          board's own margin, per the owner's placement: "upper left in
+          margin next to board, not a whole empty row above it" — absolute,
+          so it adds no row and moves no layout. Above the curtain (z-20)
+          deliberately: between turns is exactly when whoever holds the
+          device may want to put it down. */}
+      {onBack && (
+        <button
+          type="button"
+          aria-label="Back to the lobby"
+          onClick={onBack}
+          className="absolute left-3 top-3 z-20 m-0 flex h-8 w-8 items-center justify-center rounded-full bg-white/80 text-gray-600 shadow hover:bg-white hover:text-gray-900"
+        >
+          ←
+        </button>
+      )}
       <div className="flex min-w-0 flex-1 items-center justify-center p-4">
         <Board
           board={state.board}
