@@ -19,9 +19,11 @@ zone's *height* is the panel's one animation, and the founding step is one row c
 certificate. Read that plan before changing anything in `src/game/panel/` — several of its tasks
 reverse decisions the 3b carry-forward describes as shipped.
 
-**Still not done, and it is the thing that finds bugs here:** a full two-browser game to final
-scoring, including a merger whose liquidation queue reaches both players. Every one of those
-twenty-six findings came from a by-hand pass; none came from the suite.
+**By-hand passes are what find bugs here.** All twenty-six of Phase 5's findings came from one;
+none came from the suite. (The full two-browser game this paragraph used to call "still not done"
+*is* done — Stage 0, 2026-08-07, G2's merger reaching both players and G9 to final scoring, in
+`specs/2026-08-07-full-game-by-hand-notes.md`. It had survived three carry-forwards not because it
+was hard but because nobody had built the setup: `POST /dev/rooms` made it two commands.)
 
 **Phase 4 (2026-08-07) is built** — presence and recovery. A game now survives a page refresh, a
 dropped socket and a server restart, and all three were driven by hand in real browsers as well as
