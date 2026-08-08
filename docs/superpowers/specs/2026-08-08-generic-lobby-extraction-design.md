@@ -1,8 +1,10 @@
 # Generic lobby extraction — design
 
 **Date:** 2026-08-08
-**Status:** Approved design, not yet planned or built
+**Status:** Approved; implementation plan written
+(`docs/superpowers/plans/2026-08-08-generic-lobby-extraction.md`); not yet built
 **Depends on:** `revamp/turn-order-draw` merging and its v3 cutover deploying first
+— **satisfied** (v3 live on prod, 2026-08-08)
 
 ## What and why
 
@@ -47,9 +49,13 @@ Three sibling pieces, mirroring the repo's existing shared/client/server convent
 | `src/lobby/ui/` | Default components: `LobbyCard`, `RoomLobby`, `JoinRoomCard`, `RoomGone`, `RoomRefused`, `StaleClient`, `ConnectionStrip`. `TurnToast` stays game-side — it is about turns, not rooms. |
 
 The boundary is enforced the way this repo already enforces boundaries: a test in the
-node project asserts that nothing under the three lobby directories imports from
-`engine/`, `session/`, or `src/game/`. Per the hollow-gate rule, it is proven by
-temporarily adding a forbidden import and watching it fail.
+node project asserts that every *relative* import under the three lobby directories
+resolves back **inside** those directories — an allowlist, not a blocklist. (The
+first draft forbade `engine/`, `session/` and `src/game/` by name, which left
+`server/room.ts` and `src/net/` importable: a `GameRoom` import in the lobby's
+handlers would have passed the gate while breaking exactly what the gate guards.)
+Bare module imports — react, socket.io — are fine. Per the hollow-gate rule, the
+test is proven by temporarily adding a forbidden import and watching it fail.
 
 ## The protocol split
 
@@ -113,8 +119,9 @@ inverting the three places it reaches into the game today:
 
 - **`useLobbyRoom`** is today's `useRoom` minus the session: it owns
   `connecting → joining → lobby` plus `error`, `gone`, `stale`, and exposes `roster`,
-  `playerId`, `join` / `begin` / `rename` / `leaveSeat`, and the raw transport. It
-  does not know what "playing" means.
+  `playerId`, and `join` / `begin` / `rename` / `leaveSeat`. It does not know what
+  "playing" means, and it does not expose the game transport — the game already
+  holds the shared connection and reaches its transport there.
 - **The game keeps a thin `useRoom`** wrapping it: it listens on `onState` to build
   the `NetworkSession`, and computes the final phase with `stale` / `gone` ranked
   *above* `playing` — so even before the wrapper's effect disposes the session, a
@@ -260,7 +267,8 @@ exactly what the version handshake exists for.
 ## Out of scope
 
 - Generalizing the game transport (intents, projection, corrections, segments).
-- Any storage interface beyond the two roster snapshot functions.
+- Any storage interface at all — persistence stays the game's. (The first draft's
+  two roster snapshot functions were cut; see the server seam.)
 - Publishing, monorepo conversion, or a second repo (until the lift).
 - Game #2's React port itself — its own brainstorm and spec, in its own repo.
 - Any wire or behavior change visible to a player.

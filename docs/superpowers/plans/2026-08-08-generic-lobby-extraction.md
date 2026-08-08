@@ -28,7 +28,7 @@ gained three requirements this plan carries: a stub-consumer genericity test and
 - **Wire-neutral, byte for byte.** No message shape changes, no event-name changes, no rejection-code or message-string changes, **no `PROTOCOL_VERSION` bump** (stays `3`). `server/goldenSocket.test.ts`, `server/clientOverWire.test.ts`, `server/versioning.test.ts` green with **zero assertion edits** is the gate.
 - **Tests move with their files; assertions do not change.** Import-path edits in test files are expected; assertion edits are a red flag — stop and re-check the refactor instead.
 - **No `as any`.** Narrow with type guards.
-- **Boundary rule:** nothing under `lobby/`, `server/lobby/`, or `src/lobby/` imports from `engine/`, `session/`, or `src/game/`. (The reverse direction — game importing lobby — is the point.)
+- **Boundary rule (allowlist):** every relative import under `lobby/`, `server/lobby/`, or `src/lobby/` must resolve back inside those three directories; bare module imports are fine. This is stricter than "don't import engine/session/src-game" on purpose — it also forbids `server/room.ts` and `src/net/`, which a blocklist would miss. (The reverse direction — game importing lobby — is the point.)
 - **Server-side files use `.js` extensions on relative imports** (ESM); `src/` files use extensionless imports. Follow the file you're editing.
 - **`localStorage` keys must not change:** the game's identity store keeps the exact keys `acquire.room.<roomId>` and `acquire.name`, so no player loses a seat to this refactor.
 - Never run bare `tsc` — `npm run typecheck`.
@@ -800,14 +800,18 @@ git add -A && git commit -m "refactor(lobby): the lobby UI moves to src/lobby/ui
 ```ts
 // lobby/importBoundary.test.ts
 // The extraction's contract: these directories are game-agnostic, so the lift
-// to a second game is a `git mv`. Anything imported from engine/, session/ or
-// src/game/ is a coupling quietly growing back.
+// to a second game is a `git mv`. The rule is an allowlist, not a blocklist:
+// every relative import must resolve back inside the lobby directories. A
+// blocklist of engine/session/src-game would leave server/room.ts and
+// src/net/ importable — a GameRoom import in handlers.ts would pass the gate
+// while breaking exactly what the gate guards.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve, sep } from 'node:path';
 
-const REPO = resolve(__dirname, '..');
-const LOBBY_ROOTS = ['lobby', 'server/lobby', 'src/lobby'];
-const FORBIDDEN = ['engine', 'session', 'src/game'].map((p) => resolve(REPO, p) + sep);
+// import.meta.url, not __dirname: the node vitest project runs ESM.
+const REPO = fileURLToPath(new URL('..', import.meta.url));
+const LOBBY_ROOTS = ['lobby', 'server/lobby', 'src/lobby'].map((p) => resolve(REPO, p));
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -817,8 +821,8 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-test('nothing under the lobby imports from the game', () => {
-  const files = LOBBY_ROOTS.flatMap((root) => sourceFiles(resolve(REPO, root)));
+test('every relative import under the lobby resolves back inside the lobby', () => {
+  const files = LOBBY_ROOTS.flatMap((root) => sourceFiles(root));
   expect(files.length).toBeGreaterThan(10); // the absence-assertion guard: an empty walk passes vacuously
 
   const offences: string[] = [];
@@ -828,7 +832,7 @@ test('nothing under the lobby imports from the game', () => {
       const spec = match[1];
       if (!spec.startsWith('.')) continue; // bare imports (react, socket.io) are fine
       const target = resolve(dirname(file), spec);
-      if (FORBIDDEN.some((f) => (target + sep).startsWith(f) || target.startsWith(f)))
+      if (!LOBBY_ROOTS.some((root) => target.startsWith(root + sep)))
         offences.push(`${file} imports ${spec}`);
     }
   }
@@ -844,9 +848,9 @@ Expected: PASS (and the file-count guard proves the walk found the tree).
 - [ ] **Step 3: Prove it can fail — the hollow-gate rule, by running the break**
 
 Add `import type { WireIntent } from '../session/protocol';` to the top of `lobby/protocol.ts`. Run the test again.
-Expected: FAIL, naming `lobby/protocol.ts imports ../session/protocol`. Then break it from the *other* side too: add `import { PLAYER_EMOJI } from '../../../engine/startups';` to `src/lobby/ui/LobbyCard.tsx`, run, watch it fail naming that file. **Read both failure outputs — do not proceed on green memory.** Revert both edits, run once more, green.
+Expected: FAIL, naming `lobby/protocol.ts imports ../session/protocol`. Then break it where the *old blocklist design would have stayed green*: add `import type { GameRoom } from '../room.js';` to `server/lobby/handlers.ts`, run, watch it fail naming that file — that failure is the allowlist earning its keep. **Read both failure outputs — do not proceed on green memory.** Revert both edits, run once more, green.
 
-- [ ] **Step 4: Write the failing stub-consumer test**
+- [ ] **Step 4: Write the stub-consumer test** (expected green — it proves a property, not a defect)
 
 The boundary test proves *decoupled*; this proves *generic* — the registry driven by a room that is not `GameRoom`, so an accidentally Acquire-shaped abstraction goes red here instead of during the lift.
 
