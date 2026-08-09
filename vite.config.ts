@@ -34,12 +34,35 @@ export default defineConfig(({ command }) => ({
     // the comment explaining it, and .replace() substituted the comment and
     // left the actual meta tag carrying the placeholder. Caught by grepping
     // dist, which is why the verification step exists.
+    //
+    // order: 'pre' (Vite 7 regression fix, 2026-08-09): Vite's own dev-only
+    // devHtmlHook runs before any transformIndexHtml hook that doesn't
+    // declare 'pre', and it treats an unsubstituted href like
+    // "__PWA_BASE__manifest.webmanifest" as a *bare relative* specifier
+    // (isBareRelative: starts with a word character, no ':') whenever the
+    // request's originalUrl isn't exactly "/" — true for every client route
+    // (/online, /room/:id, …) and even "/" with a query string. It then
+    // prepends config.base ("/" in dev) to that raw placeholder text,
+    // producing "/__PWA_BASE__manifest.webmanifest" *before* this plugin
+    // ever runs — so the later replaceAll below turns that leading "/" +
+    // the substituted "/" into "//manifest.webmanifest", a protocol-relative
+    // URL the browser resolves as host "manifest.webmanifest" (DNS failure).
+    // 'pre' makes this plugin's substitution happen first, so devHtmlHook
+    // only ever sees the real, already-absolute path — which its own
+    // same-branch path.posix.join collapses back to a single leading slash,
+    // same as it always did before Vite 7. Root ("/") never hit this because
+    // its originalUrl is literally "/", the one value that heuristic skips —
+    // which is why the bug looked route-dependent. Build is unaffected
+    // either way: it never runs devHtmlHook.
     {
       name: "pwa-placeholders-from-tokens",
-      transformIndexHtml: (html) =>
-        html
-          .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
-          .replaceAll("__PWA_BASE__", `${command === "build" ? BASE_PATH : ""}/`),
+      transformIndexHtml: {
+        order: "pre",
+        handler: (html) =>
+          html
+            .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
+            .replaceAll("__PWA_BASE__", `${command === "build" ? BASE_PATH : ""}/`),
+      },
       // The generated manifest carries the *prod* start_url and scope, but
       // the dev server serves the app at '/'. Installing from a dev LAN URL
       // — which the owner did, first thing — produced an app that opened
