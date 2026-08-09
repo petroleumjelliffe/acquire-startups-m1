@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { JoinRoomCard } from '../game/online/JoinRoomCard';
 import { getConnection, type Connection } from '../net/connection';
 import { loadIdentity, rememberName, rememberedName, saveIdentity } from '../net/identity';
-import { PROTOCOL_VERSION } from '../../session/protocol';
 
 export interface JoinRoomPageProps {
   connect?: () => Connection;
@@ -69,7 +68,6 @@ export function JoinRoomPage({ connect = getConnection }: JoinRoomPageProps) {
           // name the seat, and a blank string would mean the same thing only
           // by the server's leniency rather than by the wire's shape.
           ...(chosen === '' ? {} : { name: chosen }),
-          protocolVersion: PROTOCOL_VERSION,
         });
       }}
     />

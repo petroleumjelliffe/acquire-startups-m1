@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import type { Socket } from 'socket.io-client';
 import { JoinRoomPage } from './JoinRoomPage';
 import type { Connection } from '../net/connection';
 import { PROTOCOL_VERSION } from '../../session/protocol';
@@ -19,6 +20,9 @@ function fakeConnection() {
   const joins: JoinRoomMessage[] = [];
 
   const connection: Connection = {
+    // Unused by this fake: `transport` is provided directly below, so nothing
+    // here ever reads the socket. It exists only to satisfy `Connection`.
+    socket: {} as unknown as Socket,
     transport: {
       sendIntent: () => {},
       sendUndo: () => {},
@@ -29,12 +33,17 @@ function fakeConnection() {
     status: () => 'open',
     subscribe: () => () => {},
     createRoom: () => {},
-    joinRoom: (m) => { joins.push(m); },
+    // The real connection injects `protocolVersion` when it builds the wire
+    // message; this fake stands in for that whole layer, so it injects the
+    // same field the same way, rather than making every call site's
+    // assertion carry the connection's own concern.
+    joinRoom: (m) => { joins.push({ ...m, protocolVersion: PROTOCOL_VERSION }); },
     beginGame: () => {},
     renamePlayer: () => {},
     leaveSeat: () => {},
     onJoined: (h) => { joined = h; return () => { joined = null; }; },
     onRoster: () => () => {},
+    onRejected: (h) => { rejectedHandlers.add(h); return () => { rejectedHandlers.delete(h); }; },
     close: () => {},
   };
 

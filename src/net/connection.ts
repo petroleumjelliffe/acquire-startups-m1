@@ -1,15 +1,8 @@
-import { io, type Socket } from 'socket.io-client';
 import { PROTOCOL_VERSION } from '../../session/protocol';
-import {
-  LOBBY_CLIENT_EVENTS,
-  LOBBY_SERVER_EVENTS,
-  type CreateRoomMessage,
-  type JoinRoomMessage,
-  type RenamePlayerMessage,
-  type JoinedMessage,
-  type RosterMessage,
-} from '../../lobby/protocol';
+import { createLobbyConnection, type LobbyConnection } from '../lobby/connection';
 import { createSocketTransport, type RoomTransport } from './transport';
+
+export type { ConnectionStatus } from '../lobby/connection';
 
 /**
  * Where the server is.
@@ -38,8 +31,6 @@ const DEV_SERVER_PORT = 3001;
 const SERVER_URL =
   import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:${DEV_SERVER_PORT}`;
 
-export type ConnectionStatus = 'connecting' | 'open' | 'closed';
-
 /**
  * The lobby half of the wire, plus the transport the game half uses.
  *
@@ -48,96 +39,13 @@ export type ConnectionStatus = 'connecting' | 'open' | 'closed';
  * covered by the by-hand pass. A test that stubs `io()` and asserts `emit`
  * was called would restate this file rather than check it.
  */
-export interface Connection {
+export interface Connection extends LobbyConnection {
   transport: RoomTransport;
-  status(): ConnectionStatus;
-  /** Fires on every status change. Returns an unsubscribe. */
-  subscribe(listener: () => void): () => void;
-  /** Omit the name to be seated under a seat-derived default. */
-  createRoom(name?: string): void;
-  joinRoom(msg: JoinRoomMessage): void;
-  beginGame(): void;
-  /** Rename your own seat. Lobby-only; the server enforces it. */
-  renamePlayer(name: string): void;
-  /** Give up your own seat. Lobby-only; mid-game leaving is a disconnect. */
-  leaveSeat(): void;
-  onJoined(handler: (msg: JoinedMessage) => void): () => void;
-  onRoster(handler: (msg: RosterMessage) => void): () => void;
-  close(): void;
 }
 
 function createConnection(): Connection {
-  const socket: Socket = io(SERVER_URL, {
-    transports: ['websocket'],
-    // Stated rather than inherited, so the reconnect behaviour is this file's
-    // decision and not a dependency's default.
-    //
-    // The original justification was a cold start: "a sleeping Render free
-    // instance takes ~30s to wake, so the first attempt times out at 20s and
-    // it is the retry that actually lands." **That premise is wrong** — the
-    // service is on Render's paid `starter` plan (confirmed 2026-08-08), and
-    // paid instances do not spin down. There is no routine 30s wake to
-    // survive.
-    //
-    // The settings stay anyway, because what they actually buy is surviving a
-    // *deploy* — the instance restarts, every socket drops, and infinite
-    // retries with a capped backoff are what bring the room back. That is a
-    // real event on every push, unlike the cold start this was written for.
-    reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 500,
-    reconnectionDelayMax: 5000,
-    timeout: 20000,
-  });
-  const listeners = new Set<() => void>();
-  let status: ConnectionStatus = 'connecting';
-
-  function set(next: ConnectionStatus): void {
-    status = next;
-    for (const listener of listeners) listener();
-  }
-
-  socket.on('connect', () => { set('open'); });
-  socket.on('disconnect', () => { set('closed'); });
-  socket.io.on('reconnect_attempt', () => { set('connecting'); });
-
-  return {
-    transport: createSocketTransport(socket),
-    status: () => status,
-    subscribe(listener) {
-      listeners.add(listener);
-      return () => { listeners.delete(listener); };
-    },
-    createRoom(name) {
-      // Sent only when there is one. An absent `name` is what tells the
-      // server to name this seat itself; sending `undefined` explicitly would
-      // serialise to the same thing, but saying it once here keeps the wire
-      // shape and the type in agreement.
-      const msg: CreateRoomMessage = name === undefined
-        ? { protocolVersion: PROTOCOL_VERSION }
-        : { name, protocolVersion: PROTOCOL_VERSION };
-      socket.emit(LOBBY_CLIENT_EVENTS.createRoom, msg);
-    },
-    joinRoom(msg) { socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, msg); },
-    beginGame() { socket.emit(LOBBY_CLIENT_EVENTS.beginGame); },
-    renamePlayer(name) {
-      const msg: RenamePlayerMessage = { name };
-      socket.emit(LOBBY_CLIENT_EVENTS.renamePlayer, msg);
-    },
-    leaveSeat() { socket.emit(LOBBY_CLIENT_EVENTS.leaveSeat); },
-    onJoined(handler) {
-      socket.on(LOBBY_SERVER_EVENTS.joined, handler);
-      return () => { socket.off(LOBBY_SERVER_EVENTS.joined, handler); };
-    },
-    onRoster(handler) {
-      socket.on(LOBBY_SERVER_EVENTS.roster, handler);
-      return () => { socket.off(LOBBY_SERVER_EVENTS.roster, handler); };
-    },
-    close() {
-      socket.disconnect();
-      listeners.clear();
-    },
-  };
+  const lobby = createLobbyConnection({ serverUrl: SERVER_URL, protocolVersion: PROTOCOL_VERSION });
+  return { ...lobby, transport: createSocketTransport(lobby.socket) };
 }
 
 let current: Connection | null = null;

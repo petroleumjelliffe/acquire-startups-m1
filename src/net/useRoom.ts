@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PROTOCOL_VERSION } from '../../session/protocol';
 import type { RosterMessage } from '../../lobby/protocol';
 import { getConnection, type Connection, type ConnectionStatus } from './connection';
 import { createNetworkSession, type NetworkSession } from './NetworkSession';
@@ -216,7 +215,6 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
         name: stored.name,
         playerId: stored.playerId,
         token: stored.token,
-        protocolVersion: PROTOCOL_VERSION,
       });
       return;
     }
@@ -230,7 +228,6 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
     connection.joinRoom({
       roomId,
       ...(remembered === null ? {} : { name: remembered }),
-      protocolVersion: PROTOCOL_VERSION,
     });
   }, [connection, roomId, status]);
 
@@ -241,7 +238,6 @@ export function useRoom(roomId: string, connect: () => Connection = getConnectio
     connection.joinRoom({
       roomId,
       ...(name === undefined ? {} : { name }),
-      protocolVersion: PROTOCOL_VERSION,
     });
   }, [connection, roomId]);
 
