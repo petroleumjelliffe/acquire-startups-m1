@@ -59,8 +59,13 @@ functionality, so it lands in the shared kit and game #2 inherits it.
   copies and the label reads "Copied", reverting after the timeout. Both proven able
   to fail per the hollow-gate rule (break the handler, watch red, revert).
 - Real-browser look at the card. The genuine share sheet requires a secure context,
-  so sheet-in-the-flesh verification happens on localhost or prod — noted, not a
-  merge blocker.
+  and **browsers disagree about `http://localhost`**: Chrome treats it as
+  trustworthy (sheet works in dev), Safari does not — measured 2026-08-09, Safari
+  26.4 reports `isSecureContext: false` there and never exposes `navigator.share`,
+  so Safari correctly shows the copy-only fallback in dev. Sheet-in-the-flesh
+  verification for Safari and phones therefore happens on prod HTTPS — noted, not
+  a merge blocker. (Desktop Firefox has no share API at all; fallback is the
+  design there.)
 
 ## Out of scope
 
