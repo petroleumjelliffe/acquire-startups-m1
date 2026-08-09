@@ -80,7 +80,7 @@ export function Board({
     <div
       data-board="grid"
       style={GRID_VARS}
-      className="grid h-full max-w-full grid-cols-[repeat(12,1fr)] gap-[5px] rounded-xl bg-gray-200 p-2 aspect-[12/9] [container-type:inline-size]"
+      className="aqua-well grid h-full max-w-full grid-cols-[repeat(12,1fr)] gap-[5px] p-3 aspect-[12/9] [container-type:inline-size]"
     >
       {ROWS.map((r) => (
         <RowCells
