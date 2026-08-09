@@ -30,6 +30,15 @@
   One real consequence for *this* branch: the gate compares zone heights with a 1px tolerance, so
   new paint must keep every box height within 1px, not merely "compensated".)
 - `prefers-reduced-motion` behaviour is unchanged (nothing new animates, so nothing new to guard).
+- **The generic lobby stays generic** (added 2026-08-09, after the lobby extraction merged). No
+  `.aqua-*` class may appear under `lobby/`, `server/lobby/` or `src/lobby/` — `importBoundary.test.ts`
+  and the stub-consumer test hold that layer game-agnostic for game #2. The lobby is skinned only
+  through its documented theme surface: the three `--lobby-*` variables (`--lobby-accent`,
+  `--lobby-accent-strong`, `--lobby-on-accent`, defaults documented in `src/lobby/ui/LobbyCard.tsx:16-18`)
+  plus the seat emoji the game injects. Those variables are flat colors consumed as
+  `bg-[var(--lobby-accent)]`, so lobby buttons **cannot take the gloss gradient** without widening
+  the lobby's theme contract — that widening is a deliberate, separate decision, not something
+  Task 8 does in passing.
 
 ## Design tokens (extracted from the mockup — copy these verbatim)
 
@@ -302,7 +311,7 @@ and in `brandPaint` keep the `ring-[3px] ${brandClasses.ring}` group outline but
 
 - [ ] **Step 1: Read `2026-08-06-phase-5-online-ui.md` first** (CLAUDE.md requires it before touching `src/game/panel/`). List which of its 26 findings touch classes you're about to edit; do not reverse any of them.
 - [ ] **Step 2: Paint the zones.** Panel column keeps its width/scroll classes; each zone body gets a surface: step stack entries on `aqua-card` rows, **active zone on `aqua-card-parchment`** (the mockup's "what you're doing now" card), hand and staging piles inside `aqua-tray` wells, zone headings get `aqua-label`. Padding compensations: wherever a surface class replaces a `border` + `bg-*`, keep the box's total padding+border constant (panel-height stability is a merge gate, and `verify-layout` measures it).
-- [ ] **Step 3: Buttons.** Primary action buttons (Buy shares / End turn / confirm) → `aqua-pill-primary` + existing sizing classes; secondary/ghost buttons (undo, pass, remove-from-staging ×) → `aqua-pill`. Height of every button stays what it is today — set the same `h-*` class explicitly. The Pass gate button added on this branch is included.
+- [ ] **Step 3: Buttons.** Primary action buttons (Buy shares / End turn / confirm) → `aqua-pill-primary` + existing sizing classes; secondary/ghost buttons (undo, pass, remove-from-staging ×) → `aqua-pill`. Height of every button stays what it is today — set the same `h-*` class explicitly. The buy step's Pass gate button (on `main` since protocol v2) is included.
 - [ ] **Step 4: What not to touch:** `StepReveal.tsx`, `stepMotion.ts`, any `transition`/`transform` class. If a diff line adds one, revert it.
 - [ ] **Step 5:** `npx vitest run --project app` — fix class assertions only; behavioural tests must pass unmodified. Then `npm run verify:layout` on a real Chrome — twice.
 - [ ] **Step 6:** Browser pass on `/scenarios`: walk a turn (place, buy, end) and a merger state; check the parchment card, trays, and that nothing jitters between steps.
@@ -323,11 +332,20 @@ and in `brandPaint` keep the `ring-[3px] ${brandClasses.ring}` group outline but
 ### Task 8: Sweep the remaining game surfaces
 
 **Files:**
-- Modify (audit, likely touch): `src/game/FinalScoring.tsx`, `RevealOverlay.tsx`, `FoundGroups.tsx`, `merger/*.tsx`, `setup/*.tsx`, `src/game/online/*` lobby components
+- Modify (audit, likely touch): `src/game/FinalScoring.tsx`, `RevealOverlay.tsx`, `FoundGroups.tsx`, `merger/*.tsx`, `setup/*.tsx`, `src/game/online/TurnToast.tsx`, and wherever the game mounts the lobby (to set the `--lobby-*` variables — likely the page/route component under `src/pages/`)
 - Test: their siblings
+- **Not touched:** anything under `src/lobby/`, `lobby/`, `server/lobby/` (see Global Constraints — the generic lobby is themed via variables, never edited)
 
 - [ ] **Step 1:** `grep -rn "bg-gray-\|bg-white\|border-gray-\|rounded-\(lg\|xl\)" src/game --include='*.tsx' -l` minus files already done — that's the audit list. For each: cards → `aqua-card`, primary buttons → `aqua-pill-primary`, headings → `aqua-label`, brand color usages → check whether the flat `tint/text` still belongs (log text, FoundGroups swatches may legitimately stay flat for readability — decide per surface, note the decision in the commit message).
-- [ ] **Step 2:** The lobby (this branch's own new UI — editable row, ×) gets chips/pills so the reskin doesn't stop at the game screen door.
+- [ ] **Step 2:** The lobby, via its theme surface only (updated 2026-08-09 — the lobby is now the generic kit in `src/lobby/ui/`: `LobbyCard`, `JoinRoomCard`, `RoomLobby`, `ShareRoomButton`, `ConnectionStrip`, `RoomGone`, `RoomRefused`, `StaleClient`). Set the three variables where the game mounts it, to the aqua blues:
+
+```css
+--lobby-accent: #1a6ecb;
+--lobby-accent-strong: #0b4b8c;
+--lobby-on-accent: #ffffff;
+```
+
+That is the whole lobby task. Flat aqua-blue buttons there are the accepted outcome; the gloss gradient stops at the lobby's theme contract (see Global Constraints). If glossy lobby buttons turn out to be wanted, that is a lobby-contract change (e.g. a `--lobby-button-surface` image variable) to design with the lobby's README, in its own task — not here.
 - [ ] **Step 3:** Full gates: `npx vitest run && npm run typecheck && npx vite build && npm run check:bundle`.
 - [ ] **Step 4: Commit** — `git commit -am "feat(skin): aqua across scoring, merger, setup and lobby surfaces"`
 
