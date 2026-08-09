@@ -26,14 +26,21 @@ functionality, so it lands in the shared kit and game #2 inherits it.
 - **Guarded like storage.** Clipboard and share calls take the same posture as
   `identity.ts`'s reads: wrapped, failures degrade silently to whatever still works.
   A lobby that throws on a share tap is worse than a share that quietly only copied.
+- **The share text is configuration, not code.** The sheet call is
+  `navigator.share({ url, text })` where `text` comes through an optional prop with
+  a game-neutral default (`"Join my game room"`). A game overrides it at the one
+  call site that already passes the URL — so wording changes later are a prop edit
+  in the game, never a kit change. The clipboard still gets the bare URL: pasted
+  links should be links.
 
 ## Where things live
 
-- **`src/lobby/ui/ShareRoomButton.tsx`** — new; one required prop, `url: string`.
-  Owns the copy/share/label machinery. Styled with the kit's `--lobby-*` accent
-  variables like every other primary control.
-- **`RoomLobby`** gains optional `shareUrl?: string`, rendered as the button under
-  the code block when present.
+- **`src/lobby/ui/ShareRoomButton.tsx`** — new; props `url: string` (required) and
+  `text?: string` (defaults to `"Join my game room"`). Owns the copy/share/label
+  machinery. Styled with the kit's `--lobby-*` accent variables like every other
+  primary control.
+- **`RoomLobby`** gains optional `shareUrl?: string` and `shareText?: string`,
+  rendered as the button under the code block when a URL is present.
 - **`RoomPage`** passes `window.location.href` — the lobby renders at
   `/room/:roomId`, so the page's own URL *is* the share link. The kit never computes
   URLs; the game hands it one, keeping the kit route-agnostic and the import
@@ -52,6 +59,8 @@ functionality, so it lands in the shared kit and game #2 inherits it.
 ## Out of scope
 
 - Share affordances anywhere but the room lobby card (Join card, mid-game).
-- Custom share text/titles per game (a `gameName` copy parameter remains deferred
-  until a string needs it, per the extraction spec).
+- A share *title* or richer share payloads — `text` + `url` is the whole surface
+  until something needs more. (This supersedes the extraction spec's "no copy
+  parameter yet" for this one string: the share text is the first string that
+  needed it.)
 - Any wire or server change.
