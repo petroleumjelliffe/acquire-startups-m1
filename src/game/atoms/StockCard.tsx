@@ -2,8 +2,14 @@ import { BRAND_CLASSES, tickerFor, type BrandKey } from '../tokens';
 import { Price } from './Price';
 
 /**
- * One share of a company — an *outlined* portrait certificate showing the
- * ticker and, always, a price. The counterpart to `Brand` (the company, filled).
+ * One share of a company — a *portrait* certificate showing the ticker and,
+ * always, a price. The counterpart to `Brand`, the company itself, which is a
+ * *pill* showing the full name.
+ *
+ * Share vs company used to be outlined vs filled. Under the aqua skin both are
+ * filled with the brand's gradient — a certificate is a printed thing, not an
+ * outline — so the separation is carried by shape and content instead. Nothing
+ * here should ever render a company name.
  *
  * Cash is the exception throughout: money reads landscape, like a bill, shows
  * `$$`, and carries no per-share price.
@@ -35,18 +41,19 @@ export interface StockCardProps {
   onClick?: () => void;
 }
 
+// No `border`/`bg-white`: `.aqua-cert` fills the card with its brand's gradient
+// and carries its own edge in the same box-shadow as the gloss.
 const BASE =
-  'relative inline-flex flex-col items-center justify-between gap-[3px] rounded-md border bg-white text-center align-bottom font-medium leading-tight';
+  'relative inline-flex flex-col items-center justify-between gap-[3px] text-center align-bottom font-medium leading-tight';
 
 /**
- * The layered edges are pseudo-elements sharing the card's border colour, offset
- * down-and-right and painted behind it. `::before` paints first and therefore
- * sits furthest back, so depth-2 puts it at the larger offset.
+ * The layered edges are pseudo-elements offset down-and-right and painted
+ * behind the card. `::before` paints first and therefore sits furthest back, so
+ * depth-2 puts it at the larger offset. Their *paint* is `.aqua-cert-stack` in
+ * styles/aqua.css; what stays here is geometry and `content`.
  */
-const DEPTH_LAYER =
-  "after:absolute after:inset-0 after:-z-10 after:rounded-md after:border after:border-inherit after:bg-white after:content-['']";
-const DEPTH_LAYER_2 =
-  "before:absolute before:inset-0 before:-z-10 before:rounded-md before:border before:border-inherit before:bg-white before:content-['']";
+const DEPTH_LAYER = "after:absolute after:inset-0 after:-z-10 after:content-['']";
+const DEPTH_LAYER_2 = "before:absolute before:inset-0 before:-z-10 before:content-['']";
 
 const DEPTH: Record<0 | 1 | 2, string> = {
   0: '',
@@ -89,7 +96,7 @@ export function StockCard({
     .join(' ');
 
   const className =
-    `${BASE} ${shape} ${brand.stroke} ${brand.text} ${DEPTH[depth]} ${state}`.trim();
+    `${BASE} ${shape} aqua-cert aqua-cert-stack ${brand.grad} ${DEPTH[depth]} ${state}`.trim();
 
   const body = (
     <>

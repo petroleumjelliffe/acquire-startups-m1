@@ -101,11 +101,34 @@
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.45);
 }
 
-/* Stock certificate */
+/* Stock certificate — one share, portrait, labelled with the ticker. */
 .aqua-cert {
   border-radius: 6px;
   background: linear-gradient(var(--aqua-top), var(--aqua-bot));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* The card edges peeking out behind a stack of two or more. Geometry (offset,
+   z-order, `content`) stays on the Tailwind `before:`/`after:` utilities in
+   StockCard; this is only their paint. Safe to apply at any depth: a
+   pseudo-element with no `content` renders nothing at all. */
+.aqua-cert-stack::before,
+.aqua-cert-stack::after {
+  background: linear-gradient(var(--aqua-top), var(--aqua-bot));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+  border-radius: 6px;
+}
+
+/* The company itself — a filled lozenge carrying the full name.
+   Share vs company used to be outlined vs filled; under the aqua skin both are
+   filled, and the separation is carried by shape and content instead: a
+   portrait rectangle showing a ticker, against a pill showing a name. */
+.aqua-brand-pill {
+  border-radius: 12px;
+  background: linear-gradient(var(--aqua-top), var(--aqua-bot));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 1px 3px rgba(0, 0, 0, 0.2);
   color: #fff;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
 }

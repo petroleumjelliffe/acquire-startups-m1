@@ -67,7 +67,7 @@ export function StockStack({
     onClick && !disabled ? (
       <button
         type="button"
-        className={`${bodyClass} cursor-pointer hover:border-gray-200 hover:bg-gray-100`}
+        className={`${bodyClass} cursor-pointer hover:border-gray-200 hover:bg-gray-100/70`}
         onClick={onClick}
       >
         {inner}

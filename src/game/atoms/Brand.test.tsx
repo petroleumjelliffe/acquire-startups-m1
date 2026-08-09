@@ -9,10 +9,14 @@ describe('Brand — the company, filled', () => {
     expect(screen.queryByText('$PP')).not.toBeInTheDocument();
   });
 
-  it('carries the brand tint and stroke', () => {
+  // Was "carries the brand tint and stroke" — a tinted background and a
+  // coloured border. The aqua skin fills the pill with the brand's gradient
+  // instead, so what has to be true is that the pill is painted, and painted
+  // with *this* brand.
+  it('carries the brand gradient', () => {
     const { container } = render(<Brand id="Messla" />);
-    expect(container.firstElementChild?.className).toMatch(/bg-purple-100/);
-    expect(container.firstElementChild?.className).toMatch(/border-purple-500/);
+    expect(container.firstElementChild?.className).toMatch(/aqua-brand-pill/);
+    expect(container.firstElementChild?.className).toMatch(/aqua-brand-Messla/);
   });
 
   it('is a button when selectable and not otherwise', () => {
