@@ -145,7 +145,7 @@ export function useTurnPanel(
       <button
         type="button"
         onClick={() => dispatch({ type: 'declareEnd', playerId: actorId })}
-        className="m-0 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-amber-700"
+        className="m-0 aqua-pill-amber px-3 py-1.5 text-sm font-semibold text-white hover:brightness-110"
       >
         End the game
       </button>
@@ -218,7 +218,7 @@ export function useTurnPanel(
                 <button
                   type="button"
                   onClick={() => actorId && dispatch({ type: 'drawTurnOrderTile', playerId: actorId })}
-                  className="m-0 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                  className="m-0 w-full aqua-pill-primary px-3 py-2 text-sm font-semibold text-white"
                 >
                   Draw your tile
                 </button>
@@ -299,7 +299,7 @@ export function useTurnPanel(
                   <button
                     type="button"
                     onClick={() => dispatch({ type: 'tradeInDeadTiles', playerId: actorId, coords: dead })}
-                    className="m-0 w-full rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                    className="m-0 w-full aqua-pill-primary px-3 py-2 text-sm font-semibold text-white"
                   >
                     {`Trade in ${dead.length} dead tile${dead.length === 1 ? '' : 's'}`}
                   </button>
@@ -308,7 +308,7 @@ export function useTurnPanel(
                   <button
                     type="button"
                     onClick={() => dispatch({ type: 'endTurn', playerId: actorId })}
-                    className="m-0 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold hover:bg-gray-50"
+                    className="m-0 w-full aqua-pill px-3 py-2 text-sm font-semibold hover:brightness-105"
                   >
                     End turn
                   </button>
@@ -526,7 +526,7 @@ export function useTurnPanel(
                     });
                     setStaged(NOTHING_STAGED);
                   }}
-                  className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+                  className="m-0 w-full aqua-pill-primary px-3 text-sm font-semibold text-white"
                 >
                   Confirm
                 </button>
@@ -700,7 +700,7 @@ export function useTurnPanel(
                 className={
                   passed
                     ? 'm-0 flex-1 rounded-lg border border-blue-600 bg-blue-50 px-3 text-sm font-semibold text-blue-700'
-                    : 'm-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50'
+                    : 'm-0 flex-1 aqua-pill px-3 text-sm font-semibold text-gray-700 hover:brightness-105'
                 }
               >
                 Pass
@@ -712,7 +712,7 @@ export function useTurnPanel(
                   dispatch({ type: 'endTurn', playerId: actorId });
                   setStaged(NOTHING_STAGED);
                 }}
-                className="m-0 flex-1 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent"
+                className="m-0 flex-1 aqua-pill px-3 text-sm font-semibold text-gray-700 hover:brightness-105 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:brightness-100"
               >
                 End turn
               </button>
@@ -725,7 +725,7 @@ export function useTurnPanel(
                 dispatch({ type: 'endTurn', playerId: actorId });
                 setStaged(NOTHING_STAGED);
               }}
-              className="m-0 w-full rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+              className="m-0 w-full aqua-pill-primary px-3 text-sm font-semibold text-white"
             >
               {'Confirm purchase'}
             </button>

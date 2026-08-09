@@ -63,7 +63,7 @@ export function HandZone({ name, portfolio, cash, prices = {} }: HandZoneProps) 
       <div
         data-zone="holdings"
         data-may-grow="true"
-        className="flex min-h-[68px] flex-wrap items-end gap-3 transition-[min-height] duration-200 motion-reduce:transition-none"
+        className="aqua-tray flex min-h-[68px] flex-wrap items-end gap-3 transition-[min-height] duration-200 motion-reduce:transition-none"
       >
         {!hasViewer ? (
           <span className="text-xs text-gray-400">Not dealt yet</span>

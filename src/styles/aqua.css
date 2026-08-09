@@ -45,9 +45,28 @@
   border-radius: 15px;
 }
 
+/* Panel zones.
+   Paint only — no padding, no border, no height. These replace a flat `bg-*`
+   on a zone that already owns its metrics, and `npm run verify:layout` compares
+   zone heights to within 1px, so a recipe that added a box metric here would
+   fail the gate. Full-bleed, hence no radius: a zone spans the panel's width. */
+.aqua-zone-active {
+  background: linear-gradient(#f7f9fc, #eef2f7);
+}
+.aqua-zone-staging {
+  background: linear-gradient(#fdf6e3, #f5ead0);
+}
+.aqua-zone-players {
+  background: linear-gradient(#eef1f6, #e2e7ee);
+}
+
 /* Controls */
 .aqua-pill {
   border-radius: 16px;
+  /* A real 1px border, not an inset shadow: this replaces `border-gray-300` on
+     buttons that size from their content, where trading a border for a shadow
+     would quietly shorten them by 2px. */
+  border: 1px solid #b9c2ce;
   background: linear-gradient(#ffffff, #dee4ec);
   box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0, 0, 0, 0.2);
 }
@@ -58,6 +77,17 @@
   color: #fff;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
+/* The consequential action — declaring the end of the game. Amber rather than
+   the primary blue, because it is not the ordinary next thing to press; the
+   flat version of this button was `bg-amber-600` for the same reason. */
+.aqua-pill-amber {
+  border-radius: 16px;
+  background: linear-gradient(#f5b95a, #c07c10);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+
 .aqua-chip {
   border-radius: 18px;
   background: linear-gradient(#f7f9fc, #dbe1e9);

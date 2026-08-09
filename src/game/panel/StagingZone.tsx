@@ -29,7 +29,7 @@ export function StagingZone({ label, shares, cashDelta = 0, action }: StagingZon
   return (
     <div
       data-zone="staging"
-      className="flex-none border-t border-dashed border-[#e7dfbf] bg-[#fffdf5] px-4 py-3"
+      className="aqua-zone-staging flex-none border-t border-dashed border-[#e0d3af] px-4 py-3"
     >
       {/*
         The net total rides the header rather than sitting under the pile. On
@@ -63,7 +63,9 @@ export function StagingZone({ label, shares, cashDelta = 0, action }: StagingZon
         height in every state. jsdom reports 0 for layout, so no test catches
         this; it took measuring the real page.
       */}
-      <div data-zone="pile" className="flex h-[72px] min-h-[72px] flex-wrap items-end gap-3">
+      {/* `.aqua-tray` is paint only — background, inset shadow, radius — so the
+          72px above still decides this box's height. */}
+      <div data-zone="pile" className="aqua-tray flex h-[72px] min-h-[72px] flex-wrap items-end gap-3">
         {/*
           No placeholder. An empty pile is self-evident, and the word "empty"
           was a label for nothing — the reservation is on this container, so the
