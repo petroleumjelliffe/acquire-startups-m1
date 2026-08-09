@@ -13,13 +13,19 @@ functionality, so it lands in the shared kit and game #2 inherits it.
 
 ## Behavior
 
-- **Copy first, then sheet.** On tap the button writes the room URL to the clipboard,
-  then calls `navigator.share({ url })` if it exists. Copy-first means the link is in
-  the clipboard even when the sheet is dismissed; a dismissed sheet (`AbortError`) is
-  silence, not an error.
-- **Fallback is copy-only.** Where `navigator.share` is absent (most desktop
-  browsers), the tap copies and the button's label flips to "Copied" for ~2 seconds —
-  a text swap, no animation, nothing for `prefers-reduced-motion` to object to.
+- **Copy and sheet start in the same gesture tick.** On tap the button starts the
+  clipboard write and calls `navigator.share({ url, text })` immediately — **no
+  await between the click and the share call**. (Corrected 2026-08-09, found by
+  hand in Safari: awaiting the clipboard first spends the click's user activation,
+  and Safari then refuses the sheet with `NotAllowedError` — silently, under the
+  original design's catch. Chrome's laxer activation window hid it.) A dismissed
+  sheet (`AbortError`) is silence; any *other* refusal means no sheet ever showed,
+  so the button falls back to the "Copied" label — the copy is the action that
+  happened, once its promise confirms it did.
+- **Fallback is copy-only.** Where `navigator.share` is absent — desktop Firefox
+  has no share API on macOS at all; that is unsupported-by-platform, not a bug —
+  the tap copies and the button's label flips to "Copied" for ~2 seconds — a text
+  swap, no animation, nothing for `prefers-reduced-motion` to object to.
 - **Everyone shares, not just the host.** Any seated player in the lobby sees the
   button; recruiting is not a host privilege. (The card's subtitle already addresses
   everyone.)
