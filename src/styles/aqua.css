@@ -1,0 +1,119 @@
+/* Aqua Titanium reskin — every gradient/gloss recipe in one file.
+   Class names are literal (Tailwind JIT never sees interpolation).
+   Style source: Claude Design "Board 10a Aqua Titanium"; token table in
+   docs/superpowers/plans/2026-08-07-aqua-titanium-reskin.md. */
+
+:root {
+  --aqua-font: 'Lucida Grande', 'Trebuchet MS', Verdana, sans-serif;
+}
+
+/* Brand gradient stops. Blue is reserved for hand/selection, green for cash. */
+.aqua-brand-Gobble        { --aqua-top: #ff6f8e; --aqua-bot: #b31038; }
+.aqua-brand-Scrapple      { --aqua-top: #ffa04d; --aqua-bot: #c25410; }
+.aqua-brand-WrecksonMobil { --aqua-top: #ffc247; --aqua-bot: #d97d00; }
+.aqua-brand-PaperfulPost  { --aqua-top: #8fdc57; --aqua-bot: #348708; }
+.aqua-brand-ZuckFace      { --aqua-top: #63dcf7; --aqua-bot: #0d9ec6; }
+.aqua-brand-Messla        { --aqua-top: #b98bf0; --aqua-bot: #5b2fae; }
+.aqua-brand-CamCrooned    { --aqua-top: #ffbfd4; --aqua-bot: #c22a5e; }
+.aqua-brand-Cash          { --aqua-top: #7ed957; --aqua-bot: #2e7d32; }
+
+/* The page ground: pinstripe deck, Lucida Grande throughout. */
+.aqua-ground {
+  background: repeating-linear-gradient(180deg, #eef1f6 0 2px, #e6ebf2 2px 4px);
+  font-family: var(--aqua-font);
+}
+
+/* Surfaces */
+.aqua-well {
+  background: linear-gradient(#dfe5ec, #eef2f7);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.22), inset 0 0 0 1px #c9d1da;
+  border-radius: 10px;
+}
+.aqua-card {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #d3dae2, 0 1px 3px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+}
+.aqua-card-parchment {
+  background: linear-gradient(#fdf6e3, #f5ead0);
+  box-shadow: inset 0 0 0 1px #e0d3af, 0 1px 3px rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+}
+.aqua-tray {
+  background: linear-gradient(#f7f9fc, #e7ecf2);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.18), inset 0 0 0 1px #cdd5de;
+  border-radius: 15px;
+}
+
+/* Controls */
+.aqua-pill {
+  border-radius: 16px;
+  background: linear-gradient(#ffffff, #dee4ec);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+.aqua-pill-primary {
+  border-radius: 16px;
+  background: linear-gradient(#8ec8fa, #1a6ecb);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75), 0 1px 3px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.aqua-chip {
+  border-radius: 18px;
+  background: linear-gradient(#f7f9fc, #dbe1e9);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0, 0, 0, 0.16);
+}
+.aqua-chip-active {
+  background: linear-gradient(#ffffff, #dee4ec);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0, 0, 0, 0.2), 0 0 0 2px #6aa9e6;
+}
+
+/* Board tiles. State classes compose with .aqua-brand-* for the gradient. */
+.aqua-tile-empty {
+  background: linear-gradient(#e4e9f0, #d3dae3);
+  box-shadow: inset 0 1px 0 #fff, inset 0 0 0 1px #c6ced8;
+  color: rgba(70, 80, 95, 0.42);
+}
+.aqua-tile-played {
+  background: linear-gradient(#ffffff, #c4cfdb);
+  box-shadow: inset 0 1px 0 #fff, 0 2px 4px rgba(0, 0, 0, 0.22);
+  color: #39424e;
+}
+.aqua-tile-hand {
+  background: linear-gradient(#8ec8fa, #2f7fd4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+.aqua-tile-chain {
+  background: linear-gradient(var(--aqua-top), var(--aqua-bot));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 5px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
+}
+.aqua-tile-founder {
+  background: linear-gradient(var(--aqua-top), var(--aqua-bot));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 2px 5px rgba(0, 0, 0, 0.35),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.9);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* Stock certificate */
+.aqua-cert {
+  border-radius: 6px;
+  background: linear-gradient(var(--aqua-top), var(--aqua-bot));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 4px rgba(0, 0, 0, 0.25);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Typography */
+.aqua-label {
+  font: bold 10px/1 var(--aqua-font);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7c8492;
+}

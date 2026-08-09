@@ -181,7 +181,7 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
   return (
     <div
       data-testid="game-surface"
-      className="relative flex h-screen w-full overflow-hidden bg-gray-50"
+      className="aqua-ground relative flex h-screen w-full overflow-hidden"
     >
       {/* The way back, for the installed app — standalone chrome has no
           browser back (owner, from the first real install). Floated in the
