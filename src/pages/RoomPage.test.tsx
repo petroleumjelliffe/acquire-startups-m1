@@ -314,10 +314,11 @@ describe('the lobby', () => {
 
     expect(screen.queryByRole('button', { name: /leave your seat/i })).toBeNull();
     // Enumerated rather than counted, so the check cannot pass merely because
-    // the × was relabelled. Sam is not the host, so `Leave` is the whole set.
+    // the × was relabelled. Sam is not the host, so the card's own controls —
+    // Share (2026-08-09) and `Leave` — are the whole set; nothing row-scoped.
     expect(
       screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent),
-    ).toEqual(['Leave']);
+    ).toEqual(['Share link', 'Leave']);
   });
 });
 

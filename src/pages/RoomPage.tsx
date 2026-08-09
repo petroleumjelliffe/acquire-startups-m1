@@ -122,6 +122,10 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
             leave();
           }}
           seatEmoji={seatEmoji}
+          // The lobby lives at /room/:id, so the page's own address IS the
+          // share link — no base-path arithmetic, one source of truth.
+          shareUrl={window.location.href}
+          shareText="Join my Acquire game!"
         />
       </>
     );
