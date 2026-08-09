@@ -43,7 +43,7 @@ export function PlayersStrip({ players }: PlayersStripProps) {
     // A tap-to-expand view is the eventual answer; this is the honest interim.
     <div
       data-zone="roster"
-      className="flex flex-none gap-2 overflow-hidden border-t border-gray-200 bg-gray-50 px-3 py-2.5"
+      className="aqua-zone-players flex flex-none gap-2 overflow-hidden border-t border-gray-200 px-3 py-2.5"
     >
       {rotateToActive(players).map((p) => (
         // The active seat is `flex-none` — it keeps its natural width and stays
@@ -56,8 +56,13 @@ export function PlayersStrip({ players }: PlayersStripProps) {
         <div
           key={p.id}
           data-seat={p.id}
-          className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 ${
-            p.active ? 'flex-none border-blue-600 bg-blue-50' : 'min-w-0 flex-1 border-gray-200 bg-white'
+          // No dimming of the seats that are not up. The mockup fades them by
+          // recency, which is a signal this table does not have — and a faded
+          // seat already means something here: it is how a *disconnected*
+          // player would read. The active seat is marked by its own ring
+          // instead, which says the same thing without borrowing that word.
+          className={`aqua-chip flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1.5 ${
+            p.active ? 'aqua-chip-active flex-none border-blue-600' : 'min-w-0 flex-1'
           }`}
         >
           <span className="flex-none text-base leading-none">{p.emoji || '•'}</span>

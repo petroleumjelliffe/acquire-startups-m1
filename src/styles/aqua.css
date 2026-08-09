@@ -88,8 +88,14 @@
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.35);
 }
 
+/* A seat in the players strip. Like `.aqua-pill`, a real 1px border: the seat
+   sizes from its content, and the strip's height is a `verify:layout` gate. The
+   border *colour* is left to whatever utility the component puts alongside —
+   Tailwind's utilities are emitted after this file, so `border-blue-600` on the
+   active seat still wins. */
 .aqua-chip {
   border-radius: 18px;
+  border: 1px solid #c3cbd6;
   background: linear-gradient(#f7f9fc, #dbe1e9);
   box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(0, 0, 0, 0.16);
 }
