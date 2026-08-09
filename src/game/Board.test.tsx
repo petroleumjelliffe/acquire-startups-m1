@@ -67,15 +67,22 @@ describe('Board', () => {
     expect(screen.queryByText('Zoe')).not.toBeInTheDocument();
   });
 
-  it('gives chain members a brand ring so neighbours read as one outline', () => {
+  // Was "gives chain members a brand ring": affiliation used to be carried by
+  // a brand-coloured ring around a neutral dark fill. Under the aqua skin the
+  // fill itself is the brand's gradient, so what makes neighbours read as one
+  // chain is that they share it. Same guarantee, different mechanism — see the
+  // comment on `brandPaint` in atoms/Tile.tsx.
+  it('paints chain members with their brand so neighbours read as one block', () => {
     const { container } = render(
       <Board board={boardWith({
         E3: { placed: true, startupId: 'Messla' },
         E4: { placed: true, startupId: 'Messla' },
       })} />,
     );
-    const rings = container.querySelectorAll('[class*="ring-purple-500"]');
-    expect(rings.length).toBeGreaterThanOrEqual(2);
+    const painted = container.querySelectorAll('[class*="aqua-brand-Messla"]');
+    expect(painted.length).toBeGreaterThanOrEqual(2);
+    // And the paint is the chain recipe, not some other brand-tinted thing.
+    for (const el of painted) expect(el.className).toMatch(/aqua-tile-(chain|founder)/);
   });
 
   it('offers no control for a hand tile with nothing to do', () => {

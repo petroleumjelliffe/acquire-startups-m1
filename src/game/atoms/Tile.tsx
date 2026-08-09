@@ -39,20 +39,29 @@ export interface TileProps {
 
 // `m-0` is deliberate: a legacy global `button{margin:1px}` in styles/index.css
 // would otherwise shrink every interactive cell inside the board's grid track.
+//
+// No `border`: every aqua recipe carries its own 1px inset edge in the same
+// box-shadow as its gloss, so a border here would be a second, doubled edge.
+// Box size is unaffected either way — Tailwind's preflight is `border-box`.
 const BASE =
-  'relative m-0 inline-flex flex-none items-center justify-center rounded border border-solid p-0 align-middle font-semibold leading-none';
+  'relative m-0 inline-flex flex-none items-center justify-center rounded p-0 align-middle font-semibold leading-none';
 
-const DARK = 'bg-gray-700 border-gray-700 text-gray-50 font-bold';
-
-/** Brand hue is deliberately absent from `blocked`: it is not about any company. */
+/**
+ * Aqua paint. Each recipe lives in `src/styles/aqua.css`; the brand recipes
+ * (`chain`, `founded`) additionally need a `.aqua-brand-*` class for their
+ * gradient stops, which `brandPaint` below composes in.
+ *
+ * Brand hue is deliberately absent from `blocked`: it is not about any company.
+ */
 const STATE_CLASSES: Record<TileState, string> = {
-  empty: 'bg-gray-100 border-gray-300 text-gray-500 font-medium',
-  filled: DARK,
-  placed: `${DARK} outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]`, // == filled + selected
-  hand: 'bg-blue-100 border-2 border-blue-500 text-blue-700 font-bold',
-  blocked: 'bg-blue-100 border-2 border-blue-500 text-blue-700/30 font-bold cursor-not-allowed',
-  chain: `${DARK} z-[1]`,
-  founded: 'border-2 font-extrabold z-[2]',
+  empty: 'aqua-tile-empty font-medium',
+  filled: 'aqua-tile-played font-bold',
+  // == filled + selected
+  placed: 'aqua-tile-played font-bold outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]',
+  hand: 'aqua-tile-hand font-bold',
+  blocked: 'aqua-tile-hand font-bold opacity-60 cursor-not-allowed',
+  chain: 'aqua-tile-chain z-[1]',
+  founded: 'aqua-tile-founder font-extrabold z-[2]',
 };
 
 const SELECTED = 'outline outline-[3px] -outline-offset-[3px] outline-blue-600 z-[3]';
@@ -60,14 +69,22 @@ const SELECTED = 'outline outline-[3px] -outline-offset-[3px] outline-blue-600 z
 export function Tile({ coord, state, brand, onClick, fill, selected, onMouseEnter, onMouseLeave }: TileProps) {
   const brandClasses = brand ? BRAND_CLASSES[brand] : null;
 
-  // Chain members wear the brand ring so neighbouring rings overlap into a
-  // single group outline; the HQ additionally takes the brand's tint and text.
-  const brandPaint =
-    brandClasses && state === 'chain'
-      ? `ring-[3px] ${brandClasses.ring}`
-      : brandClasses && state === 'founded'
-        ? `ring-[3px] ${brandClasses.ring} ${brandClasses.tint} ${brandClasses.stroke} ${brandClasses.text}`
-        : '';
+  /**
+   * Chain affiliation moved from the *ring* to the *fill*.
+   *
+   * It used to be carried entirely by a brand-coloured `ring-[3px]`, because
+   * the fill was one neutral dark grey for every chain — so the ring was the
+   * only hue on the tile, and neighbouring rings overlapping into one group
+   * outline was what drew the chain's shape.
+   *
+   * Under the aqua skin the fill *is* the brand's gradient, so a chain reads
+   * as a contiguous block of its own colour and the ring has nothing left to
+   * say. It also could not survive mechanically: Tailwind's `ring-*` and the
+   * `.aqua-tile-*` recipes both write `box-shadow`, so one silently erases the
+   * other. The HQ keeps its own marker — a white inner ring, inside
+   * `.aqua-tile-founder` — which is how the mockup distinguishes it too.
+   */
+  const brandPaint = brandClasses && (state === 'chain' || state === 'founded') ? brandClasses.grad : '';
 
   const box = fill ? 'h-full w-full' : 'h-[34px] w-[34px]';
   /**
@@ -84,7 +101,10 @@ export function Tile({ coord, state, brand, onClick, fill, selected, onMouseEnte
   // `blocked` keeps its own cursor either way: "yours, and never playable" is
   // a fact about the tile, not about whether this screen offers a handler.
   const interactive = onClick != null;
-  const affordance = interactive && state !== 'blocked' ? 'cursor-pointer hover:bg-blue-200' : '';
+  // `hover:brightness-110` rather than a hover *colour*: every aqua recipe
+  // paints with a gradient, and a flat `hover:bg-*` would replace the gloss
+  // rather than lift it. A filter also moves no layout.
+  const affordance = interactive && state !== 'blocked' ? 'cursor-pointer hover:brightness-110' : '';
 
   const className =
     `${BASE} ${box} ${STATE_CLASSES[state]} ${brandPaint} ${affordance} ${selected ? SELECTED : ''}`.trim();
