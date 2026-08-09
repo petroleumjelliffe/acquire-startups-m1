@@ -48,7 +48,7 @@ export function PassAndPlayPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-start justify-center bg-gray-50 p-6">
+    <div className="flex aqua-ground min-h-screen items-start justify-center p-6">
       <div className="mt-8 w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
         <h1 className="text-center text-xl font-bold">Pass &amp; Play</h1>
         <p className="mb-4 text-center text-sm text-gray-600">Pass and play on this device</p>
@@ -89,7 +89,7 @@ export function PassAndPlayPage() {
                   <button
                     type="button"
                     onClick={() => setConfirming(false)}
-                    className="m-0 flex-1 rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
+                    className="m-0 flex-1 aqua-pill px-4 py-2 font-semibold hover:brightness-105"
                   >
                     Cancel
                   </button>
@@ -99,7 +99,7 @@ export function PassAndPlayPage() {
               <button
                 type="button"
                 onClick={() => setConfirming(true)}
-                className="m-0 mb-4 w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                className="m-0 mb-4 w-full aqua-pill-primary px-4 py-2 font-semibold text-white hover:brightness-110"
               >
                 New Game
               </button>
@@ -117,7 +117,7 @@ export function PassAndPlayPage() {
               <button
                 type="button"
                 onClick={() => navigate('game')}
-                className="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+                className="mt-3 w-full aqua-pill-primary px-4 py-2 font-semibold text-white hover:brightness-110"
               >
                 Continue
               </button>
@@ -130,7 +130,7 @@ export function PassAndPlayPage() {
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="m-0 mt-4 w-full rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
+          className="m-0 mt-4 w-full aqua-pill px-4 py-2 font-semibold hover:brightness-105"
         >
           Leave
         </button>

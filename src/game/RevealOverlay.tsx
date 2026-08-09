@@ -17,7 +17,9 @@ export function RevealOverlay({ playerName, emoji, onReveal }: RevealOverlayProp
   return (
     // Fully opaque (owner, hotseat pass): at 95% the board's positions read
     // straight through the veil, and this overlay exists to hide them.
-    <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-white">
+    // `.aqua-ground` is opaque (a repeating gradient over no transparency), so
+    // it keeps the guarantee the flat white had.
+    <div className="aqua-ground absolute inset-0 z-20 flex flex-col items-center justify-center gap-3">
       {emoji && <span className="text-4xl leading-none">{emoji}</span>}
       <div className="text-lg font-bold text-gray-800">{`Pass to ${playerName}`}</div>
       {/*
@@ -29,7 +31,7 @@ export function RevealOverlay({ playerName, emoji, onReveal }: RevealOverlayProp
       <button
         type="button"
         onClick={onReveal}
-        className="rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+        className="aqua-pill-primary px-6 py-3 text-sm font-semibold text-white hover:brightness-110"
       >
         Start
       </button>

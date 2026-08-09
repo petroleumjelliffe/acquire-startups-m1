@@ -5,6 +5,20 @@
 
 :root {
   --aqua-font: 'Lucida Grande', 'Trebuchet MS', Verdana, sans-serif;
+
+  /* The generic lobby kit (src/lobby/ui) is game-agnostic and is themed only
+     through these three variables — its whole documented contract, declared in
+     LobbyCard.tsx. This is the game doing the theming; no .aqua-* class may
+     appear inside the kit, and an import-boundary test holds that.
+
+     They are flat colours because the kit consumes them as `bg-[var(--…)]`, so
+     lobby buttons are flat aqua blue rather than glossy. Giving them the gloss
+     would mean widening the lobby's contract (an image variable, say), which is
+     a decision for the kit's README and game #2 — not something to slip in
+     here. */
+  --lobby-accent: #1a6ecb;
+  --lobby-accent-strong: #0b4b8c;
+  --lobby-on-accent: #ffffff;
 }
 
 /* Brand gradient stops. Blue is reserved for hand/selection, green for cash. */
@@ -77,6 +91,17 @@
   color: #fff;
   text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
 }
+/* Pass-and-play's own colour on the mode chooser. The two modes have been blue
+   and green since the first screen; the gloss follows them rather than
+   flattening both into one primary. */
+.aqua-pill-green {
+  border-radius: 16px;
+  background: linear-gradient(#7fd06a, #2e8b32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 1px 3px rgba(0, 0, 0, 0.28);
+  color: #fff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+
 /* The consequential action — declaring the end of the game. Amber rather than
    the primary blue, because it is not the ordinary next thing to press; the
    flat version of this button was `bg-amber-600` for the same reason. */

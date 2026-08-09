@@ -33,7 +33,7 @@ export interface LiqActionsProps {
 // without it the two actions cannot share a row in a 264px panel and the
 // second wraps underneath, which is what they did.
 const ACTION =
-  'flex min-w-0 items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-1.5 py-2 disabled:cursor-not-allowed disabled:opacity-50';
+  'aqua-pill flex min-w-0 items-center justify-center gap-1 px-1.5 py-2 disabled:cursor-not-allowed disabled:opacity-50';
 
 export function LiqActions({
   absorbedId,

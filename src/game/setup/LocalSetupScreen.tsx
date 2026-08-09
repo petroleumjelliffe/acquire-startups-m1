@@ -63,7 +63,7 @@ export function LocalSetupScreen({ onStart, defaultSeed, initialNames }: LocalSe
         type="button"
         disabled={!canStart}
         onClick={() => onStart({ seed, names })}
-        className="m-0 rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+        className="m-0 aqua-pill-primary px-4 py-3 font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Start game
       </button>

@@ -22,7 +22,7 @@ export function HomePage() {
   const update = useUpdateReady();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="aqua-ground min-h-screen flex items-center justify-center p-4">
       <div className="bg-white p-8 rounded-xl shadow-xl w-[600px] max-w-full">
         <h1 className="text-3xl font-bold mb-2 text-center">Acquire</h1>
         <p className="text-center text-gray-600 mb-8">Choose your game mode</p>
@@ -32,7 +32,7 @@ export function HomePage() {
           <button
             onClick={() => navigate('/online')}
             disabled={!online}
-            className="w-full px-6 py-5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-left group disabled:cursor-not-allowed disabled:bg-gray-400"
+            className="w-full px-6 py-5 aqua-pill-primary text-white rounded-lg hover:brightness-110 transition-colors text-left group disabled:cursor-not-allowed disabled:bg-gray-400"
           >
             <div className="flex items-start gap-4">
               <span className="text-3xl">🌐</span>
@@ -50,7 +50,7 @@ export function HomePage() {
           {/* Pass & Play */}
           <button
             onClick={() => navigate('/pass-and-play')}
-            className="w-full px-6 py-5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-left group"
+            className="w-full px-6 py-5 aqua-pill-green text-white rounded-lg hover:brightness-110 transition-colors text-left group"
           >
             <div className="flex items-start gap-4">
               <span className="text-3xl">🎮</span>
@@ -76,7 +76,7 @@ export function HomePage() {
           <button
             type="button"
             onClick={update.apply}
-            className="mt-3 w-full rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            className="mt-3 w-full aqua-pill px-4 py-2 text-sm text-gray-600 hover:brightness-105"
           >
             Update ready — restart the app
           </button>

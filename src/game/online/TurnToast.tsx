@@ -73,7 +73,9 @@ export function TurnToast({ name, emoji, mine = false, disconnected = false }: T
       className={
         'step-enter pointer-events-none absolute left-1/2 top-3 z-30 flex -translate-x-1/2 ' +
         'items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow-lg ' +
-        (mine ? 'bg-blue-600' : 'bg-slate-900/90')
+        // `rounded-full` still wins over the pill recipe's own radius: Tailwind's
+        // utilities are emitted after aqua.css. A toast stays a full round.
+        (mine ? 'aqua-pill-primary' : 'bg-slate-900/90')
       }
     >
       <span aria-hidden className="text-base leading-none">{emoji || '•'}</span>
