@@ -29,7 +29,7 @@ export function RoomGone({ roomId, onExit }: RoomGoneProps) {
         <button
           type="button"
           onClick={onExit}
-          className="m-0 w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700"
+          className="m-0 w-full rounded-lg bg-[var(--lobby-accent,#2563eb)] px-4 py-3 font-semibold text-[var(--lobby-on-accent,#ffffff)] hover:bg-[var(--lobby-accent-strong,#1d4ed8)]"
         >
           Back to the lobby
         </button>

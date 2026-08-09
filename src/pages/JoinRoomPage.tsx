@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { JoinRoomCard } from '../game/online/JoinRoomCard';
+import { JoinRoomCard } from '../lobby/ui/JoinRoomCard';
 import { getConnection, type Connection } from '../net/connection';
 import { loadIdentity, rememberName, rememberedName, saveIdentity } from '../net/identity';
 

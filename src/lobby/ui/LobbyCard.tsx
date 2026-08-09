@@ -1,4 +1,4 @@
-// src/game/online/LobbyCard.tsx
+// src/lobby/ui/LobbyCard.tsx
 // The one card the online lobby is drawn on, in both of its states.
 //
 // New Room and Join Room are the same card in the Lobby Flow design: a title,
@@ -10,22 +10,14 @@
 // Room drifted — it became a pair of labelled inputs ("Room code", "Your
 // name") while New Room matched the frame. Sharing the card is what stops the
 // two answering the same question differently again.
+//
+// Theming surface: three CSS custom properties, read via Tailwind arbitrary
+// values so an un-themed consumer renders exactly today's blue.
+//   --lobby-accent        primary button background (default #2563eb)
+//   --lobby-accent-strong primary button hover background (default #1d4ed8)
+//   --lobby-on-accent     primary button text color (default #ffffff)
 
 import type { ReactNode } from 'react';
-import { PLAYER_EMOJI } from '../../../engine/startups';
-
-/**
- * The face the game is about to give a seat.
- *
- * Derived, never invented: the engine assigns `PLAYER_EMOJI` by seat index at
- * `startGame`, so the lobby can show it early. Null past the end of the table
- * — and, more importantly, null when there is no seat yet, which is every row
- * on the Join card. Guessing seat one there would be wrong for everyone who
- * does not turn out to be first.
- */
-export function seatEmoji(seat: number | null): string | null {
-  return seat === null ? null : PLAYER_EMOJI[seat] ?? null;
-}
 
 export interface SeatRowProps {
   emoji: string | null;
