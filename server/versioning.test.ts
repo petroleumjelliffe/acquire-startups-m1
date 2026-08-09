@@ -12,13 +12,13 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
 import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
 import { SAVE_VERSION } from './store.js';
+import { PROTOCOL_VERSION } from '../session/protocol.js';
 import {
-  CLIENT_EVENTS,
-  SERVER_EVENTS,
-  PROTOCOL_VERSION,
+  LOBBY_CLIENT_EVENTS,
+  LOBBY_SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
-} from '../session/protocol.js';
+} from '../lobby/protocol.js';
 
 let server: TestServer;
 
@@ -38,8 +38,8 @@ async function bareSocket(): Promise<Bare> {
   const rejections: RejectedMessage[] = [];
   const joins: JoinedMessage[] = [];
 
-  socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
-  socket.on(SERVER_EVENTS.joined, (m: JoinedMessage) => joins.push(m));
+  socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+  socket.on(LOBBY_SERVER_EVENTS.joined, (m: JoinedMessage) => joins.push(m));
 
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('bare socket never connected')), 4000);
@@ -76,7 +76,7 @@ describe('joinRoom refuses a protocol it does not speak', () => {
       try {
         const msg: Record<string, unknown> = { roomId: room.id, name: 'Sam' };
         if (version !== undefined) msg.protocolVersion = version;
-        client.socket.emit(CLIENT_EVENTS.joinRoom, msg);
+        client.socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, msg);
         await settleSocket(client.socket);
 
         expect(client.rejections.map((r) => r.code)).toEqual(['versionMismatch']);
@@ -97,7 +97,7 @@ describe('joinRoom refuses a protocol it does not speak', () => {
     const client = await bareSocket();
 
     try {
-      client.socket.emit(CLIENT_EVENTS.joinRoom, {
+      client.socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, {
         roomId: room.id,
         name: 'Sam',
         protocolVersion: PROTOCOL_VERSION,
@@ -151,7 +151,7 @@ describe('createRoom refuses a protocol it does not speak', () => {
       try {
         const msg: Record<string, unknown> = { name: 'Alex' };
         if (version !== undefined) msg.protocolVersion = version;
-        client.socket.emit(CLIENT_EVENTS.createRoom, msg);
+        client.socket.emit(LOBBY_CLIENT_EVENTS.createRoom, msg);
         await settleSocket(client.socket);
 
         expect(client.rejections.map((r) => r.code)).toEqual(['versionMismatch']);
@@ -170,7 +170,7 @@ describe('createRoom refuses a protocol it does not speak', () => {
     const client = await bareSocket();
 
     try {
-      client.socket.emit(CLIENT_EVENTS.createRoom, {
+      client.socket.emit(LOBBY_CLIENT_EVENTS.createRoom, {
         name: 'Alex',
         protocolVersion: PROTOCOL_VERSION,
       });

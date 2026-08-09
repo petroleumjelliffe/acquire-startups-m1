@@ -1,12 +1,12 @@
 import type { Socket } from 'socket.io-client';
 import {
-  CLIENT_EVENTS,
-  SERVER_EVENTS,
-  type RejectedMessage,
+  GAME_CLIENT_EVENTS,
+  GAME_SERVER_EVENTS,
   type StateMessage,
   type UndoMessage,
   type WireIntent,
 } from '../../session/protocol';
+import { LOBBY_SERVER_EVENTS, type RejectedMessage } from '../../lobby/protocol';
 
 /**
  * Everything a session may do to the network, and nothing else.
@@ -20,7 +20,13 @@ export interface RoomTransport {
   sendUndo(stepId: number): void;
   /** Returns an unsubscribe. */
   onState(handler: (msg: StateMessage) => void): () => void;
-  /** Returns an unsubscribe. */
+  /**
+   * Returns an unsubscribe. Shares the socket's `rejected` event with
+   * `src/lobby/connection.ts`'s `onRejected` — one channel, two subscribers.
+   * The lobby side branches on its own codes (`noSuchRoom`, `versionMismatch`,
+   * …); this side interprets the rest. A subscriber added on either side is
+   * heard by both.
+   */
   onRejected(handler: (msg: RejectedMessage) => void): () => void;
   /** False while the socket is down, so intents are refused rather than dropped. */
   isOpen(): boolean;
@@ -35,18 +41,18 @@ export interface RoomTransport {
  */
 export function createSocketTransport(socket: Socket): RoomTransport {
   return {
-    sendIntent: (wire) => { socket.emit(CLIENT_EVENTS.intent, wire); },
+    sendIntent: (wire) => { socket.emit(GAME_CLIENT_EVENTS.intent, wire); },
     sendUndo: (stepId) => {
       const msg: UndoMessage = { stepId };
-      socket.emit(CLIENT_EVENTS.undo, msg);
+      socket.emit(GAME_CLIENT_EVENTS.undo, msg);
     },
     onState(handler) {
-      socket.on(SERVER_EVENTS.state, handler);
-      return () => { socket.off(SERVER_EVENTS.state, handler); };
+      socket.on(GAME_SERVER_EVENTS.state, handler);
+      return () => { socket.off(GAME_SERVER_EVENTS.state, handler); };
     },
     onRejected(handler) {
-      socket.on(SERVER_EVENTS.rejected, handler);
-      return () => { socket.off(SERVER_EVENTS.rejected, handler); };
+      socket.on(LOBBY_SERVER_EVENTS.rejected, handler);
+      return () => { socket.off(LOBBY_SERVER_EVENTS.rejected, handler); };
     },
     isOpen: () => socket.connected,
   };

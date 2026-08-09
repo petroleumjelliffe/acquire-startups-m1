@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import type { Socket } from 'socket.io-client';
 import { OnlineLobbyPage } from './OnlineLobbyPage';
 import type { Connection } from '../net/connection';
-import type { JoinedMessage, RejectedMessage } from '../../session/protocol';
+import type { JoinedMessage, RejectedMessage } from '../../lobby/protocol';
 
 // `CreateRoomPage.test.tsx`'s coverage, carried here when that page was
 // deleted: the Lobby Flow design has no name form in front of a room, so
@@ -16,6 +17,9 @@ function fakeConnection() {
   const created: (string | undefined)[] = [];
 
   const connection: Connection = {
+    // Unused by this fake: `transport` is provided directly below, so nothing
+    // here ever reads the socket. It exists only to satisfy `Connection`.
+    socket: {} as unknown as Socket,
     transport: {
       sendIntent: () => {}, sendUndo: () => {},
       onState: () => () => {},
@@ -31,6 +35,7 @@ function fakeConnection() {
     leaveSeat: () => {},
     onJoined: (h) => { joined = h; return () => { joined = null; }; },
     onRoster: () => () => {},
+    onRejected: (h) => { rejectedHandlers.add(h); return () => { rejectedHandlers.delete(h); }; },
     close: () => {},
   };
 

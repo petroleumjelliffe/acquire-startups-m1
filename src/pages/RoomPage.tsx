@@ -1,10 +1,11 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { GameScreen } from '../game/GameScreen';
-import { RoomLobby } from '../game/online/RoomLobby';
-import { RoomGone } from '../game/online/RoomGone';
-import { StaleClient } from '../game/online/StaleClient';
-import { ConnectionStrip } from '../game/online/ConnectionStrip';
-import { RoomRefused } from '../game/online/RoomRefused';
+import { RoomLobby } from '../lobby/ui/RoomLobby';
+import { RoomGone } from '../lobby/ui/RoomGone';
+import { StaleClient } from '../lobby/ui/StaleClient';
+import { ConnectionStrip } from '../lobby/ui/ConnectionStrip';
+import { RoomRefused } from '../lobby/ui/RoomRefused';
+import { seatEmoji } from '../game/online/seatEmoji';
 import { useRoom } from '../net/useRoom';
 import { forceUpdateAndReload } from '../pwa/update';
 import { useDevSeat } from '../net/devSeat';
@@ -120,6 +121,7 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
             room.leaveSeat();
             leave();
           }}
+          seatEmoji={seatEmoji}
         />
       </>
     );

@@ -6,7 +6,8 @@ import { ALL_GOLDEN_GAMES, type GoldenStep } from '../../engine/golden';
 import { replayGoldenGame } from '../../engine/golden/replay';
 import { getCurrentActor } from '../../engine/actor';
 import type { GameState } from '../../engine/gameTypes';
-import { DRAWS, type RejectedMessage, type StateMessage } from '../../session/protocol';
+import { DRAWS, type StateMessage } from '../../session/protocol';
+import type { RejectedMessage } from '../../lobby/protocol';
 
 /** p1 holds E6 next to a loner, so founding is one click away. p2 waits. */
 function board(): GameState {

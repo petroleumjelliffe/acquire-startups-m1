@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
+import { PROTOCOL_VERSION } from '../session/protocol.js';
 import {
-  CLIENT_EVENTS,
-  PROTOCOL_VERSION,
-  SERVER_EVENTS,
+  LOBBY_CLIENT_EVENTS,
+  LOBBY_SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
   type RosterMessage,
-} from '../session/protocol.js';
+} from '../lobby/protocol.js';
 import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
 
 let server: TestServer;
@@ -33,8 +33,8 @@ async function raw(port: number): Promise<Socket> {
 function collect(socket: Socket) {
   const joined: JoinedMessage[] = [];
   const rosters: RosterMessage[] = [];
-  socket.on(SERVER_EVENTS.joined, (m: JoinedMessage) => joined.push(m));
-  socket.on(SERVER_EVENTS.roster, (m: RosterMessage) => rosters.push(m));
+  socket.on(LOBBY_SERVER_EVENTS.joined, (m: JoinedMessage) => joined.push(m));
+  socket.on(LOBBY_SERVER_EVENTS.roster, (m: RosterMessage) => rosters.push(m));
   return { joined, rosters };
 }
 
@@ -58,21 +58,21 @@ describe('one socket holds one seat per room', () => {
   it('re-seats the socket it already knows rather than adding a player', async () => {
     const host = await raw(server.port);
     const hostSaw = collect(host);
-    host.emit(CLIENT_EVENTS.createRoom, { name: 'Alex', protocolVersion: PROTOCOL_VERSION });
+    host.emit(LOBBY_CLIENT_EVENTS.createRoom, { name: 'Alex', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(host);
 
     const roomId = hostSaw.joined[0].roomId;
 
     const guest = await raw(server.port);
     const guestSaw = collect(guest);
-    guest.emit(CLIENT_EVENTS.joinRoom, { roomId, name: 'Sam', protocolVersion: PROTOCOL_VERSION });
+    guest.emit(LOBBY_CLIENT_EVENTS.joinRoom, { roomId, name: 'Sam', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(guest);
 
     const firstSeat = guestSaw.joined[0].playerId;
 
     // The second join. A client that never heard its own `joined` has no token
     // to send, so this is byte-for-byte the message it sent the first time.
-    guest.emit(CLIENT_EVENTS.joinRoom, { roomId, name: 'Sam', protocolVersion: PROTOCOL_VERSION });
+    guest.emit(LOBBY_CLIENT_EVENTS.joinRoom, { roomId, name: 'Sam', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(guest);
     await settleSocket(host);
 
@@ -93,15 +93,15 @@ describe('one socket holds one seat per room', () => {
   it('still seats a genuinely new player on a second socket', async () => {
     const host = await raw(server.port);
     const hostSaw = collect(host);
-    host.emit(CLIENT_EVENTS.createRoom, { name: 'Alex', protocolVersion: PROTOCOL_VERSION });
+    host.emit(LOBBY_CLIENT_EVENTS.createRoom, { name: 'Alex', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(host);
     const roomId = hostSaw.joined[0].roomId;
 
     const one = await raw(server.port);
     const two = await raw(server.port);
-    one.emit(CLIENT_EVENTS.joinRoom, { roomId, name: 'Sam', protocolVersion: PROTOCOL_VERSION });
+    one.emit(LOBBY_CLIENT_EVENTS.joinRoom, { roomId, name: 'Sam', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(one);
-    two.emit(CLIENT_EVENTS.joinRoom, { roomId, name: 'Jordan', protocolVersion: PROTOCOL_VERSION });
+    two.emit(LOBBY_CLIENT_EVENTS.joinRoom, { roomId, name: 'Jordan', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(two);
 
     try {
@@ -119,9 +119,9 @@ describe('a join that cannot be honoured', () => {
   it('says the room does not exist, by name', async () => {
     const socket = await raw(server.port);
     const rejections: RejectedMessage[] = [];
-    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+    socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
-    socket.emit(CLIENT_EVENTS.joinRoom, { roomId: 'NOPE12', name: 'Sam', protocolVersion: PROTOCOL_VERSION });
+    socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, { roomId: 'NOPE12', name: 'Sam', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(socket);
 
     // The distinction the gone-room screen is built on: nothing the player
@@ -135,9 +135,9 @@ describe('a join that cannot be honoured', () => {
     const { room } = server.rooms.create('Alex');
     const socket = await raw(server.port);
     const rejections: RejectedMessage[] = [];
-    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+    socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
-    socket.emit(CLIENT_EVENTS.joinRoom, {
+    socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, {
       roomId: room.id,
       name: 'Ghost',
       playerId: 'p1',

@@ -123,6 +123,7 @@ export default defineConfig(({ command }) => ({
             'engine/**/*.test.ts',
             'session/**/*.test.ts',
             'server/**/*.test.ts',
+            'lobby/**/*.test.ts',
           ],
           environment: 'node',
           globals: true,

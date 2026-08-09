@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { ConnectionStatus } from '../../net/connection';
+import type { ConnectionStatus } from '../connection';
 
 /**
  * How long a connect may take before it is worth explaining.

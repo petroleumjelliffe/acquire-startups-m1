@@ -1,5 +1,6 @@
 import type { GameState } from '../engine/gameTypes';
 import type { Intent, IllegalIntentCode } from '../engine/intents';
+import type { LobbyRejectionCode } from '../lobby/protocol';
 
 /**
  * `Omit` does not distribute over a union: `Omit<Intent, 'playerId'>` collapses
@@ -111,34 +112,19 @@ export function toWire(intent: Intent): WireIntent {
  *
  * Undo is not an intent — it never reaches `applyIntent` — so
  * `IllegalIntentCode` has no word for "that step belongs to a segment you no
- * longer own". `notConnected` is not a refusal at all in the protocol sense —
- * the server never sends it — it is the client's own signal that the transport
- * is down, given a real member here rather than borrowing an unrelated wire
- * code.
+ * longer own".
  *
- * `noSuchRoom` and `seatRefused` are one refusal split in two, because they
- * have different remedies. Nothing reaches a room that is not there, so that
- * is an ending: the game may have finished, or the server may have restarted
- * with an ephemeral disk. A room that is there but refuses this seat means the
- * stored identity is stale, and joining fresh works. Sending one code for both
- * made every wiped game read as `cannot join ABC123`.
+ * The rest of what this file adds is `LobbyRejectionCode` — `notConnected`,
+ * `noSuchRoom`, `seatRefused`, `versionMismatch` — documented in
+ * `lobby/protocol.ts`, where those refusals live now that the lobby is
+ * game-agnostic.
  *
  * Adding these here keeps `engine/` untouched.
  */
 export type RejectionCode =
   | IllegalIntentCode
   | 'undoOutOfSegment'
-  | 'notConnected'
-  | 'noSuchRoom'
-  /**
-   * The client and the server do not speak the same protocol.
-   *
-   * Its own code, deliberately. A stale client told `noSuchRoom` goes hunting
-   * for a room that is perfectly fine, and the player has no way to learn that
-   * reloading is the fix.
-   */
-  | 'versionMismatch'
-  | 'seatRefused';
+  | LobbyRejectionCode;
 
 /**
  * Why a state arrived.
@@ -174,32 +160,17 @@ export interface StateMessage {
   previousSegmentStart?: number;
 }
 
-export interface RejectedMessage {
-  code: RejectionCode;
-  message: string;
-}
-
-export interface JoinedMessage {
-  roomId: string;
-  playerId: string;
-  /** Presented on rejoin. Issued once, at first join, and never re-issued. */
-  token: string;
-}
-
-export interface RosterMessage {
-  roomId: string;
-  lifecycle: 'lobby' | 'playing' | 'over';
-  players: { id: string; name: string; isHost: boolean; connected: boolean }[];
-}
-
 /**
  * What "the wire" currently is.
  *
- * Bump this when the shape of anything in this file changes: `WireIntent`,
- * `StateMessage`, `RejectionCode`, `JoinedMessage`, `RosterMessage`,
- * `CLIENT_EVENTS` or `SERVER_EVENTS`. This file owns all of them, which is why
- * the constant lives here and nowhere else — it is the only place that knows
- * what "changed" means.
+ * Bump this when the shape of anything on either half of the wire changes:
+ * `WireIntent`, `StateMessage`, `RejectionCode`, `UndoMessage`,
+ * `GAME_CLIENT_EVENTS` or `GAME_SERVER_EVENTS` here, or `JoinedMessage`,
+ * `RosterMessage`, `CreateRoomMessage`, `JoinRoomMessage`,
+ * `RenamePlayerMessage`, `LOBBY_CLIENT_EVENTS` or `LOBBY_SERVER_EVENTS` in
+ * `lobby/protocol.ts`. This constant is the one thing both files share, which
+ * is why it lives here rather than in either half alone — it is the only
+ * place that knows what "changed" means for the wire as a whole.
  *
  * Skew runs in **both** directions in this deployment. The client ships to
  * GitHub Pages and the server to Render, independently, so either can be the
@@ -223,55 +194,13 @@ export interface RosterMessage {
  */
 export const PROTOCOL_VERSION = 3;
 
-/**
- * `name` is optional on both, and that is a correction to v2 rather than a v3:
- * v2 has never been deployed — prod still speaks v1 — so no client in the
- * world sends the required-name shape. Adding a name later would have cost a
- * cutover; adding it now costs nothing. Do not read the absent bump as a
- * missed one.
- *
- * An absent name means "you name me": the server seats you and names you by
- * your seat number, which is the only thing that knows it. See
- * `server/rooms.ts`'s `seatPlayer`.
- */
-export interface CreateRoomMessage { name?: string; protocolVersion: number }
-export interface JoinRoomMessage {
-  roomId: string;
-  name?: string;
-  playerId?: string;
-  token?: string;
-  protocolVersion: number;
-}
 export interface UndoMessage { stepId: number }
 
-export const CLIENT_EVENTS = {
-  createRoom: 'createRoom',
-  joinRoom: 'joinRoom',
-  beginGame: 'beginGame',
+export const GAME_CLIENT_EVENTS = {
   intent: 'intent',
   undo: 'undo',
-  /**
-   * Change your own seat's name, in the lobby only. Identity comes from the
-   * socket binding, never the payload — there is no way to rename anyone
-   * else. Lobby-only because the engine copies names into `GameState` at
-   * startGame; a mid-game rename would leave the roster and the log
-   * disagreeing about who did what.
-   */
-  renamePlayer: 'renamePlayer',
-  /**
-   * Vacate your own seat, in the lobby only — your own and nobody else's,
-   * since identity comes from the socket binding. Sent by the lobby's `Leave`.
-   * Distinct from a disconnect, which keeps the seat and marks it away: this
-   * one gives it up.
-   */
-  leaveSeat: 'leaveSeat',
 } as const;
 
-export interface RenamePlayerMessage { name: string }
-
-export const SERVER_EVENTS = {
+export const GAME_SERVER_EVENTS = {
   state: 'state',
-  rejected: 'rejected',
-  roster: 'roster',
-  joined: 'joined',
 } as const;

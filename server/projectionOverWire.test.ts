@@ -4,13 +4,13 @@ import { buildFixture } from '../engine/golden/fixtures.js';
 import type { Coord, Row } from '../engine/gameHelpers.js';
 import { startTestServer, connectPlayer, settleSocket, type TestServer } from './socketHarness.js';
 import { project } from './projection.js';
+import { GAME_CLIENT_EVENTS, PROTOCOL_VERSION } from '../session/protocol.js';
 import {
-  CLIENT_EVENTS,
-  PROTOCOL_VERSION,
-  SERVER_EVENTS,
+  LOBBY_CLIENT_EVENTS,
+  LOBBY_SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
-} from '../session/protocol.js';
+} from '../lobby/protocol.js';
 
 let server: TestServer;
 
@@ -419,14 +419,14 @@ describe('a malformed or absent payload', () => {
   it('createRoom rejects it instead of crashing the server', async () => {
     const socket = await bareSocket();
     const rejections: RejectedMessage[] = [];
-    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+    socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
     try {
       // An absent payload has no version either, and the version check runs
       // first — deliberately, so a client built before versioning existed is
       // told it is stale rather than told its payload is malformed. Still a
       // clean rejection rather than a crash, which is what this test is for.
-      socket.emit(CLIENT_EVENTS.createRoom, undefined);
+      socket.emit(LOBBY_CLIENT_EVENTS.createRoom, undefined);
       await settleSocket(socket);
       expect(rejections).toHaveLength(1);
       expect(rejections[0].code).toBe('versionMismatch');
@@ -434,7 +434,7 @@ describe('a malformed or absent payload', () => {
       // Carries the right version, so it reaches the shape guard this case
       // is actually about. Without the version it would never get past the
       // check above and would silently stop testing what it says.
-      socket.emit(CLIENT_EVENTS.createRoom, { name: 42, protocolVersion: PROTOCOL_VERSION });
+      socket.emit(LOBBY_CLIENT_EVENTS.createRoom, { name: 42, protocolVersion: PROTOCOL_VERSION });
       await settleSocket(socket);
       expect(rejections).toHaveLength(2);
       expect(rejections[1].code).toBe('unknownIntent');
@@ -443,8 +443,8 @@ describe('a malformed or absent payload', () => {
       // same socket, right after two malformed ones, still works.
       const joined = await new Promise<JoinedMessage>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('never joined')), 4000);
-        socket.once(SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
-        socket.emit(CLIENT_EVENTS.createRoom, {
+        socket.once(LOBBY_SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
+        socket.emit(LOBBY_CLIENT_EVENTS.createRoom, {
           name: 'Real Name', protocolVersion: PROTOCOL_VERSION,
         });
       });
@@ -458,12 +458,12 @@ describe('a malformed or absent payload', () => {
     const { room } = server.rooms.create('Host');
     const socket = await bareSocket();
     const rejections: RejectedMessage[] = [];
-    socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+    socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
     try {
       // See the note in the `createRoom` case above: no payload, so no
       // version, so the version check answers first.
-      socket.emit(CLIENT_EVENTS.joinRoom, undefined);
+      socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, undefined);
       await settleSocket(socket);
       expect(rejections).toHaveLength(1);
       expect(rejections[0].code).toBe('versionMismatch');
@@ -474,7 +474,7 @@ describe('a malformed or absent payload', () => {
       // omitting the field here would seat this socket and quietly stop
       // testing the guard — and would break the well-formed join below, which
       // the one-seat-per-socket rule would then refuse.
-      socket.emit(CLIENT_EVENTS.joinRoom, {
+      socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, {
         roomId: room.id, name: 42, protocolVersion: PROTOCOL_VERSION,
       });
       await settleSocket(socket);
@@ -483,8 +483,8 @@ describe('a malformed or absent payload', () => {
 
       const joined = await new Promise<JoinedMessage>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('never joined')), 4000);
-        socket.once(SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
-        socket.emit(CLIENT_EVENTS.joinRoom, {
+        socket.once(LOBBY_SERVER_EVENTS.joined, (m: JoinedMessage) => { clearTimeout(timer); resolve(m); });
+        socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, {
           roomId: room.id, name: 'Guest', protocolVersion: PROTOCOL_VERSION,
         });
       });
@@ -500,12 +500,12 @@ describe('a malformed or absent payload', () => {
     const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
 
     try {
-      p1.socket.emit(CLIENT_EVENTS.undo, {});
+      p1.socket.emit(GAME_CLIENT_EVENTS.undo, {});
       await settleSocket(p1.socket);
       expect(p1.rejections).toHaveLength(1);
       expect(p1.rejections[0].code).toBe('undoOutOfSegment');
 
-      p1.socket.emit(CLIENT_EVENTS.undo, undefined);
+      p1.socket.emit(GAME_CLIENT_EVENTS.undo, undefined);
       await settleSocket(p1.socket);
       expect(p1.rejections).toHaveLength(2);
       expect(p1.rejections[1].code).toBe('undoOutOfSegment');
@@ -543,14 +543,14 @@ describe('a malformed or absent payload', () => {
         { type: 'buyShares', picks: 5 },    // picks not iterable
       ];
       for (const [i, payload] of buyMalformed.entries()) {
-        buyer.socket.emit(CLIENT_EVENTS.intent, payload);
+        buyer.socket.emit(GAME_CLIENT_EVENTS.intent, payload);
         await settleSocket(buyer.socket);
         expect(buyer.rejections, `buyShares payload ${i} (${JSON.stringify(payload)})`)
           .toHaveLength(i + 1);
         expect(buyer.rejections[i].code).toBe('unknownIntent');
       }
 
-      trader.socket.emit(CLIENT_EVENTS.intent, { type: 'tradeInDeadTiles', coords: 5 });
+      trader.socket.emit(GAME_CLIENT_EVENTS.intent, { type: 'tradeInDeadTiles', coords: 5 });
       await settleSocket(trader.socket);
       expect(trader.rejections).toHaveLength(1);
       expect(trader.rejections[0].code).toBe('unknownIntent');

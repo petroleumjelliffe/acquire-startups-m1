@@ -1,10 +1,10 @@
-// src/game/online/RoomLobby.tsx
+// src/lobby/ui/RoomLobby.tsx
 // The New Room state of the lobby card: the code is read-only because you are
 // already in the room it names, and the list holds everybody. Its Join Room
 // twin is `JoinRoomCard`; both are drawn by `LobbyCard`.
 
-import type { RosterMessage } from '../../../session/protocol';
-import { LobbyCard, SeatRow, seatEmoji } from './LobbyCard';
+import type { RosterMessage } from '../../../lobby/protocol';
+import { LobbyCard, SeatRow } from './LobbyCard';
 
 export interface RoomLobbyProps {
   roomId: string;
@@ -20,10 +20,16 @@ export interface RoomLobbyProps {
   onRename: (name: string) => void;
   /** Give up your own seat — the `Leave` button, which is now the only way. */
   onLeaveSeat: () => void;
+  /**
+   * The face a seat is about to get. Injected rather than imported: this
+   * component knows rooms and seats, not startups, so what a seat number
+   * renders as is the caller's to decide.
+   */
+  seatEmoji: (seat: number) => string | null;
 }
 
 export function RoomLobby({
-  roomId, players, myPlayerId, isHost, note, onStart, onRename, onLeaveSeat,
+  roomId, players, myPlayerId, isHost, note, onStart, onRename, onLeaveSeat, seatEmoji,
 }: RoomLobbyProps) {
   const enough = players.length >= 2;
 
@@ -39,7 +45,7 @@ export function RoomLobby({
           type="button"
           onClick={onStart}
           disabled={!enough}
-          className="m-0 w-full rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          className="m-0 w-full rounded-lg bg-[var(--lobby-accent,#2563eb)] px-4 py-3 font-semibold text-[var(--lobby-on-accent,#ffffff)] hover:bg-[var(--lobby-accent-strong,#1d4ed8)] disabled:cursor-not-allowed disabled:bg-gray-300"
         >
           {enough ? 'Start game' : 'Waiting for another player'}
         </button>

@@ -7,14 +7,18 @@
 import { io as connect, type Socket } from 'socket.io-client';
 import { createServer } from './index.js';
 import {
-  CLIENT_EVENTS,
+  GAME_CLIENT_EVENTS,
+  GAME_SERVER_EVENTS,
   PROTOCOL_VERSION,
-  SERVER_EVENTS,
-  type JoinedMessage,
-  type RejectedMessage,
   type StateMessage,
   type WireIntent,
 } from '../session/protocol.js';
+import {
+  LOBBY_CLIENT_EVENTS,
+  LOBBY_SERVER_EVENTS,
+  type JoinedMessage,
+  type RejectedMessage,
+} from '../lobby/protocol.js';
 
 export interface TestServer {
   port: number;
@@ -97,8 +101,8 @@ export async function connectPlayer(
   const states: StateMessage[] = [];
   const rejections: RejectedMessage[] = [];
 
-  socket.on(SERVER_EVENTS.state, (m: StateMessage) => states.push(m));
-  socket.on(SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
+  socket.on(GAME_SERVER_EVENTS.state, (m: StateMessage) => states.push(m));
+  socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
 
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${name} never connected`)), 4000);
@@ -108,8 +112,8 @@ export async function connectPlayer(
 
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(`${name} never joined ${roomId}`)), 4000);
-    socket.once(SERVER_EVENTS.joined, (_m: JoinedMessage) => { clearTimeout(timer); resolve(); });
-    socket.emit(CLIENT_EVENTS.joinRoom, {
+    socket.once(LOBBY_SERVER_EVENTS.joined, (_m: JoinedMessage) => { clearTimeout(timer); resolve(); });
+    socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, {
       roomId, name, playerId, token, protocolVersion: PROTOCOL_VERSION,
     });
   });
@@ -123,11 +127,11 @@ export async function connectPlayer(
     rejections,
     latest: () => states[states.length - 1],
     async send(wire) {
-      socket.emit(CLIENT_EVENTS.intent, wire);
+      socket.emit(GAME_CLIENT_EVENTS.intent, wire);
       await settle();
     },
     async undo(stepId) {
-      socket.emit(CLIENT_EVENTS.undo, { stepId });
+      socket.emit(GAME_CLIENT_EVENTS.undo, { stepId });
       await settle();
     },
     close: () => { socket.disconnect(); },

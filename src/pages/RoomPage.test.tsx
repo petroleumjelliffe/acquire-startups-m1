@@ -1,27 +1,30 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+import type { Socket } from 'socket.io-client';
 import { RoomPage } from './RoomPage';
 import type { Connection, ConnectionStatus } from '../net/connection';
+import { PROTOCOL_VERSION, type StateMessage } from '../../session/protocol';
 import {
-  PROTOCOL_VERSION,
   type JoinedMessage,
   type RejectedMessage,
   type RosterMessage,
-  type StateMessage,
-} from '../../session/protocol';
+} from '../../lobby/protocol';
 import { buildFixture } from '../../engine/golden/fixtures';
 import { loadIdentity } from '../net/identity';
 import { useRoom, type RoomPhase } from '../net/useRoom';
 
 function fakeConnection() {
-  let joined: ((m: JoinedMessage) => void) | null = null;
   let roster: ((m: RosterMessage) => void) | null = null;
-  // Sets, not a single slot: production is `socket.on`/`socket.off`, and both
-  // `useRoom` and `createNetworkSession` register their own `state` and
-  // `rejected` listeners on the same transport. A single overwritten slot
-  // would silently collapse two real listeners into one and hide any
-  // regression in that coexistence.
+  // Sets, not a single slot: production is `socket.on`/`socket.off`, and more
+  // than one caller registers its own listener on the same event —
+  // `useLobbyRoom` and the game's `useRoom` both call `onJoined` (the lobby
+  // to seat itself, the wrapper to track the id it needs to build a session
+  // ahead of the next render); `useRoom` and `createNetworkSession` both
+  // register `state` and `rejected` on the same transport. A single
+  // overwritten slot would silently collapse two real listeners into one and
+  // hide any regression in that coexistence.
+  const joinedHandlers = new Set<(m: JoinedMessage) => void>();
   const stateHandlers = new Set<(m: StateMessage) => void>();
   const rejectedHandlers = new Set<(m: RejectedMessage) => void>();
   const statusListeners = new Set<() => void>();
@@ -32,6 +35,9 @@ function fakeConnection() {
   let status: ConnectionStatus = 'open';
 
   const connection: Connection = {
+    // Unused by this fake: `transport` is provided directly below, so nothing
+    // here ever reads the socket. It exists only to satisfy `Connection`.
+    socket: {} as unknown as Socket,
     transport: {
       sendIntent: () => {},
       sendUndo: () => {},
@@ -45,12 +51,17 @@ function fakeConnection() {
     status: () => status,
     subscribe: (l) => { statusListeners.add(l); return () => { statusListeners.delete(l); }; },
     createRoom: () => {},
-    joinRoom: (m) => { joins.push(m); },
+    // The real connection injects `protocolVersion` when it builds the wire
+    // message; this fake stands in for that whole layer, so it injects the
+    // same field the same way, rather than making every call site's
+    // assertion carry the connection's own concern.
+    joinRoom: (m) => { joins.push({ ...m, protocolVersion: PROTOCOL_VERSION }); },
     beginGame: () => { begins.push(1); },
     renamePlayer: (n) => { renames.push(n); },
     leaveSeat: () => { seatLeaves.push(1); },
-    onJoined: (h) => { joined = h; return () => { joined = null; }; },
+    onJoined: (h) => { joinedHandlers.add(h); return () => { joinedHandlers.delete(h); }; },
     onRoster: (h) => { roster = h; return () => { roster = null; }; },
+    onRejected: (h) => { rejectedHandlers.add(h); return () => { rejectedHandlers.delete(h); }; },
     close: () => {},
   };
 
@@ -60,7 +71,7 @@ function fakeConnection() {
     begins,
     renames,
     seatLeaves,
-    sendJoined: (m: JoinedMessage) => act(() => { joined?.(m); }),
+    sendJoined: (m: JoinedMessage) => act(() => { for (const h of joinedHandlers) h(m); }),
     sendRoster: (m: RosterMessage) => act(() => { roster?.(m); }),
     sendState: (m: StateMessage) => act(() => { for (const h of stateHandlers) h(m); }),
     sendRejected: (m: RejectedMessage) => act(() => { for (const h of rejectedHandlers) h(m); }),
