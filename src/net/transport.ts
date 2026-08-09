@@ -20,7 +20,13 @@ export interface RoomTransport {
   sendUndo(stepId: number): void;
   /** Returns an unsubscribe. */
   onState(handler: (msg: StateMessage) => void): () => void;
-  /** Returns an unsubscribe. */
+  /**
+   * Returns an unsubscribe. Shares the socket's `rejected` event with
+   * `src/lobby/connection.ts`'s `onRejected` — one channel, two subscribers.
+   * The lobby side branches on its own codes (`noSuchRoom`, `versionMismatch`,
+   * …); this side interprets the rest. A subscriber added on either side is
+   * heard by both.
+   */
   onRejected(handler: (msg: RejectedMessage) => void): () => void;
   /** False while the socket is down, so intents are refused rather than dropped. */
   isOpen(): boolean;

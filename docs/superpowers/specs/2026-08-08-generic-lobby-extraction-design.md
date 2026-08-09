@@ -1,8 +1,9 @@
 # Generic lobby extraction — design
 
 **Date:** 2026-08-08
-**Status:** Approved; implementation plan written
-(`docs/superpowers/plans/2026-08-08-generic-lobby-extraction.md`); not yet built
+**Status:** Built on this branch — implementation plan
+(`docs/superpowers/plans/2026-08-08-generic-lobby-extraction.md`) executed 2026-08-09; by-hand pass
+run
 **Depends on:** `revamp/turn-order-draw` merging and its v3 cutover deploying first
 — **satisfied** (v3 live on prod, 2026-08-08)
 

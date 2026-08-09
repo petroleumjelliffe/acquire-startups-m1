@@ -988,6 +988,14 @@ Run: `git diff main...HEAD` and read it end to end, hunting specifically for sea
 7. Navigate to a made-up room code — `RoomGone` by name, and Back works.
 8. **The token-lost reclaim** (the least-tested path crossing the boundary): mid-game, in the second browser's devtools, delete **both** its `acquire.room.<code>` and `acquire.name` localStorage keys, then refresh. (Deleting only the room key lets the auto-join silently reclaim via the remembered name — worth seeing once, but it skips the screen this leg exists for.) The nameless join is refused → `RoomRefused`; retype a *wrong* name and watch it get refused again; retype the seat's *exact* name — it takes the old seat back, token rotated, and play continues.
 
+   > **By-hand finding (2026-08-09):** the reclaim mechanism itself verified end-to-end — wrong
+   > name refused, exact name reclaims the seat with a rotated token. But `RoomRefused` deliberately
+   > has no name field (its own doc comment says so: "nothing asks who you are on the way into a
+   > room any more, so there is no answer to correct and resubmit"), so its "Try again" loops
+   > namelessly and can never retype anything. The working reclaim path is the join page, not this
+   > screen. The leg as written described a screen that never existed; the dead-end is pre-existing
+   > product behavior, filed separately, not a branch regression.
+
 Any deviation from today's behavior is a finding: record it in the plan doc's margin, fix, re-run the relevant leg.
 
 - [ ] **Step 4: Final commit and hand back**
