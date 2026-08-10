@@ -9,7 +9,7 @@ import { reasonText } from '../FinalScoring';
 import { ActiveStep } from '../panel/ActiveStep';
 import { StagingZone } from '../panel/StagingZone';
 import { FoundGroups } from '../FoundGroups';
-import { floodFillUnclaimed } from '../../../engine/gameHelpers';
+import { compareTiles, floodFillUnclaimed } from '../../../engine/gameHelpers';
 import { isStartupId, MAX_BUYS_PER_TURN, TRADE_RATIO } from '../../../engine/startups';
 import { StockStack } from '../atoms/StockStack';
 import { StockCard } from '../atoms/StockCard';
@@ -238,7 +238,9 @@ export function useTurnPanel(
     // The viewer's own tiles, which are the actor's only when the viewer is
     // acting. `dead` above stays the actor's: it drives the trade-in button,
     // which is the actor's move to make.
-    const viewerHand = viewer?.hand ?? [];
+    // Sorted for reading, not for play: the engine's hand is in draw order,
+    // which shuffles under you every time a tile is replaced.
+    const viewerHand = [...(viewer?.hand ?? [])].sort(compareTiles);
     const viewerDead = viewer ? getDeadTilesInHand(state, viewer.id) : [];
 
     return {

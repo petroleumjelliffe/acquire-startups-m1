@@ -101,6 +101,29 @@ describe('GameScreen', () => {
   });
 });
 
+describe('the hand reads in board order', () => {
+  /**
+   * The engine's hand is in draw order, and a replaced tile lands wherever the
+   * last one was — so the row you are scanning for moves. The panel sorts by
+   * letter, then by number.
+   */
+  it('sorts the panel hand by letter then number', () => {
+    const state = buildFixture({
+      players: [
+        { name: 'Alex', cash: 6000, hand: ['H8', 'A10', 'C1', 'A2', 'E6'] },
+        { name: 'Sam', cash: 6000, hand: ['A1'] },
+      ],
+      loners: ['E5'],
+    });
+    const { container } = render(<GameScreen session={createGameSession({ state })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^start$/i }));
+
+    const panelHand = container.querySelector('[data-panel-hand]')!;
+    const shown = [...panelHand.querySelectorAll('[title]')].map((el) => el.getAttribute('title'));
+    expect(shown).toEqual(['A2', 'A10', 'C1', 'E6', 'H8']);
+  });
+});
+
 describe('the hand highlight follows the pointer', () => {
   /**
    * The owner's hotseat pass: the board highlights nothing automatically —
