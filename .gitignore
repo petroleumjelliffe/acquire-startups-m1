@@ -41,3 +41,7 @@ server/games/
 # Claude
 .worktrees/
 .claude/settings.local.json
+
+# Derived from the engine by scripts/extract-step-states.ts — regenerate rather
+# than commit, so it can never drift from the rules it was replayed out of.
+step-states.json
