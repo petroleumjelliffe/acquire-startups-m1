@@ -16,6 +16,8 @@
 - **Target versions:** `react@^19`, `react-dom@^19`, `@types/react@^19`, `@types/react-dom@^19`. Leave `@testing-library/react` at `^16.3.0` — already the React 19–compatible line. Leave `@vitejs/plugin-react` at `^5.2.0` and `react-router-dom` at `^7.9.4`; both support 19.
 - **`PROTOCOL_VERSION` does not change.** This is client-only; no wire change, no cutover.
 - **Never run bare `tsc`** — use `npm run typecheck`.
+- **This plan lives on `docs/lobby-lift-sequencing`.** Merge that branch first, or read the plan from it, or `git checkout main` will leave you without the file you are executing.
+- **The two halves are separately revertible, and that is deliberate.** The React bump is Task 1's commit; StrictMode is Task 2's one-line commit. If StrictMode turns out to destabilise something you cannot fix quickly, revert *it* and keep React 19 — the baseline is what the lift needs, and StrictMode is the early-warning system, not the goal.
 - **Two vitest projects, and the split is load-bearing.** `node` runs `engine/`, `session/`, `server/`; `app` runs `src/` under jsdom. A stray `window.` in the node set is a production crash.
 - **Prove any new test can fail** by breaking the code and reading real output, never by reading the check.
 - **A measurement you did not measure is a defect.** Where this plan asks for numbers, record the actual output.
@@ -42,7 +44,9 @@ npx vitest run 2>&1 | tail -5
 npm run typecheck
 ```
 
-Write down the test count and file count. At the time of writing the suite has **771 `it()` blocks**; the run will report its own totals. A later task compares against these numbers, so they have to be real.
+Write down the test count and file count. Measured on `main` on 2026-08-12: **830 tests in 79 files**. A later task compares against these numbers, so record what your run actually prints rather than copying these — `main` may have moved.
+
+(An earlier draft of this plan said "771 `it()` blocks", which was a grep artifact rather than a measurement. Counting `it(` occurrences misses `it.each` expansions. Ask the runner.)
 
 - [ ] **Step 2: Confirm the audit still holds**
 
@@ -184,12 +188,15 @@ The suite renders components directly, so it never sees `main.tsx`. This task is
 
 - [ ] **Step 1: Serve the built bundle, not the dev server**
 
+**Prerequisites:** two browser windows, and the socket server running. The online legs cannot be driven without both.
+
 ```bash
-npm run build && npm run dev:server
-npx vite preview
+npm run build
+npm run dev:server      # in one terminal
+npm run preview         # in another
 ```
 
-Two browsers are needed for the online legs. Check which tree is serving before believing anything — Vite silently moves to the next free port when another checkout holds 5173, and a Phase 4 round was once measured against `main` before anyone noticed.
+Check which tree is serving before believing anything — Vite silently moves to the next free port when another checkout holds the default, and a Phase 4 round was once measured against `main` before anyone noticed.
 
 - [ ] **Step 2: Watch the server log while one client connects**
 
@@ -207,7 +214,7 @@ Refresh the actor's browser while a draft is uncommitted. It must come back to i
 
 - [ ] **Step 5: Kill and restart the server**
 
-With a room live, restart `dev:server`. The boot line must read `✓ Restored N room(s)`. Reload both browsers and confirm the same mid-game state, both seats.
+With a room live, restart `dev:server`. The boot line must read `✓ Restored N room(s)` — note [server/index.ts:258](../../../server/index.ts#L258) only prints it when `count > 0`, so silence means nothing was restored, not that restore is quiet. Reload both browsers and confirm the same mid-game state, both seats.
 
 - [ ] **Step 6: Drive pass-and-play too**
 

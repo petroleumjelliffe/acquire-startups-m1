@@ -34,8 +34,12 @@ own token. Rail Baron's `useGame` carries a long comment about that hazard preci
 bit them there.
 
 This is why step 2 exists and why it comes before anything is extracted. Finding it in one repo,
-with 771 tests and a working by-hand routine, is far cheaper than finding it across a submodule
+with 830 tests and a working by-hand routine, is far cheaper than finding it across a submodule
 boundary in a game that has no server yet.
+
+**But note what those 830 tests will not do here: no test imports `src/main.tsx`.** They render
+components directly, so turning StrictMode on is not exercised by a single one of them. The
+by-hand pass in step 1's plan is the only thing that actually tests it.
 
 ## The order
 
