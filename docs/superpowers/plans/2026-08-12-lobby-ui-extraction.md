@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- **Branch from `main`** as `chore/lobby-ui-extraction`. Requires [PR #15](https://github.com/petroleumjelliffe/acquire-startups-m1/pull/15) (React 19) merged first.
+- **Branch from `main`** as `chore/lobby-ui-extraction`. **Independent of [PR #15](https://github.com/petroleumjelliffe/acquire-startups-m1/pull/15)** — moving React components does not interact with the React version, so the two can merge in either order. (An earlier draft of this line said #15 was required; it is not.) The only consequence of merging this first is that its by-hand pass runs without StrictMode, which is fine: this plan verifies a file move, and StrictMode was verified in #15.
 - **No aqua conflict — verified.** `revamp/aqua-titanium-reskin` touches `HomePage`, `OnlineLobbyPage`, `PassAndPlayPage`; this plan touches `JoinRoomPage` and `RoomPage`. Disjoint. An earlier draft of the sequencing doc predicted a 6-line conflict on `OnlineLobbyPage`; that was wrong — it imports from `src/net/`, not from the lobby UI at all.
 - **No behaviour change.** Every test that passes before must pass after, with the same totals: **830 tests in 79 files** on `main` as of 2026-08-12.
 - **`PROTOCOL_VERSION` does not change.**
