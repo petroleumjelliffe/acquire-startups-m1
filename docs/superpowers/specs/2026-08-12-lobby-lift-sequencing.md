@@ -19,9 +19,11 @@ need their own design pass.
 | React version | **19 everywhere, Acquire moves first.** Making 19 the baseline removes the dual-React CI job the split would otherwise need, and the upgrade turns out to be a four-dependency bump. |
 | Branch point | **`main`, not `revamp/aqua-titanium-reskin`.** The reskin is 12 commits ahead across 31 files and touches none of `package.json`, `src/main.tsx`, `src/net/` or `src/lobby/`. Stacking on it would mean the lobby work cannot merge until a reskin does — the wrong dependency direction. |
 
-**The one overlap with the reskin**, and it is later: step 3 touches
-`src/pages/OnlineLobbyPage.tsx`, which aqua also edits by 6 lines. Trivial conflict, and it
-vanishes if aqua merges first.
+**There is no overlap with the reskin — checked, and an earlier draft of this doc was wrong.** It
+claimed step 3 would conflict with aqua on `src/pages/OnlineLobbyPage.tsx`. It will not: that page
+imports from `src/net/`, not from the lobby UI at all. aqua touches `HomePage`, `OnlineLobbyPage`
+and `PassAndPlayPage`; step 3 touches `JoinRoomPage` and `RoomPage`. Disjoint, so the lobby work
+does not need to wait for a reskin and aqua can rebase whenever it likes.
 
 ## The risk that is invisible today
 
@@ -93,7 +95,16 @@ anything is extracted.
 Also rewrites `lobby/README.md`, which currently advertises the themeable UI as part of the
 contract — a claim that did not survive first contact with a consumer.
 
-**Needs its own plan.** Touches `src/pages/` and the import-boundary test's roots.
+**Target: `src/game/lobby/`** (owner's ruling, 2026-08-12), alongside Acquire's other game UI —
+so `src/lobby/` is left purely headless, which is exactly what moves to the submodule.
+
+**Plan written:** [2026-08-12-lobby-ui-extraction.md](../plans/2026-08-12-lobby-ui-extraction.md).
+It also folds in the `npm run preview` fix, since every by-hand pass from here needs it.
+
+**The interesting part is a tripwire firing.** The import-boundary test walks 21 files, 12 of them
+under `ui/`, and guards with `expect(files.length).toBeGreaterThan(10)` so an empty walk cannot
+pass vacuously. Remove 12 and 9 remain — the guard trips, correctly. The plan answers it by
+asserting the exact count instead, so a file quietly leaving the lobby is caught too.
 
 ### Step 4 — The game supplies the seat-id space
 
