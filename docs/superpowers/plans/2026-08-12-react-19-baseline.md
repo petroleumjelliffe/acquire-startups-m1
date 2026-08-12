@@ -10,6 +10,11 @@
 
 **Spec:** [2026-08-12-lobby-lift-sequencing.md](../specs/2026-08-12-lobby-lift-sequencing.md), step 1 and step 2.
 
+> **Executed 2026-08-12** — [PR #15](https://github.com/petroleumjelliffe/acquire-startups-m1/pull/15).
+> No StrictMode doubling found. Corrections made to this document *after* execution are marked
+> **[corrected]** below; three of the original steps asked for things the codebase does not do.
+> Results: [2026-08-12-react-19-by-hand-notes.md](../specs/2026-08-12-react-19-by-hand-notes.md).
+
 ## Global Constraints
 
 - **Branch from `main`**, not `revamp/aqua-titanium-reskin`. The reskin is 12 commits ahead across 31 files and touches none of `package.json`, `src/main.tsx`, `src/net/` or `src/lobby/`.
@@ -192,17 +197,39 @@ The suite renders components directly, so it never sees `main.tsx`. This task is
 
 ```bash
 npm run build
-npm run dev:server      # in one terminal
-npm run preview         # in another
+npm run dev:server                              # in one terminal
+npx vite preview --base /acquire-startups-m1/   # in another
 ```
 
-Check which tree is serving before believing anything — Vite silently moves to the next free port when another checkout holds the default, and a Phase 4 round was once measured against `main` before anyone noticed.
+**[corrected]** `npm run preview` **cannot serve this project's build.** [vite.config.ts:121](../../../vite.config.ts#L121) sets `base` only for `command === 'build'`, so preview hosts `dist/` at `/` while the built `index.html` references `/acquire-startups-m1/…`. Every asset URL misses, the SPA fallback returns `index.html` **with a 200**, and the page renders nothing. Hence the explicit `--base`.
 
-- [ ] **Step 2: Watch the server log while one client connects**
+**Verify with the byte count, not the status code.** A status of `200` proves nothing here — the fallback returns 200 with the wrong body:
 
-Create a room in one browser. In the `dev:server` output, count the connect and join lines for that one client.
+```bash
+curl -s -o /dev/null -w "%{http_code} %{size_download}\n" \
+  http://localhost:4173/acquire-startups-m1/assets/<hash>.js
+```
 
-**Expected: one of each.** Two is the StrictMode double-mount reaching the socket, which is the headline bug this task exists to find.
+Expect ~358000 bytes. ~2600 is `index.html` wearing the bundle's URL, and it cost real time on the first run of this plan.
+
+If another checkout holds the port, Vite moves silently to the next one — check which tree is serving before believing anything. A Phase 4 round was once measured against `main` before anyone noticed.
+
+- [ ] **Step 2: Count seats, not log lines**
+
+**[corrected]** The original step said to count connect and join lines in the `dev:server` output. **The server logs neither** — nothing is printed on connect or join, so that step was unperformable.
+
+Count seats instead, which is better anyway: the roster is the thing a double join would corrupt, and it is observable from the client.
+
+Create a room in one browser. The roster must show **exactly one seat**. Then open the same room URL in a second tab of the same profile: still **one seat**, because the stored identity rejoins by token rather than minting a duplicate. That second tab is worth doing — it puts two sockets on one seat and exercises the rejoin path at the same time.
+
+Two seats for one browser is the StrictMode double-mount reaching the socket, which is the headline bug this task exists to find.
+
+**Run your own server on a spare port** so its log and its games directory are yours, rather than fighting whatever another shell already has on 3001:
+
+```bash
+env PORT=3002 GAMES_DIR=/tmp/rb-games npm run dev:server
+env VITE_SERVER_URL=http://localhost:3002 npm run build
+```
 
 - [ ] **Step 3: Join from a second browser, then drive a full turn**
 
@@ -218,17 +245,20 @@ With a room live, restart `dev:server`. The boot line must read `✓ Restored N 
 
 - [ ] **Step 6: Drive pass-and-play too**
 
-StrictMode double-invokes updaters, and an impure one applies the same intent twice for one click. Note the save record holds **a whole `GameState`, not a move log** — that was a deliberate ruling — so there is no move count to compare. The symptom is a doubled *effect*, so check effects that are visibly cumulative:
+**[corrected]** An earlier draft said the save holds "a whole `GameState`, not a move log — so there is no move count to compare". That is wrong: `GameState` carries a **`log`** and a monotonic **`nextStepId`**, and both are the cleanest measure available of "one action, one effect".
 
-- Buy one share → holdings go up by exactly one, and cash down by exactly one share's price.
-- Place one tile → the board gains exactly that tile, and the step stack advances one step.
-- End one turn → the actor changes once, not twice.
-
-Then read the record back to confirm what persisted matches the board:
+The best probe is the **turn-order draw**, because each draw is one discrete, countable action and the screen states the remaining count out loud:
 
 ```js
-JSON.parse(localStorage.getItem('acquire.local.game')).state
+const s = JSON.parse(localStorage.getItem('acquire.local.game')).state;
+({ log: s.log.length, nextStepId: s.nextStepId, draws: s.turnOrderDraws?.length, stage: s.stage })
 ```
+
+Start a two-player game, then click **Draw your tile** once. Expect `log` 0 → 1, `nextStepId` 1 → 2, `draws` 1, and the screen to move from "2 still to draw" to "1 still to draw". A doubled updater consumes both draws on the first click and shows "0 still to draw".
+
+Then the curtain (**Start**, passing the device) must change **nothing** — it is pure UI. Then the second draw takes `draws` to 2 and `stage` to `play`.
+
+**One result looks like doubling and is not.** The final draw advances `log` by 2, because the turn-order winner is announced as its own step rather than merely arrived at. Expected; do not report it as a defect.
 
 This is the same class of bug Rail Baron's `useGame` documents, in a codebase that has never been checked for it.
 

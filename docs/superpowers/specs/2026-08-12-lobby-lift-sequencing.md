@@ -43,7 +43,11 @@ by-hand pass in step 1's plan is the only thing that actually tests it.
 
 ## The order
 
-### Step 1 — React 19 in Acquire · *plan written*
+### Step 1 — React 19 in Acquire · **done**
+
+**[PR #15](https://github.com/petroleumjelliffe/acquire-startups-m1/pull/15)**, 2026-08-12. Landed on
+19.2.8, the same version Rail Baron runs. 830 tests in 79 files before and after — the same numbers,
+not merely green.
 
 Four dependencies. Nothing to migrate: audited for every React 19 removal
 (`ReactDOM.render`, `findDOMNode`, `react-dom/test-utils`, `defaultProps`, `propTypes`, string
@@ -52,10 +56,32 @@ refs) and there are **zero hits**. `@testing-library/react` is already on `^16.3
 
 Plan: [2026-08-12-react-19-baseline.md](../plans/2026-08-12-react-19-baseline.md).
 
-### Step 2 — StrictMode on · *same plan as step 1*
+### Step 2 — StrictMode on · **done**
 
-Folded into step 1's plan because the upgrade and the switch want one by-hand pass between them,
-not two. Expect it to surface something in `src/net/`; that is the point of doing it.
+Same PR as step 1. **It surfaced nothing** — two clicks produced exactly two turn-order draws, the
+pass-the-device curtain changed no state at all, and one browser and two tabs both showed exactly
+one seat, so the rejoin-by-token path held with two sockets on one seat.
+
+A clean result, but a narrow one: both tabs share a browser profile and therefore one stored
+identity, so a **genuine second player** — and with it refresh-mid-draft and server-restart under
+StrictMode — was not covered and needs a separate profile.
+
+## Tooling every remaining step will hit
+
+Found while executing step 1, and unrelated to it:
+
+- **`npm run preview` cannot serve this project's build.** [vite.config.ts:121](../../../vite.config.ts#L121)
+  sets `base` only for `command === 'build'`, so preview hosts `dist/` at `/` while the built
+  `index.html` asks for `/acquire-startups-m1/…`. Every asset misses and the SPA fallback returns
+  `index.html` **with a 200**, so the page renders blank. Work around it with
+  `npx vite preview --base /acquire-startups-m1/`; **worth fixing properly in step 3**, since every
+  by-hand pass from here needs it.
+- **Verify served assets by byte count, not status code.** The fallback returns 200 with the wrong
+  body — ~2600 bytes instead of ~358000.
+- **The server logs neither connect nor join.** Count seats in the roster instead; it is the thing a
+  double join would corrupt, and it is visible from the client.
+- **Run your own server on a spare port** (`env PORT=3002 GAMES_DIR=… npm run dev:server`, and build
+  with `VITE_SERVER_URL` pointed at it) rather than contending for 3001 with another shell.
 
 ### Step 3 — `src/lobby/ui/` moves out of the lobby
 
