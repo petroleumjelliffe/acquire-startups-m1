@@ -1,4 +1,4 @@
-import { PLAYER_EMOJI } from '../../../engine/startups';
+import { MAX_PLAYERS, PLAYER_EMOJI } from '../../../engine/startups';
 import { SeatRow } from './SeatRow';
 
 /**
@@ -27,7 +27,10 @@ export function PlayerRoster({
   seats,
   onChange,
   minSeats = 2,
-  maxSeats = PLAYER_EMOJI.length,
+  // The rule, not the emoji list's length: emoji are decoration and are
+  // meant to grow into a larger selectable set, which must not quietly
+  // change how many people can sit down.
+  maxSeats = MAX_PLAYERS,
 }: PlayerRosterProps) {
   const canAdd = seats.length < maxSeats;
   const canRemove = seats.length > minSeats;
