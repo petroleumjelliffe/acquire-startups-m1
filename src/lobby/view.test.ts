@@ -1,11 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { lobbyView, type LobbyLimits } from './view';
-import type { LobbyRoomState } from './useLobbyRoom';
+import { lobbyView, type LobbyLimits, type LobbySnapshot } from './view';
 
 const LIMITS: LobbyLimits = { capacity: 4, minPlayers: 2 };
 
-const noop = () => {};
-const base = (over: Partial<LobbyRoomState> = {}): LobbyRoomState => ({
+const base = (over: Partial<LobbySnapshot> = {}): LobbySnapshot => ({
   phase: 'lobby',
   status: 'open',
   roster: {
@@ -17,13 +15,6 @@ const base = (over: Partial<LobbyRoomState> = {}): LobbyRoomState => ({
     ],
   },
   playerId: 'p2',
-  message: null,
-  gone: false,
-  stale: false,
-  join: noop,
-  begin: noop,
-  rename: noop,
-  leaveSeat: noop,
   ...over,
 });
 
@@ -118,8 +109,16 @@ describe('connection and terminal state', () => {
     expect(lobbyView(base(), LIMITS).terminal).toBeNull();
   });
 
-  it('ranks stale above gone, because a stale client cannot trust either answer', () => {
-    expect(lobbyView(base({ gone: true, stale: true }), LIMITS).terminal).toBe('stale');
+  it('reads the terminal state off the phase rather than re-ranking it', () => {
+    // Both useLobbyRoom and useRoom already decide that stale outranks gone.
+    // A third copy of that ordering would be a third place for it to drift.
+    expect(lobbyView(base({ phase: 'stale' }), LIMITS).terminal).toBe('stale');
+    expect(lobbyView(base({ phase: 'gone' }), LIMITS).terminal).toBe('gone');
+  });
+
+  it('treats a phase it does not recognise as not terminal', () => {
+    // Acquire adds 'playing'; a game may add others.
+    expect(lobbyView(base({ phase: 'playing' }), LIMITS).terminal).toBeNull();
   });
 
   it('reports a refusal from the error phase', () => {

@@ -6,6 +6,8 @@ import { StaleClient } from '../game/lobby/StaleClient';
 import { ConnectionStrip } from '../game/lobby/ConnectionStrip';
 import { RoomRefused } from '../game/lobby/RoomRefused';
 import { seatEmoji } from '../game/online/seatEmoji';
+import { lobbyView } from '../lobby/view';
+import { MAX_PLAYERS, MIN_PLAYERS } from '../../engine/startups';
 import { useRoom } from '../net/useRoom';
 import { forceUpdateAndReload } from '../pwa/update';
 import { useDevSeat } from '../net/devSeat';
@@ -103,15 +105,15 @@ export function RoomPage({ connect = getConnection }: RoomPageProps) {
   }
 
   if (room.phase === 'lobby' && room.roster) {
-    const me = room.roster.players.find((p) => p.id === room.playerId);
+    // Seats, who you are and whether you may begin come from the view now.
+    // This page used to find itself in the roster and read isHost off the
+    // result, which every other consumer would have had to repeat.
+    const view = lobbyView(room, { capacity: MAX_PLAYERS, minPlayers: MIN_PLAYERS });
     return (
       <>
         <ConnectionStrip status={room.status} />
         <RoomLobby
-          roomId={room.roster.roomId}
-          players={room.roster.players}
-          myPlayerId={room.playerId}
-          isHost={me?.isHost === true}
+          view={view}
           note={room.message}
           onStart={room.begin}
           onRename={room.rename}

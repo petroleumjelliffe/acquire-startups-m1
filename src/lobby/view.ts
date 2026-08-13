@@ -1,4 +1,24 @@
-import type { LobbyRoomState } from './useLobbyRoom';
+import type { RosterMessage } from '../../lobby/protocol';
+import type { ConnectionStatus } from './connection';
+
+/**
+ * The minimum this view reads — deliberately structural rather than
+ * `LobbyRoomState`, so a game's own wrapper satisfies it too. Acquire's
+ * `useRoom` reshapes the hook's state (it adds a `playing` phase and drops
+ * the `gone`/`stale` booleans into the phase), and requiring the hook's exact
+ * return type would have shut it out of the thing built for it.
+ */
+export interface LobbySnapshot {
+  /**
+   * Any phase name. This view recognises `gone`, `stale` and `error`; a game
+   * may have more — Acquire adds `playing` — and anything unrecognised is
+   * simply not terminal.
+   */
+  phase: string;
+  status: ConnectionStatus;
+  roster: RosterMessage | null;
+  playerId: string | null;
+}
 
 export interface LobbySeat {
   /** Server-assigned id, or null when nobody is sitting here. */
@@ -58,7 +78,7 @@ const emptySeat = (index: number): LobbySeat => ({
  * Pure, and deliberately so. This is the half both games share, and neither
  * game's screens can be tested through the other's.
  */
-export function lobbyView(state: LobbyRoomState, limits: LobbyLimits): LobbyView {
+export function lobbyView(state: LobbySnapshot, limits: LobbyLimits): LobbyView {
   const players = state.roster?.players ?? [];
   const lifecycle = state.roster?.lifecycle ?? 'lobby';
 
@@ -98,14 +118,17 @@ export function lobbyView(state: LobbyRoomState, limits: LobbyLimits): LobbyView
     beginBlocked,
     connection:
       state.status === 'open' ? 'live' : state.status === 'closed' ? 'dropped' : 'connecting',
-    // Stale outranks gone: a client on the wrong protocol cannot trust either
-    // answer it was given, so "your client is old" is the honest one.
-    terminal: state.stale
-      ? 'stale'
-      : state.gone
-        ? 'gone'
-        : state.phase === 'error'
-          ? 'refused'
-          : null,
+    // Read off the phase rather than re-ranked here. Both `useLobbyRoom` and
+    // `useRoom` already decide that stale outranks gone — a client on the
+    // wrong protocol cannot trust either answer it was given — and a third
+    // copy of that ordering is a third place for it to drift.
+    terminal:
+      state.phase === 'stale'
+        ? 'stale'
+        : state.phase === 'gone'
+          ? 'gone'
+          : state.phase === 'error'
+            ? 'refused'
+            : null,
   };
 }
