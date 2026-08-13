@@ -14,7 +14,7 @@ function walk(dir: string, root = dir): string[] {
   });
 }
 
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, isPreview }) => ({
   plugins: [
     react(),
     // Substitutes the PWA placeholders in index.html.
@@ -118,7 +118,16 @@ export default defineConfig(({ command }) => ({
     },
   ],
   server: { port: 5173 },
-  base: command === 'build' ? BASE_PATH : "/",
+  // `isPreview` matters as much as `command` here. Preview runs as `serve`,
+  // so without it preview hosted `dist/` at "/" while the built index.html
+  // asked for `${BASE_PATH}/assets/…`. Every asset missed and the SPA
+  // fallback answered with index.html and a **200**, so the page rendered
+  // blank and a status-code check read as success. Dev still wants "/".
+  //
+  // Note this stays derived from BASE_PATH rather than repeating the path in
+  // the preview script — the whole point of basePath.ts is that there is one
+  // copy, and it has already been three.
+  base: command === 'build' || isPreview ? BASE_PATH : "/",
   test: {
     globals: true,
     environment: 'jsdom',

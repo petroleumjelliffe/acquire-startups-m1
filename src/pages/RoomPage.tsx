@@ -1,10 +1,10 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { GameScreen } from '../game/GameScreen';
-import { RoomLobby } from '../lobby/ui/RoomLobby';
-import { RoomGone } from '../lobby/ui/RoomGone';
-import { StaleClient } from '../lobby/ui/StaleClient';
-import { ConnectionStrip } from '../lobby/ui/ConnectionStrip';
-import { RoomRefused } from '../lobby/ui/RoomRefused';
+import { RoomLobby } from '../game/lobby/RoomLobby';
+import { RoomGone } from '../game/lobby/RoomGone';
+import { StaleClient } from '../game/lobby/StaleClient';
+import { ConnectionStrip } from '../game/lobby/ConnectionStrip';
+import { RoomRefused } from '../game/lobby/RoomRefused';
 import { seatEmoji } from '../game/online/seatEmoji';
 import { useRoom } from '../net/useRoom';
 import { forceUpdateAndReload } from '../pwa/update';
