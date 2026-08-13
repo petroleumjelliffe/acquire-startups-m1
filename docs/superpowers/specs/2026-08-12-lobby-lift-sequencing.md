@@ -131,7 +131,39 @@ fifth — which seats are empty — because the roster sends only occupied ones.
 **Needs its own plan.** Pure, testable without either game's UI, and the thing that makes Rail
 Baron's boards `1d`/`1e`/`1f` buildable.
 
-### Step 6 — Reorganise into one prefix
+### Step 6 — ~~Reorganise into one prefix~~ · **deleted 2026-08-13**
+
+**The premise was false, and testing it is what showed that.** This step existed so
+`git subtree split` would have a single prefix to work from. But subtree split carries a prefix's
+history only from the moment that prefix *began existing* — it does not follow content across a
+rename into it.
+
+Measured, not assumed: `git subtree split -P src/lobby` on `main` produced **9 commits**, reaching
+back only to `596dc22`, which created `src/lobby/`. The earlier work in `lobby/` and
+`server/lobby/` — the wire split, the generic registry, the handlers behind `onBegin`/`onSeated` —
+was not in it.
+
+So reorganising into `packages/lobby/` and then splitting that prefix would have yielded **one
+commit: the reorg.** The step would have destroyed exactly the history it existed to preserve.
+
+**`git filter-repo` replaces it** (owner ruling, 2026-08-13). It handles multiple paths *and* the
+renaming in one pass, so no reorg PR is needed in Acquire at all:
+
+```bash
+# against a CLONE — filter-repo rewrites history irreversibly
+git filter-repo \
+  --path lobby --path server/lobby --path src/lobby \
+  --path-rename lobby:protocol \
+  --path-rename server/lobby:server \
+  --path-rename src/lobby:client
+```
+
+All 15 commits, the right layout, one command.
+
+<details>
+<summary>The original step 6, kept because the reasoning is still instructive</summary>
+
+#### Reorganise into one prefix
 
 `git subtree split` operates on a single prefix, and the lobby is three directories. To carry
 the 12 commits of history out, they first become:
@@ -144,13 +176,21 @@ Imports, the boundary test's roots, and the vitest project globs move with them.
 and copy files into a fresh repo instead if the history is judged not worth the churn — that is
 a real option, not a failure.
 
-**Needs its own plan**, mostly mechanical.
+</details>
 
-### Step 7 — Split and wire as a submodule
+### Step 7 — Extract and wire as a submodule
 
 ```bash
-git subtree split -P packages/lobby -b lobby-only
-git submodule add https://github.com/petroleumjelliffe/lobby vendor/lobby
+# in a throwaway clone, never the working repo
+git clone https://github.com/petroleumjelliffe/acquire-startups-m1 lobby-extract
+cd lobby-extract && git filter-repo \
+  --path lobby --path server/lobby --path src/lobby \
+  --path-rename lobby:protocol \
+  --path-rename server/lobby:server \
+  --path-rename src/lobby:client
+
+# then, in each consumer
+git submodule add https://github.com/petroleumjelliffe/<name> vendor/lobby
 ```
 
 Per consumer: add `vendor/lobby` to `tsconfig.include`, point the vitest project globs at it,
