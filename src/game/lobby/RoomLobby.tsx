@@ -3,17 +3,18 @@
 // already in the room it names, and the list holds everybody. Its Join Room
 // twin is `JoinRoomCard`; both are drawn by `LobbyCard`.
 
-import type { RosterMessage } from '../../../lobby/protocol';
+import type { LobbyView } from '../../lobby/view';
 import { LobbyCard, SeatRow } from './LobbyCard';
 import { ShareRoomButton } from './ShareRoomButton';
 
 export interface RoomLobbyProps {
-  roomId: string;
-  players: RosterMessage['players'];
-  /** Whose row gets the name field. The design gives it to nobody else. */
-  myPlayerId: string | null;
-  /** Only the host may start, which is the server's rule too. */
-  isHost: boolean;
+  /**
+   * Seats, who you are, and whether you may begin — already worked out.
+   * This component used to be handed the raw roster and re-derive all three,
+   * and could not render an empty seat at all, because the roster has no way
+   * to mention one.
+   */
+  view: LobbyView;
   /** A refusal that arrived while sitting here — shown, not navigated away from. */
   note?: string | null;
   onStart: () => void;
@@ -38,16 +39,15 @@ export interface RoomLobbyProps {
 }
 
 export function RoomLobby({
-  roomId, players, myPlayerId, isHost, note, onStart, onRename, onLeaveSeat, seatEmoji,
-  shareUrl, shareText,
+  view, note, onStart, onRename, onLeaveSeat, seatEmoji, shareUrl, shareText,
 }: RoomLobbyProps) {
-  const enough = players.length >= 2;
+  const isHost = view.you?.isHost === true;
 
   return (
     <LobbyCard
       title="New Room"
       subtitle="Share this code with other players"
-      code={roomId}
+      code={view.code}
       underCode={shareUrl !== undefined && (
         <ShareRoomButton url={shareUrl} {...(shareText === undefined ? {} : { text: shareText })} />
       )}
@@ -57,18 +57,24 @@ export function RoomLobby({
         <button
           type="button"
           onClick={onStart}
-          disabled={!enough}
+          disabled={!view.canBegin}
           className="m-0 w-full rounded-lg bg-[var(--lobby-accent,#2563eb)] px-4 py-3 font-semibold text-[var(--lobby-on-accent,#ffffff)] hover:bg-[var(--lobby-accent-strong,#1d4ed8)] disabled:cursor-not-allowed disabled:bg-gray-300"
         >
-          {enough ? 'Start game' : 'Waiting for another player'}
+          {view.beginBlocked === 'notEnoughPlayers' ? 'Waiting for another player' : 'Start game'}
         </button>
       ) : (
         <p className="text-center text-sm text-gray-600">Waiting for the host to start.</p>
       )}
     >
-      {players.map((p, seat) => (
-        <SeatRow key={p.id} emoji={seatEmoji(seat)} connected={p.connected} isHost={p.isHost}>
-          {p.id === myPlayerId ? (
+      {view.seats.map((seat) => (
+        <SeatRow
+          key={seat.index}
+          emoji={seatEmoji(seat.index)}
+          connected={seat.connected}
+          isHost={seat.isHost}
+          empty={seat.id === null}
+        >
+          {seat.canRename ? (
             // Your row and only yours: the field. Committed on blur or Enter
             // rather than per keystroke, so the room is not broadcast every
             // letter of a half-typed name.
@@ -78,10 +84,10 @@ export function RoomLobby({
             // your seat, and on the host's row a × read as "boot yourself".
             <input
               aria-label="Your name"
-              defaultValue={p.name}
+              defaultValue={seat.name ?? ''}
               onBlur={(e) => {
                 const next = e.target.value.trim();
-                if (next !== '' && next !== p.name) onRename(next);
+                if (next !== '' && next !== seat.name) onRename(next);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
@@ -89,7 +95,17 @@ export function RoomLobby({
               className="min-w-0 flex-1 rounded border border-gray-300 px-2 py-1 font-semibold"
             />
           ) : (
-            <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
+            // An empty seat says so rather than being absent — the room's
+            // size is information, and the roster could never carry it.
+            <span
+              className={
+                seat.id === null
+                  ? 'min-w-0 flex-1 truncate italic text-gray-400'
+                  : 'min-w-0 flex-1 truncate font-semibold'
+              }
+            >
+              {seat.name ?? 'Empty seat'}
+            </span>
           )}
         </SeatRow>
       ))}

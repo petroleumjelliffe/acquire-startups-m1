@@ -31,6 +31,11 @@ export interface SeatRowProps {
    */
   connected: boolean | null;
   isHost: boolean;
+  /**
+   * A seat nobody is in. Drawn dimmed rather than omitted: how many seats a
+   * room has is information, and the roster has no way to mention one.
+   */
+  empty?: boolean;
   /** The name: a plain span in the room, an input on your own row. */
   children: ReactNode;
 }
@@ -38,11 +43,16 @@ export interface SeatRowProps {
 /** One row's chrome. The name itself is the caller's, because the room's field
  *  is uncontrolled (committed on blur) and the join card's is controlled (read
  *  at submit) — one shared input would have to be both. */
-export function SeatRow({ emoji, connected, isHost, children }: SeatRowProps) {
+export function SeatRow({ emoji, connected, isHost, empty = false, children }: SeatRowProps) {
   return (
-    <li className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
+    <li
+      data-empty={empty ? '' : undefined}
+      className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+        empty ? 'border-dashed border-gray-200 opacity-60' : 'border-gray-200'
+      }`}
+    >
       <span aria-hidden className="flex-none text-base leading-none">{emoji ?? '·'}</span>
-      {connected !== null && (
+      {!empty && connected !== null && (
         <span
           data-testid="presence-dot"
           aria-hidden
