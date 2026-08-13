@@ -3,6 +3,19 @@ import { createGameRoom, type GameRoom, type RoomPlayer } from './room.js';
 import { createNullStore, SAVE_VERSION, type RoomStore, type SavedRoom } from './store.js';
 import { PROTOCOL_VERSION } from '../session/protocol.js';
 import { createLobbyRegistry, seatPlayer, type SeatHolder } from './lobby/rooms.js';
+import { MAX_PLAYERS } from '../engine/startups.js';
+
+/**
+ * `p1`…`p6`, and the strings matter: `store.ts` persists rosters and
+ * `restore()` seats them at boot, so changing them would orphan every saved
+ * room. This change was to *how* a seat is chosen, never to what it is called.
+ *
+ * Sized by the game's own rule rather than by `PLAYER_EMOJI.length` — the
+ * emoji are decoration and are meant to grow.
+ */
+const ACQUIRE_SEATS = {
+  ids: Array.from({ length: MAX_PLAYERS }, (_, i) => `p${i + 1}`),
+};
 
 export interface Seat {
   room: GameRoom;
@@ -46,7 +59,10 @@ export interface RoomRegistry {
 export const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRegistry {
-  const lobby = createLobbyRegistry<GameRoom>((id, players) => createGameRoom(id, players));
+  const lobby = createLobbyRegistry<GameRoom>(
+    (id, players) => createGameRoom(id, players),
+    ACQUIRE_SEATS,
+  );
   let restored = false;
 
   return {
@@ -57,7 +73,18 @@ export function createRoomRegistry(store: RoomStore = createNullStore()): RoomRe
     get: (roomId) => lobby.get(roomId),
 
     fromState(roomId, names, state) {
-      const players = names.map((name, i) => seatPlayer(i, name));
+      // Seated cumulatively, because each seat is chosen against the ones
+      // already taken rather than from an index.
+      const players: SeatHolder[] = [];
+      for (const name of names) {
+        const seated = seatPlayer(ACQUIRE_SEATS, players, name);
+        if (!seated) {
+          throw new Error(
+            `dev seed asked for ${names.length} seats; the space holds ${ACQUIRE_SEATS.ids.length}`,
+          );
+        }
+        players.push(seated);
+      }
       const room = createGameRoom(roomId, players, state);
       lobby.adopt(room);
       return room;

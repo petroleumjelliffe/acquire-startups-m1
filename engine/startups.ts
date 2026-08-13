@@ -18,6 +18,14 @@ export const HAND_SIZE = 6;
 /** Absorbed shares handed in per survivor share gained in a merger trade. */
 export const TRADE_RATIO = 2;
 export const SIZE_THRESHOLDS: readonly number[] = [2, 3, 4, 5, 6, 11, 21, 31, 41];
+/**
+ * Acquire seats 2–6. A game rule, so it lives with the rules — and
+ * deliberately *not* `PLAYER_EMOJI.length`, which is a decoration list meant
+ * to grow into a larger selectable set. Deriving the cap from it would mean
+ * adding an emoji silently changed how many people can play.
+ */
+export const MAX_PLAYERS = 6;
+/** Decoration, not identity, and not a capacity. Assigned by seat index. */
 export const PLAYER_EMOJI: readonly string[] = ['🦊', '🐢', '🦁', '🐙', '🦉', '🐝'];
 
 export interface StartupConfig { id: StartupId; tier: 0 | 1 | 2; ticker: string }
