@@ -9,7 +9,7 @@ import {
   type JoinedMessage,
   type RejectedMessage,
   type RosterMessage,
-} from '../../lobby/protocol';
+} from '../../vendor/lobby/protocol/protocol';
 import { buildFixture } from '../../engine/golden/fixtures';
 import { loadIdentity } from '../net/identity';
 import { useRoom, type RoomPhase } from '../net/useRoom';

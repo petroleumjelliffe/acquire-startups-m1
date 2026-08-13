@@ -155,7 +155,12 @@ export default defineConfig(({ command, isPreview }) => ({
             'engine/**/*.test.ts',
             'session/**/*.test.ts',
             'server/**/*.test.ts',
-            'lobby/**/*.test.ts',
+            // The shared lobby, as a submodule. Its protocol and server
+            // halves are node-side; its client half is jsdom and belongs to
+            // the `app` project below. A consumer that does not run these
+            // will not notice when a submodule bump breaks it.
+            'vendor/lobby/protocol/**/*.test.ts',
+            'vendor/lobby/server/**/*.test.ts',
           ],
           environment: 'node',
           globals: true,
@@ -166,7 +171,7 @@ export default defineConfig(({ command, isPreview }) => ({
         extends: true,
         test: {
           name: 'app',
-          include: ['src/**/*.test.{ts,tsx}'],
+          include: ['src/**/*.test.{ts,tsx}', 'vendor/lobby/client/**/*.test.{ts,tsx}'],
           environment: 'jsdom',
           globals: true,
           setupFiles: './src/test/setup.ts',

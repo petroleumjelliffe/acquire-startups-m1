@@ -18,7 +18,7 @@ import {
   LOBBY_SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
-} from '../lobby/protocol.js';
+} from '../vendor/lobby/protocol/protocol.js';
 
 export interface TestServer {
   port: number;
