@@ -1,8 +1,8 @@
 import { PROTOCOL_VERSION } from '../../session/protocol';
-import { createLobbyConnection, type LobbyConnection } from '../lobby/connection';
+import { createLobbyConnection, type LobbyConnection } from '../../vendor/lobby/client/connection';
 import { createSocketTransport, type RoomTransport } from './transport';
 
-export type { ConnectionStatus } from '../lobby/connection';
+export type { ConnectionStatus } from '../../vendor/lobby/client/connection';
 
 /**
  * Where the server is.

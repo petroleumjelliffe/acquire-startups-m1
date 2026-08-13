@@ -10,7 +10,7 @@ import {
   LOBBY_SERVER_EVENTS,
   type JoinedMessage,
   type RejectedMessage,
-} from '../lobby/protocol.js';
+} from '../vendor/lobby/protocol/protocol.js';
 
 let server: TestServer;
 

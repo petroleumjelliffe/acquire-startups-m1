@@ -1,5 +1,5 @@
-import { createIdentityStore } from '../lobby/identity';
-export type { RoomIdentity } from '../lobby/identity';
+import { createIdentityStore } from '../../vendor/lobby/client/identity';
+export type { RoomIdentity } from '../../vendor/lobby/client/identity';
 
 /** This game's identity store. The appId is the localStorage namespace —
  * changing it logs every player out of every room. */

@@ -6,7 +6,7 @@ import {
   type UndoMessage,
   type WireIntent,
 } from '../../session/protocol';
-import { LOBBY_SERVER_EVENTS, type RejectedMessage } from '../../lobby/protocol';
+import { LOBBY_SERVER_EVENTS, type RejectedMessage } from '../../vendor/lobby/protocol/protocol';
 
 /**
  * Everything a session may do to the network, and nothing else.
