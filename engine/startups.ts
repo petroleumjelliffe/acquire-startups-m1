@@ -25,6 +25,8 @@ export const SIZE_THRESHOLDS: readonly number[] = [2, 3, 4, 5, 6, 11, 21, 31, 41
  * adding an emoji silently changed how many people can play.
  */
 export const MAX_PLAYERS = 6;
+/** Acquire needs two to start. The other half of the 2–6 range. */
+export const MIN_PLAYERS = 2;
 /** Decoration, not identity, and not a capacity. Assigned by seat index. */
 export const PLAYER_EMOJI: readonly string[] = ['🦊', '🐢', '🦁', '🐙', '🦉', '🐝'];
 
