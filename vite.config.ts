@@ -117,7 +117,11 @@ export default defineConfig(({ command, isPreview }) => ({
       },
     },
   ],
-  server: { port: 5173 },
+  // 7932 is Acquire's dev-client slot in the cross-game port registry (the
+  // game-host repo's PORTS.md); strictPort fails loudly rather than sliding
+  // into a neighbour's slot. allowedHosts covers the host machine's mDNS
+  // name, which Vite's DNS-rebind guard would otherwise refuse.
+  server: { port: 7932, strictPort: true, allowedHosts: ['.local'] },
   // `isPreview` matters as much as `command` here. Preview runs as `serve`,
   // so without it preview hosted `dist/` at "/" while the built index.html
   // asked for `${BASE_PATH}/assets/…`. Every asset missed and the SPA

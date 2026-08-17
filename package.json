@@ -13,6 +13,7 @@
     "verify:layout": "node scripts/verify-layout.mjs",
     "build:server": "test -f vendor/lobby/protocol/protocol.ts || { echo 'ERROR: vendor/lobby is empty. The server imports it at runtime, and tsx compiles nothing at build time — so without this check the build goes green and the process dies at boot with ERR_MODULE_NOT_FOUND. Clone with --recurse-submodules, or run: git submodule update --init --recursive'; exit 1; }",
     "start:server": "tsx server/index.ts",
+    "serve": "npm run build && tsx server/index.ts",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
     "test": "vitest",

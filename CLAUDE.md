@@ -170,7 +170,7 @@ before starting work.
 
 ```bash
 npm run dev            # Vite dev server (5173). Pass-and-play, /catalog and /scenarios only
-npm run dev:server     # Socket.io server (3001). Needed for anything under /online or /room
+npm run dev:server     # Socket.io server (4002). Needed for anything under /online or /room
 npm run dev:all        # both, concurrently — what an online by-hand pass needs
 npx vitest run         # full suite
 npx vitest run server/recovery.test.ts        # one file
@@ -282,8 +282,8 @@ Client on GitHub Pages under the base path `/acquire-startups-m1` — **one copy
 it, the router derives its basename from Vite's `BASE_URL`, and the manifest generator reads it
 too); server on Render, service `srv-d3klnhnfte5s73diht90`, **plan `starter`** (paid) —
 *not* free, whatever older notes say. `VITE_SERVER_URL` points the client at a server, defaulting
-to `http://<current hostname>:3001` in dev — the hostname, not `localhost`, so a phone on the LAN
-works. The server reads `PORT` (3001) and writes rooms to `server/games/`, gitignored.
+to `http://<current hostname>:4002` in dev — the hostname, not `localhost`, so a phone on the LAN
+works. The server reads `PORT` (4002; Acquire's slot in the game-host repo's PORTS.md) and writes rooms to `server/games/`, gitignored.
 
 **Rooms are durable as of 2026-08-08, and the gone-room ending is no longer the normal case.** A
 1 GB disk (`dsk-d9rafvlbedkc73coe2k0`) is mounted at **`/var/data`**, and `GAMES_DIR` — set on the

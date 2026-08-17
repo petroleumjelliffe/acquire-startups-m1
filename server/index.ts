@@ -4,9 +4,12 @@
 
 import express from 'express';
 import cors from 'cors';
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createServer as createHttpServer, type Server as HttpServer } from 'node:http';
 import { Server as SocketServer } from 'socket.io';
+import { BASE_PATH } from '../basePath.js';
 import { project } from './projection.js';
 import { createRoomRegistry, type RoomRegistry } from './rooms.js';
 import { createFileStore, createNullStore, SAVE_VERSION, type RoomStore } from './store.js';
@@ -35,7 +38,13 @@ export interface ServerHandle {
 export interface ServerOptions {
   /** Defaults to the null store, so every test that boots a bare server keeps working. */
   store?: RoomStore;
+  /** Where the built client lives. Tests point this at a fake; production
+   *  resolves it from this module's location, never the cwd — a service's
+   *  working directory is wherever its plist says. */
+  distDir?: string;
 }
+
+const DEFAULT_DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
 
 export function createServer(options: ServerOptions = {}): ServerHandle {
   const app = express();
@@ -53,6 +62,25 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
   app.get('/health', (_req, res) => {
     res.json({ ok: true, protocolVersion: PROTOCOL_VERSION, saveVersion: SAVE_VERSION });
   });
+
+  // The built client, served under its base path so one process can be the
+  // whole game on a LAN (the game-host repo's front door points here). No
+  // build present is the ordinary dev case — Vite serves the client then —
+  // so it's a boot note, not an error. Render is unaffected: its build may
+  // not produce a dist at all, and the client there comes from Pages.
+  const dist = options.distDir ?? DEFAULT_DIST;
+  if (existsSync(join(dist, 'index.html'))) {
+    app.use(BASE_PATH, express.static(dist));
+    // SPA fallback: a refresh on a client-side route under the base path is
+    // a route, not a file — hand it back to the router.
+    app.use(BASE_PATH, (req, res, next) => {
+      if (req.method !== 'GET') { next(); return; }
+      res.sendFile(join(dist, 'index.html'));
+    });
+    console.log(`Serving built client at ${BASE_PATH}/ from ${dist}`);
+  } else {
+    console.log(`No built client (${join(dist, 'index.html')} missing) — ${BASE_PATH}/ not served. Run \`npm run build\` to host the client from this server.`);
+  }
 
   const httpServer = createHttpServer(app);
   const io = new SocketServer(httpServer, { cors: { origin: '*' } });
@@ -239,8 +267,23 @@ export function gamesDir(env: NodeJS.ProcessEnv = process.env): string {
 // Started only when run directly, so tests can boot their own on port 0.
 if (process.argv[1]?.endsWith('index.ts')) {
   const store = createFileStore(gamesDir());
-  const { httpServer, rooms } = createServer({ store });
-  const port = Number(process.env.PORT ?? 3001);
+  const { httpServer, io, rooms } = createServer({ store });
+  // 4002 is Acquire's slot in the cross-game port registry (the game-host
+  // repo's PORTS.md). Render injects PORT, so this default is local-only.
+  // Must agree with src/net/connection.ts's DEV_SERVER_PORT.
+  const port = Number(process.env.PORT ?? 4002);
+
+  // launchd/`brew services stop` speak SIGTERM, Ctrl-C speaks SIGINT.
+  // Persists are awaited inside handlers, so closing the sockets and the
+  // listener is enough for an orderly exit; a second signal skips the wait.
+  let closing = false;
+  const stop = (): void => {
+    if (closing) process.exit(1);
+    closing = true;
+    io.close(() => { process.exit(0); });
+  };
+  process.on('SIGTERM', stop);
+  process.on('SIGINT', stop);
 
   // Before `listen`, not after: a client that connects into a half-restored
   // registry would be told its room does not exist and would clear the very

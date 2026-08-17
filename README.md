@@ -38,7 +38,7 @@ Already cloned without it (the server crashes with `ERR_MODULE_NOT_FOUND` on `ve
 ```bash
 git submodule update --init --recursive
 ```
-Then `npm install` and `npm run dev:all` (client on 5173, server on 3001).
+Then `npm install` and `npm run dev:all` (client on 7932, server on 4002 — slots from the game-host repo's PORTS.md).
 
 # How it was built
 * This was largely vibe coded with Claude.ai, in React Typescript

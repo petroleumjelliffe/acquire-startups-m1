@@ -17,10 +17,12 @@ export type { ConnectionStatus } from '../../vendor/lobby/client/connection';
  * never reveals it.
  *
  * The port stays fixed: the dev server is `tsx watch server/index.ts`, which
- * listens on 3001 unless `PORT` says otherwise, and that env var belongs to
- * the server process rather than to this bundle.
+ * listens on 4002 unless `PORT` says otherwise, and that env var belongs to
+ * the server process rather than to this bundle. 4002 is Acquire's slot in
+ * the cross-game port registry (the game-host repo's PORTS.md); it must
+ * agree with server/index.ts's default.
  */
-const DEV_SERVER_PORT = 3001;
+const DEV_SERVER_PORT = 4002;
 // `window` is read at module scope here, which throws on import in an
 // environment with no `window` — a node test, most concretely. Safe today:
 // every importer of this module lives under `src/**`, which vitest always
