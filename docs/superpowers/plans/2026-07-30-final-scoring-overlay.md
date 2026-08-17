@@ -78,7 +78,7 @@ appended line).
 const fs = require('fs');
 const assert = require('assert');
 
-const SRC = '/Users/petroleumjelliffe/Developer/personal/acquire-startups-m1/prototype/components.js';
+const SRC = require('path').join(__dirname, '../../../prototype/components.js');
 const src = fs.readFileSync(SRC, 'utf8') + '\n;module.exports = { finalScoring, scoreColumns };';
 const mod = { exports: {} };
 new Function('module', 'exports', src)(mod, mod.exports);

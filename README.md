@@ -29,6 +29,17 @@ Largely the same as the board game
 # Play Now
 [Start New Game](https://petroleumjelliffe.github.io/acquire-startups-m1/)
 
+# Local development
+The lobby lives in a git submodule (`vendor/lobby`), so clone with it:
+```bash
+git clone --recurse-submodules https://github.com/petroleumjelliffe/acquire-startups-m1.git
+```
+Already cloned without it (the server crashes with `ERR_MODULE_NOT_FOUND` on `vendor/lobby/...`)? Run:
+```bash
+git submodule update --init --recursive
+```
+Then `npm install` and `npm run dev:all` (client on 5173, server on 3001).
+
 # How it was built
 * This was largely vibe coded with Claude.ai, in React Typescript
 * Server is hosted on Render.com
