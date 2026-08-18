@@ -93,9 +93,10 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
 
   const httpServer = createHttpServer(app);
   // Mounted under the base path so sockets ride the same front-door route as
-  // pages and assets. Render overrides with SOCKET_PATH=/socket.io: its Pages
-  // client keeps socket.io's default path (see src/net/connection.ts), and dev
-  // uses the same knob (see the dev:server script).
+  // pages and assets. Overridden via the boot block's SOCKET_PATH (the
+  // options seam): Render sets /socket.io because its Pages client keeps
+  // socket.io's default path (see src/net/connection.ts), and dev uses the
+  // same knob (see the dev:server script).
   const io = new SocketServer(httpServer, {
     cors: { origin: '*' },
     path: options.socketPath ?? `${BASE_PATH}/socket.io`,
