@@ -10,8 +10,9 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
-import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
+import { startTestServer, settleSocket, SOCKET_PATH, type TestServer } from './socketHarness.js';
 import { SAVE_VERSION } from './store.js';
+import { BASE_PATH } from '../basePath.js';
 import { PROTOCOL_VERSION } from '../session/protocol.js';
 import {
   LOBBY_CLIENT_EVENTS,
@@ -34,7 +35,10 @@ interface Bare {
 
 /** A connected socket that has not joined anything — what a stale client is. */
 async function bareSocket(): Promise<Bare> {
-  const socket = connect(`http://localhost:${server.port}`, { transports: ['websocket'] });
+  const socket = connect(`http://localhost:${server.port}`, {
+    transports: ['websocket'],
+    path: SOCKET_PATH,
+  });
   const rejections: RejectedMessage[] = [];
   const joins: JoinedMessage[] = [];
 
@@ -139,6 +143,17 @@ describe('/health says what this server speaks', () => {
     // exact case you are debugging — can still ask what the server speaks.
     const res = await fetch(`http://localhost:${server.port}/health`);
     expect((await res.json()).protocolVersion).toBe(PROTOCOL_VERSION);
+  });
+
+  it('answers the same under the base path — the route the front door forwards', async () => {
+    // Behind the game-host proxy every request arrives prefixed, so a bare
+    // `/health` is unreachable from outside; the twin under BASE_PATH is what
+    // an operator's curl through port 80 actually hits.
+    const bare = await fetch(`http://localhost:${server.port}/health`);
+    const prefixed = await fetch(`http://localhost:${server.port}${BASE_PATH}/health`);
+
+    expect(prefixed.status).toBe(200);
+    expect(await prefixed.json()).toEqual(await bare.json());
   });
 });
 

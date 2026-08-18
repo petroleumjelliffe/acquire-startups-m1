@@ -8,7 +8,7 @@ import {
   type RejectedMessage,
   type RosterMessage,
 } from '../vendor/lobby/protocol/protocol.js';
-import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
+import { startTestServer, settleSocket, SOCKET_PATH, type TestServer } from './socketHarness.js';
 
 let server: TestServer;
 
@@ -21,7 +21,10 @@ afterAll(async () => { await server.close(); });
  * file is *not* about.
  */
 async function raw(port: number): Promise<Socket> {
-  const socket = connect(`http://localhost:${port}`, { transports: ['websocket'] });
+  const socket = connect(`http://localhost:${port}`, {
+    transports: ['websocket'],
+    path: SOCKET_PATH,
+  });
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('never connected')), 4000);
     socket.on('connect', () => { clearTimeout(timer); resolve(); });

@@ -15,7 +15,7 @@ import { io as connect } from 'socket.io-client';
 import { createServer } from './index.js';
 import { createFileStore } from './store.js';
 import { buildFixture } from '../engine/golden/fixtures.js';
-import { connectPlayer, settleSocket } from './socketHarness.js';
+import { connectPlayer, settleSocket, SOCKET_PATH } from './socketHarness.js';
 import { PROTOCOL_VERSION } from '../session/protocol.js';
 import { LOBBY_CLIENT_EVENTS, LOBBY_SERVER_EVENTS, type RejectedMessage } from '../vendor/lobby/protocol/protocol.js';
 
@@ -152,7 +152,10 @@ describe('a server restarted with a game in progress', () => {
     const second = await boot();
     expect(await second.rooms.restore()).toBe(0);
 
-    const socket = connect(`http://localhost:${second.port}`, { transports: ['websocket'] });
+    const socket = connect(`http://localhost:${second.port}`, {
+      transports: ['websocket'],
+      path: SOCKET_PATH,
+    });
     const rejections: RejectedMessage[] = [];
     socket.on(LOBBY_SERVER_EVENTS.rejected, (m: RejectedMessage) => rejections.push(m));
     await new Promise<void>((r) => socket.on('connect', () => r()));

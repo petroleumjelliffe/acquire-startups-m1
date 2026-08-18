@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as ioConnect, type Socket } from 'socket.io-client';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import type { Coord, Row } from '../engine/gameHelpers.js';
-import { startTestServer, connectPlayer, settleSocket, type TestServer } from './socketHarness.js';
+import { startTestServer, connectPlayer, settleSocket, SOCKET_PATH, type TestServer } from './socketHarness.js';
 import { project } from './projection.js';
 import { GAME_CLIENT_EVENTS, PROTOCOL_VERSION } from '../session/protocol.js';
 import {
@@ -135,7 +135,10 @@ function buyStage(roomId: string) {
 
 /** A bare socket, connected but bound to nothing. */
 async function bareSocket(): Promise<Socket> {
-  const socket = ioConnect(`http://localhost:${server.port}`, { transports: ['websocket'] });
+  const socket = ioConnect(`http://localhost:${server.port}`, {
+    transports: ['websocket'],
+    path: SOCKET_PATH,
+  });
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('never connected')), 4000);
     socket.on('connect', () => { clearTimeout(timer); resolve(); });

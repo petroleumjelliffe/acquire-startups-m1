@@ -2,7 +2,7 @@
 // Transport only. The room decides what happened; this file decides who hears
 // about it, and is the single place `project` is ever called.
 
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -42,6 +42,11 @@ export interface ServerOptions {
    *  resolves it from this module's location, never the cwd — a service's
    *  working directory is wherever its plist says. */
   distDir?: string;
+  /** Where socket.io mounts. Absent means the prefixed default below, which
+   *  is what pins the test harness by construction — no ambient env can move
+   *  a test server's mount. The env read (SOCKET_PATH) lives in the boot
+   *  block, same as PORT and GAMES_DIR. */
+  socketPath?: string;
 }
 
 const DEFAULT_DIST = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist');
@@ -59,9 +64,13 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
    * deployed" one curl rather than a trip to the hosting dashboard, which is
    * what it took on 2026-08-07.
    */
-  app.get('/health', (_req, res) => {
+  const health = (_req: Request, res: Response): void => {
     res.json({ ok: true, protocolVersion: PROTOCOL_VERSION, saveVersion: SAVE_VERSION });
-  });
+  };
+  app.get('/health', health);
+  // Twinned under the base path because that is the only route the game-host
+  // front door forwards — a bare `/health` is unreachable through the proxy.
+  app.get(`${BASE_PATH}/health`, health);
 
   // The built client, served under its base path so one process can be the
   // whole game on a LAN (the game-host repo's front door points here). No
@@ -83,7 +92,15 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
   }
 
   const httpServer = createHttpServer(app);
-  const io = new SocketServer(httpServer, { cors: { origin: '*' } });
+  // Mounted under the base path so sockets ride the same front-door route as
+  // pages and assets. Overridden via the boot block's SOCKET_PATH (the
+  // options seam): Render sets /socket.io because its Pages client keeps
+  // socket.io's default path (see src/net/connection.ts), and dev uses the
+  // same knob (see the dev:server script).
+  const io = new SocketServer(httpServer, {
+    cors: { origin: '*' },
+    path: options.socketPath ?? `${BASE_PATH}/socket.io`,
+  });
   const rooms = createRoomRegistry(options.store ?? createNullStore());
 
   // Dev only, and absent rather than guarded — see `devSeed.ts`. This is the
@@ -267,10 +284,13 @@ export function gamesDir(env: NodeJS.ProcessEnv = process.env): string {
 // Started only when run directly, so tests can boot their own on port 0.
 if (process.argv[1]?.endsWith('index.ts')) {
   const store = createFileStore(gamesDir());
-  const { httpServer, io, rooms } = createServer({ store });
+  // SOCKET_PATH is read here, not inside createServer, so a test server's
+  // mount can never be moved by ambient env — same seam as PORT below and
+  // GAMES_DIR above. Render and the dev:server script both set /socket.io.
+  const { httpServer, io, rooms } = createServer({ store, socketPath: process.env.SOCKET_PATH });
   // 4002 is Acquire's slot in the cross-game port registry (the game-host
   // repo's PORTS.md). Render injects PORT, so this default is local-only.
-  // Must agree with src/net/connection.ts's DEV_SERVER_PORT.
+  // Must agree with vite.config.ts's dev proxy target.
   const port = Number(process.env.PORT ?? 4002);
 
   // launchd/`brew services stop` speak SIGTERM, Ctrl-C speaks SIGINT.
@@ -304,6 +324,9 @@ if (process.argv[1]?.endsWith('index.ts')) {
       console.warn('! Restore failed, starting with no rooms:', e);
     })
     .finally(() => {
-      httpServer.listen(port, () => console.log(`✓ Server listening on ${port}`));
+      // The socket path is in the banner because a bare `tsx server/index.ts`
+      // mounts the prefixed default — a dev client asking for '/socket.io'
+      // never connects, and this line is where that mismatch shows itself.
+      httpServer.listen(port, () => console.log(`✓ Server listening on ${port}, sockets at ${io.path()}`));
     });
 }

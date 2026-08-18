@@ -5,6 +5,7 @@
 // which is the defect this phase most needs to catch.
 
 import { io as connect, type Socket } from 'socket.io-client';
+import { BASE_PATH } from '../basePath.js';
 import { createServer } from './index.js';
 import {
   GAME_CLIENT_EVENTS,
@@ -19,6 +20,14 @@ import {
   type JoinedMessage,
   type RejectedMessage,
 } from '../vendor/lobby/protocol/protocol.js';
+
+/**
+ * Where `createServer` mounts socket.io. The bare '/socket.io' default is
+ * gone (see server/index.ts — sockets ride the same front-door route as
+ * pages), so every test client must ask for the prefixed path. Exported for
+ * the suites that open raw sockets outside `connectPlayer`.
+ */
+export const SOCKET_PATH = `${BASE_PATH}/socket.io`;
 
 export interface TestServer {
   port: number;
@@ -97,7 +106,10 @@ export async function connectPlayer(
   playerId: string,
   token: string,
 ): Promise<TestClient> {
-  const socket = connect(`http://localhost:${port}`, { transports: ['websocket'] });
+  const socket = connect(`http://localhost:${port}`, {
+    transports: ['websocket'],
+    path: SOCKET_PATH,
+  });
   const states: StateMessage[] = [];
   const rejections: RejectedMessage[] = [];
 

@@ -10,7 +10,7 @@
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { io as connect, type Socket } from 'socket.io-client';
-import { startTestServer, settleSocket, type TestServer } from './socketHarness.js';
+import { startTestServer, settleSocket, SOCKET_PATH, type TestServer } from './socketHarness.js';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import { connectPlayer } from './socketHarness.js';
 import { PROTOCOL_VERSION } from '../session/protocol.js';
@@ -36,7 +36,10 @@ interface Seated {
 }
 
 async function raw(): Promise<Socket> {
-  const socket = connect(`http://localhost:${server.port}`, { transports: ['websocket'] });
+  const socket = connect(`http://localhost:${server.port}`, {
+    transports: ['websocket'],
+    path: SOCKET_PATH,
+  });
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('never connected')), 4000);
     socket.on('connect', () => { clearTimeout(timer); resolve(); });
