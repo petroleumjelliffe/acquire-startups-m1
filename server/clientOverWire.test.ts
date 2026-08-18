@@ -428,16 +428,21 @@ describe('createLobbyConnection against a socket.io mount moved off /socket.io',
       conn.createRoom('Alex');
 
       // No round trip can order this assertion — the whole claim is that no
-      // channel ever opens to round-trip on. A short fixed settle is the
-      // honest substitute: locally, a websocket attempt at the wrong path is
-      // refused within milliseconds, so 500ms is not a tight margin.
-      await new Promise((r) => setTimeout(r, 500));
+      // channel ever opens to round-trip on. The refusal itself is the event
+      // to await instead: a websocket attempt at the wrong path is refused,
+      // and that surfaces as `connect_error` on the raw socket.
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('the wrong-path attempt was never refused')),
+          4000,
+        );
+        conn.socket.once('connect_error', () => { clearTimeout(timer); resolve(); });
+      });
 
       // 'connecting' (still retrying) or 'closed' — never 'open'. If this
       // reads 'open', the server answered at `/socket.io` too, and the
       // positive case above proved nothing about the mount having moved.
       expect(['connecting', 'closed']).toContain(conn.status());
-      expect(conn.status()).not.toBe('open');
       expect(joinedCount).toBe(0);
     } finally {
       conn.close();

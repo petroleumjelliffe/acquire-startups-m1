@@ -281,7 +281,7 @@ if (process.argv[1]?.endsWith('index.ts')) {
   const { httpServer, io, rooms } = createServer({ store });
   // 4002 is Acquire's slot in the cross-game port registry (the game-host
   // repo's PORTS.md). Render injects PORT, so this default is local-only.
-  // Must agree with src/net/connection.ts's DEV_SERVER_PORT.
+  // Must agree with vite.config.ts's dev proxy target.
   const port = Number(process.env.PORT ?? 4002);
 
   // launchd/`brew services stop` speak SIGTERM, Ctrl-C speaks SIGINT.
