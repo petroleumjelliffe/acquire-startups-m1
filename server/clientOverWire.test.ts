@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { createServer as createHttpServer, type Server as HttpServer } from 'node:http';
+import { Server as SocketServer } from 'socket.io';
 import { ALL_GOLDEN_GAMES } from '../engine/golden/index.js';
 import { buildFixture } from '../engine/golden/fixtures.js';
-import { DRAWS, toWire } from '../session/protocol.js';
+import { DRAWS, PROTOCOL_VERSION, toWire } from '../session/protocol.js';
 import { project } from './projection.js';
+import { createRoomRegistry } from './rooms.js';
 import {
   startTestServer,
   connectPlayer,
@@ -12,6 +15,9 @@ import {
 } from './socketHarness.js';
 import { createNetworkSession, type NetworkSession } from '../src/net/NetworkSession.js';
 import { createSocketTransport } from '../src/net/transport.js';
+import { createLobbyHandlers } from '../vendor/lobby/server/handlers.js';
+import { createLobbyConnection } from '../vendor/lobby/client/connection.js';
+import type { JoinedMessage } from '../vendor/lobby/protocol/protocol.js';
 
 let server: TestServer;
 
@@ -330,5 +336,110 @@ describe('a socket that drops mid-segment and comes back', () => {
     }
 
     a.close(); s.close(); again.close();
+  });
+});
+
+/**
+ * The socket.io mount, moved off `/socket.io` — the wire proof for the
+ * lobby's `socketPath` option (game-host specs/2026-08-17-origin-relative-clients.md).
+ *
+ * Behind the game-host path proxy every game lives under its base path, so
+ * its sockets must too: the server mounts at `<base>/socket.io` and the
+ * client must be told, because socket.io's default is a bare `/socket.io`
+ * the proxy never forwards. This server is built by hand rather than through
+ * `startTestServer` for exactly that reason — `createServer` mounts at the
+ * default path, which is the thing this block needs to *not* have.
+ *
+ * `createLobbyConnection` pins `transports: ['websocket']`, so the negative
+ * case shows a socket that simply never opens (no engine.io polling to fall
+ * back to) — and that case is what proves the mount actually moved, rather
+ * than both paths happening to work.
+ */
+describe('createLobbyConnection against a socket.io mount moved off /socket.io', () => {
+  const SOCKET_PATH = '/acquire-startups-m1/socket.io';
+
+  let prefixed: { httpServer: HttpServer; io: SocketServer; port: number };
+
+  beforeAll(async () => {
+    const httpServer = createHttpServer();
+    const io = new SocketServer(httpServer, { path: SOCKET_PATH, cors: { origin: '*' } });
+    // The registry's default null store: these rooms exist to answer one
+    // `createRoom` each, not to be persisted.
+    const rooms = createRoomRegistry();
+    const lobby = createLobbyHandlers(io, rooms, {
+      protocolVersion: PROTOCOL_VERSION,
+      onBegin() {},
+      onSeated() {},
+    });
+    io.on('connection', (socket) => { lobby.attach(socket); });
+
+    await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+    const address = httpServer.address();
+    if (address === null || typeof address === 'string') {
+      throw new Error('prefixed test server did not bind an ephemeral port');
+    }
+    prefixed = { httpServer, io, port: address.port };
+  });
+
+  afterAll(async () => {
+    await new Promise<void>((resolve) => {
+      prefixed.io.close();
+      prefixed.httpServer.close(() => resolve());
+    });
+  });
+
+  it('completes a createRoom → joined roundtrip when told the path', async () => {
+    const conn = createLobbyConnection({
+      serverUrl: `http://localhost:${prefixed.port}`,
+      protocolVersion: PROTOCOL_VERSION,
+      socketPath: SOCKET_PATH,
+    });
+    try {
+      // Emitted before 'connect' fires — socket.io-client buffers emits until
+      // the connection opens, so this is the ordinary client idiom, not a race.
+      const joined = await new Promise<JoinedMessage>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('joined never arrived over the prefixed mount')),
+          4000,
+        );
+        conn.onJoined((msg) => { clearTimeout(timer); resolve(msg); });
+        conn.createRoom('Alex');
+      });
+      expect(joined.roomId).toBeTruthy();
+      expect(joined.playerId).toBeTruthy();
+      expect(joined.token).toBeTruthy();
+      expect(conn.status()).toBe('open');
+    } finally {
+      // `reconnection: Infinity` is pinned inside `createLobbyConnection` —
+      // an unclosed connection would keep retrying past the end of the run.
+      conn.close();
+    }
+  });
+
+  it('never opens without socketPath — the default mount is genuinely gone', async () => {
+    const conn = createLobbyConnection({
+      serverUrl: `http://localhost:${prefixed.port}`,
+      protocolVersion: PROTOCOL_VERSION,
+    });
+    try {
+      let joinedCount = 0;
+      conn.onJoined(() => { joinedCount++; });
+      conn.createRoom('Alex');
+
+      // No round trip can order this assertion — the whole claim is that no
+      // channel ever opens to round-trip on. A short fixed settle is the
+      // honest substitute: locally, a websocket attempt at the wrong path is
+      // refused within milliseconds, so 500ms is not a tight margin.
+      await new Promise((r) => setTimeout(r, 500));
+
+      // 'connecting' (still retrying) or 'closed' — never 'open'. If this
+      // reads 'open', the server answered at `/socket.io` too, and the
+      // positive case above proved nothing about the mount having moved.
+      expect(['connecting', 'closed']).toContain(conn.status());
+      expect(conn.status()).not.toBe('open');
+      expect(joinedCount).toBe(0);
+    } finally {
+      conn.close();
+    }
   });
 });
