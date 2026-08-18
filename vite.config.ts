@@ -126,7 +126,16 @@ export default defineConfig(({ command, isPreview }) => ({
     // Dev plays the part Caddy plays in hosting: the client is origin-relative
     // and this proxy carries its socket path to the game server. 4002 per
     // game-host PORTS.md — build tooling, not shipped code.
-    proxy: { '/socket.io': { target: 'http://localhost:4002', ws: true } },
+    //
+    // Two keys because the client's path follows its base: dev serves at '/'
+    // so it asks for '/socket.io' — the target must run with
+    // SOCKET_PATH=/socket.io, which the dev:server script does — while
+    // preview serves the built client at BASE_PATH, so it asks for the
+    // prefixed path, which a bare `tsx server/index.ts` mounts by default.
+    proxy: {
+      '/socket.io': { target: 'http://localhost:4002', ws: true },
+      [`${BASE_PATH}/socket.io`]: { target: 'http://localhost:4002', ws: true },
+    },
   },
   // `isPreview` matters as much as `command` here. Preview runs as `serve`,
   // so without it preview hosted `dist/` at "/" while the built index.html

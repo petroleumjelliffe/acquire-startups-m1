@@ -16,7 +16,8 @@ export type { ConnectionStatus } from '../../vendor/lobby/client/connection';
 // socket.io's default path — that server owns its whole origin. Otherwise the
 // page's own origin: in dev Vite proxies the socket path to the game server,
 // hosted the game server IS the origin's answerer. No host or port appears
-// here — see game-host specs/2026-08-17-origin-relative-clients.md.
+// here — see game-host specs/2026-08-17-origin-relative-clients.md — and a
+// phone on the LAN works for free: its origin is whatever page it loaded.
 const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
 const SOCKET_PATH = import.meta.env.VITE_SERVER_URL
   ? undefined
