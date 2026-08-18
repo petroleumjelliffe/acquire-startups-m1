@@ -4,25 +4,6 @@ import { createSocketTransport, type RoomTransport } from './transport';
 
 export type { ConnectionStatus } from '../../vendor/lobby/client/connection';
 
-/**
- * Where the server is.
- *
- * A deployed build sets `VITE_SERVER_URL` and that wins. The fallback is for
- * development, and it derives the host from the page rather than hardcoding
- * `localhost` — because `localhost` is only correct for the machine running
- * the dev server. `npm run dev` is `vite --host`, so the app is served across
- * the network on purpose, and a phone loading it from `192.168.x.x` used to
- * resolve this to *its own* `localhost` and sit on "Connecting…" forever.
- * Found by hand, testing two devices; a second browser on the same machine
- * never reveals it.
- *
- * The port stays fixed: the dev server is `tsx watch server/index.ts`, which
- * listens on 4002 unless `PORT` says otherwise, and that env var belongs to
- * the server process rather than to this bundle. 4002 is Acquire's slot in
- * the cross-game port registry (the game-host repo's PORTS.md); it must
- * agree with server/index.ts's default.
- */
-const DEV_SERVER_PORT = 4002;
 // `window` is read at module scope here, which throws on import in an
 // environment with no `window` — a node test, most concretely. Safe today:
 // every importer of this module lives under `src/**`, which vitest always
@@ -30,8 +11,16 @@ const DEV_SERVER_PORT = 4002;
 // something under `server/**` or `session/**` (the `node` project) imports
 // this module, directly or transitively — that import would fail before a
 // single test in the file runs, with a stack trace pointing here.
-const SERVER_URL =
-  import.meta.env.VITE_SERVER_URL || `http://${window.location.hostname}:${DEV_SERVER_PORT}`;
+//
+// A deployed build sets VITE_SERVER_URL (Pages → Render) and that wins, with
+// socket.io's default path — that server owns its whole origin. Otherwise the
+// page's own origin: in dev Vite proxies the socket path to the game server,
+// hosted the game server IS the origin's answerer. No host or port appears
+// here — see game-host specs/2026-08-17-origin-relative-clients.md.
+const SERVER_URL = import.meta.env.VITE_SERVER_URL || window.location.origin;
+const SOCKET_PATH = import.meta.env.VITE_SERVER_URL
+  ? undefined
+  : `${import.meta.env.BASE_URL}socket.io`;
 
 /**
  * The lobby half of the wire, plus the transport the game half uses.
@@ -46,7 +35,11 @@ export interface Connection extends LobbyConnection {
 }
 
 function createConnection(): Connection {
-  const lobby = createLobbyConnection({ serverUrl: SERVER_URL, protocolVersion: PROTOCOL_VERSION });
+  const lobby = createLobbyConnection({
+    serverUrl: SERVER_URL,
+    protocolVersion: PROTOCOL_VERSION,
+    socketPath: SOCKET_PATH,
+  });
   return { ...lobby, transport: createSocketTransport(lobby.socket) };
 }
 

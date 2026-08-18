@@ -121,7 +121,13 @@ export default defineConfig(({ command, isPreview }) => ({
   // game-host repo's PORTS.md); strictPort fails loudly rather than sliding
   // into a neighbour's slot. allowedHosts covers the host machine's mDNS
   // name, which Vite's DNS-rebind guard would otherwise refuse.
-  server: { port: 7932, strictPort: true, allowedHosts: ['.local'] },
+  server: {
+    port: 7932, strictPort: true, allowedHosts: ['.local'],
+    // Dev plays the part Caddy plays in hosting: the client is origin-relative
+    // and this proxy carries its socket path to the game server. 4002 per
+    // game-host PORTS.md — build tooling, not shipped code.
+    proxy: { '/socket.io': { target: 'http://localhost:4002', ws: true } },
+  },
   // `isPreview` matters as much as `command` here. Preview runs as `serve`,
   // so without it preview hosted `dist/` at "/" while the built index.html
   // asked for `${BASE_PATH}/assets/…`. Every asset missed and the SPA
