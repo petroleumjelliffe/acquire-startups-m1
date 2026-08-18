@@ -347,8 +347,9 @@ describe('a socket that drops mid-segment and comes back', () => {
  * its sockets must too: the server mounts at `<base>/socket.io` and the
  * client must be told, because socket.io's default is a bare `/socket.io`
  * the proxy never forwards. This server is built by hand rather than through
- * `startTestServer` for exactly that reason — `createServer` mounts at the
- * default path, which is the thing this block needs to *not* have.
+ * `startTestServer` so the mount is pinned right here — `createServer`'s is
+ * env-driven (SOCKET_PATH), and this block's claim is about which path
+ * answers, so its server must not depend on the environment.
  *
  * `createLobbyConnection` pins `transports: ['websocket']`, so the negative
  * case shows a socket that simply never opens (no engine.io polling to fall

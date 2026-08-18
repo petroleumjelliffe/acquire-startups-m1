@@ -2,7 +2,7 @@
 // Transport only. The room decides what happened; this file decides who hears
 // about it, and is the single place `project` is ever called.
 
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -59,9 +59,13 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
    * deployed" one curl rather than a trip to the hosting dashboard, which is
    * what it took on 2026-08-07.
    */
-  app.get('/health', (_req, res) => {
+  const health = (_req: Request, res: Response): void => {
     res.json({ ok: true, protocolVersion: PROTOCOL_VERSION, saveVersion: SAVE_VERSION });
-  });
+  };
+  app.get('/health', health);
+  // Twinned under the base path because that is the only route the game-host
+  // front door forwards — a bare `/health` is unreachable through the proxy.
+  app.get(`${BASE_PATH}/health`, health);
 
   // The built client, served under its base path so one process can be the
   // whole game on a LAN (the game-host repo's front door points here). No
@@ -83,7 +87,14 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
   }
 
   const httpServer = createHttpServer(app);
-  const io = new SocketServer(httpServer, { cors: { origin: '*' } });
+  // Mounted under the base path so sockets ride the same front-door route as
+  // pages and assets. Render overrides with SOCKET_PATH=/socket.io: its Pages
+  // client keeps socket.io's default path (see src/net/connection.ts), and dev
+  // uses the same knob (see the dev:server script).
+  const io = new SocketServer(httpServer, {
+    cors: { origin: '*' },
+    path: process.env.SOCKET_PATH ?? `${BASE_PATH}/socket.io`,
+  });
   const rooms = createRoomRegistry(options.store ?? createNullStore());
 
   // Dev only, and absent rather than guarded — see `devSeed.ts`. This is the
