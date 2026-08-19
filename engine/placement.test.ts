@@ -42,8 +42,8 @@ describe('previewPlacement', () => {
     expect(p.survivorId).toBe('Messla');
     expect(p.absorbedIds).toEqual(['ZuckFace']);
     expect(p.tiedSurvivorIds).toBeUndefined();
-    expect(p.prices['Messla'].nextSize).toBe(10); // 6 + 3 + the placed tile
-    expect(p.prices['ZuckFace'].nextSize).toBe(0);
+    expect(p.prices['Messla']!.nextSize).toBe(10); // 6 + 3 + the placed tile
+    expect(p.prices['ZuckFace']!.nextSize).toBe(0);
   });
 
   it('flags a tie for survivor rather than picking one', () => {
@@ -92,8 +92,8 @@ describe('previewPlacement', () => {
       { id: 'Messla', tiles: ['B1', 'B2', 'B3', 'B4', 'B5'], tier: 0 },
     ]);
     expect(previewPlacement(state, 'B1').block).toBe('occupied');
-    state.players[0].hand = ['E5'];
-    expect(previewPlacement(state, 'E6', state.players[0].id).block).toBe('notInHand');
+    state.players[0]!.hand = ['E5'];
+    expect(previewPlacement(state, 'E6', state.players[0]!.id).block).toBe('notInHand');
   });
 
   it('lists only the dead tiles in a hand', () => {
@@ -101,7 +101,7 @@ describe('previewPlacement', () => {
       { id: 'Messla', tiles: ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10', 'B11'], tier: 0 },
       { id: 'ZuckFace', tiles: ['D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10', 'D11'], tier: 1 },
     ]);
-    state.players[0].hand = ['C1', 'G6'];
-    expect(getDeadTilesInHand(state, state.players[0].id)).toEqual(['C1']);
+    state.players[0]!.hand = ['C1', 'G6'];
+    expect(getDeadTilesInHand(state, state.players[0]!.id)).toEqual(['C1']);
   });
 });

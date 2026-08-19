@@ -76,7 +76,7 @@ describe('useTurnPanel', () => {
     // is read back rather than asserted as a literal.
     const drawn = session.getView().state.turnOrderDraws![0];
     expect(screen.getByText('Alex')).toBeInTheDocument();
-    expect(screen.getByTitle(drawn.tile)).toBeInTheDocument();
+    expect(screen.getByTitle(drawn!.tile)).toBeInTheDocument();
     expect(screen.getByText(/2 still to draw/i)).toBeInTheDocument();
   });
 
@@ -130,11 +130,11 @@ describe('useTurnPanel', () => {
     if (!g8) throw new Error('no golden game G8');
     const states = replayGoldenGame(g8);
     const state = states.find(
-      (s) => s.stage === 'play' && getDeadTilesInHand(s, s.players[s.turnIndex].id).length > 0,
+      (s) => s.stage === 'play' && getDeadTilesInHand(s, s.players[s.turnIndex]!.id).length > 0,
     );
     if (!state) throw new Error('G8 no longer reaches a dead tile in hand');
 
-    const dead = getDeadTilesInHand(state, state.players[state.turnIndex].id)[0];
+    const dead = getDeadTilesInHand(state, state.players[state.turnIndex]!.id)[0];
     const { container } = render(
       <Harness session={createGameSession({ state })} dispatch={() => {}} />,
     );
@@ -246,7 +246,7 @@ describe('useTurnPanel — buying', () => {
   it('shows sold-out cards rather than the empty state', () => {
     const session = atBuy();
     const state = structuredClone(session.getView().state);
-    state.startups.Messla.availableShares = 0;
+    state.startups.Messla!.availableShares = 0;
 
     render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
     expect(screen.queryByText(/found a startup to buy shares/i)).toBeNull();
@@ -380,7 +380,7 @@ describe('useTurnPanel — buying', () => {
       chains: [{ id: 'Messla', coords: ['E5', 'E6'] }],
       bag: ['I11', 'I12'],
     });
-    expect(nothingToBuy.startups.Messla.availableShares, 'fixture not sold out').toBe(0);
+    expect(nothingToBuy.startups.Messla!.availableShares, 'fixture not sold out').toBe(0);
     const dispatch = vi.fn();
 
     render(<Harness session={createGameSession({ state: nothingToBuy })} dispatch={dispatch} />);
@@ -421,7 +421,7 @@ describe('useTurnPanel — buying', () => {
       bag: ['I11', 'I12'],
     });
     expect(
-      soldOut.startups.Messla.availableShares,
+      soldOut.startups.Messla!.availableShares,
       'the fixture did not actually sell Messla out',
     ).toBe(0);
 
@@ -502,7 +502,7 @@ describe('useTurnPanel — mergers', () => {
     const survivorId = state.mergerContext!.survivorId;
 
     // The whole point of the case: exactly one share to be had.
-    expect(state.startups[survivorId as 'Messla'].availableShares).toBe(1);
+    expect(state.startups[survivorId as 'Messla']!.availableShares).toBe(1);
 
     render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
 
@@ -531,7 +531,7 @@ describe('useTurnPanel — mergers', () => {
       const absorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
       const holder = ctx.shareholderQueue[ctx.currentShareholderIndex];
       const player = s.players.find((p) => p.id === holder);
-      return (player?.portfolio[absorbed] ?? 0) >= TRADE_RATIO;
+      return (player?.portfolio[absorbed!] ?? 0) >= TRADE_RATIO;
     });
 
     const survivorId = state.mergerContext!.survivorId;
@@ -569,7 +569,7 @@ describe('useTurnPanel — mergers', () => {
     const removes = within(staging()).getAllByRole('button', { name: /remove one/i });
     expect(removes).toHaveLength(1);
 
-    fireEvent.click(removes[0]);
+    fireEvent.click(removes[0]!);
     expect(within(staging()).queryByRole('button', { name: /remove one/i })).toBeNull();
   });
 
@@ -584,7 +584,7 @@ describe('useTurnPanel — mergers', () => {
     expect(dispatch).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
-    const call = dispatch.mock.calls[0][0];
+    const call = dispatch.mock.calls[0]![0];
 
     expect(call.type).toBe('liquidate');
     expect(call.playerId).toBe(view.actorId);
@@ -592,7 +592,7 @@ describe('useTurnPanel — mergers', () => {
 
     const ctx = view.state.mergerContext!;
     const absorbedId = ctx.absorbedIds[ctx.currentLiquidationIndex];
-    const held = view.state.players.find((p) => p.id === view.actorId)!.portfolio[absorbedId] ?? 0;
+    const held = view.state.players.find((p) => p.id === view.actorId)!.portfolio[absorbedId!] ?? 0;
     expect(call.sell + call.trade + call.keep).toBe(held);
   });
 
@@ -729,7 +729,7 @@ describe('useTurnPanel — declaring the end', () => {
 
   it('offers the end when every founded chain is safe', () => {
     const g10 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G10')!;
-    const state = replayGoldenGame(g10)[0];
+    const state = replayGoldenGame(g10)[0]!;
 
     render(<Harness session={createGameSession({ state })} dispatch={() => {}} />);
     expect(screen.getByText(/every founded startup is safe/i)).toBeInTheDocument();
@@ -743,7 +743,7 @@ describe('useTurnPanel — declaring the end', () => {
     // safe); the unmet side needs a fixture of its own — G10 alone never
     // exercises a state where the condition stops holding.
     const g10 = ALL_GOLDEN_GAMES.find((g) => g.id === 'G10')!;
-    const met = replayGoldenGame(g10)[0];
+    const met = replayGoldenGame(g10)[0]!;
 
     const unmet = buildFixture({
       players: [

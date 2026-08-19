@@ -10,8 +10,8 @@ describe('PlayerRoster', () => {
     render(<PlayerRoster seats={TWO} onChange={() => {}} />);
     const rows = screen.getAllByRole('listitem');
     expect(rows).toHaveLength(2);
-    expect(within(rows[0]).getByText(PLAYER_EMOJI[0])).toBeInTheDocument();
-    expect(within(rows[1]).getByText(PLAYER_EMOJI[1])).toBeInTheDocument();
+    expect(within(rows[0]!).getByText(PLAYER_EMOJI[0]!)).toBeInTheDocument();
+    expect(within(rows[1]!).getByText(PLAYER_EMOJI[1]!)).toBeInTheDocument();
   });
 
   it('assigns avatars by seat index', () => {
@@ -37,7 +37,7 @@ describe('PlayerRoster', () => {
     const onChange = vi.fn();
     render(<PlayerRoster seats={[{ name: 'Alex' }, { name: 'Sam' }, { name: 'Jo' }]} onChange={onChange} />);
     const rows = screen.getAllByRole('listitem');
-    fireEvent.click(within(rows[1]).getByRole('button', { name: /remove sam/i }));
+    fireEvent.click(within(rows[1]!).getByRole('button', { name: /remove sam/i }));
     expect(onChange).toHaveBeenCalledWith([{ name: 'Alex' }, { name: 'Jo' }]);
   });
 
@@ -50,6 +50,6 @@ describe('PlayerRoster', () => {
   it('cannot remove below two seats', () => {
     render(<PlayerRoster seats={TWO} onChange={() => {}} />);
     const rows = screen.getAllByRole('listitem');
-    expect(within(rows[0]).getByRole('button', { name: /remove alex/i })).toBeDisabled();
+    expect(within(rows[0]!).getByRole('button', { name: /remove alex/i })).toBeDisabled();
   });
 });

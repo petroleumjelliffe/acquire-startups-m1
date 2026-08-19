@@ -27,7 +27,7 @@ describe('a tile landing', () => {
 
     const landed = container.querySelectorAll('[data-landed]');
     expect(landed).toHaveLength(1);
-    expect(landed[0].querySelector('[title="E6"]')).not.toBeNull();
+    expect(landed[0]!.querySelector('[title="E6"]')).not.toBeNull();
   });
 
   it('marks nothing when no tile has been placed', () => {

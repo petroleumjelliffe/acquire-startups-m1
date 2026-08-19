@@ -148,8 +148,8 @@ describe('reclaiming a mid-game seat by name', () => {
 
   it('hands a disconnected seat back to a tokenless joiner with the same name', () => {
     const { rooms, room } = midGame();
-    const before = room.players[1].token;
-    room.players[1].connected = false;
+    const before = room.players[1]!.token;
+    room.players[1]!.connected = false;
 
     const seat = rooms.join('golden-1', 'Sam');
 
@@ -163,7 +163,7 @@ describe('reclaiming a mid-game seat by name', () => {
 
   it('matches the name the way a human retypes it — case and spacing forgiven', () => {
     const { rooms, room } = midGame();
-    room.players[1].connected = false;
+    room.players[1]!.connected = false;
 
     expect(rooms.join('golden-1', '  sam ')?.player.id).toBe('p2');
   });
@@ -176,7 +176,7 @@ describe('reclaiming a mid-game seat by name', () => {
 
   it('still refuses a tokenless stranger mid-game', () => {
     const { rooms, room } = midGame();
-    room.players[1].connected = false;
+    room.players[1]!.connected = false;
 
     expect(rooms.join('golden-1', 'Jordan')).toBeNull();
     expect(rooms.join('golden-1')).toBeNull();
@@ -197,7 +197,7 @@ describe('restoring rooms at boot', () => {
     const room = rooms.fromState(roomId, ['Alex', 'Sam'], fixture());
     await rooms.persist(room);
     const [saved] = (await store.loadAll()).records;
-    return saved;
+    return saved!;
   }
 
   it('seats a saved room again, with its tokens intact', async () => {
@@ -211,7 +211,7 @@ describe('restoring rooms at boot', () => {
     expect(room).toBeDefined();
     expect(room!.lifecycle()).toBe('playing');
     // The rejoin material survived the process, which is the whole feature.
-    const token = saved.players[1].token;
+    const token = saved.players[1]!.token;
     expect(rooms.join('ABC123', 'Sam', 'p2', token)?.player.id).toBe('p2');
   });
 
@@ -286,7 +286,7 @@ describe('restoring rooms at boot', () => {
     // bump: valid in every respect except the wire its state speaks.
     await writeFile(
       join(dir, 'game-oldwire.json'),
-      JSON.stringify({ ...good, roomId: 'STALE1', protocolVersion: good.protocolVersion + 1 }),
+      JSON.stringify({ ...good, roomId: 'STALE1', protocolVersion: good!.protocolVersion + 1 }),
       'utf8',
     );
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -436,7 +436,7 @@ describe('what persist writes to disk', () => {
     await rooms.persist(room);
 
     const [saved] = (await store.loadAll()).records;
-    expect(saved.state.board).toEqual(room.committed().board);
+    expect(saved!.state.board).toEqual(room.committed().board);
   });
 
   it('stamps the record with the wire it was written by', async () => {
@@ -445,6 +445,6 @@ describe('what persist writes to disk', () => {
     await rooms.persist(rooms.fromState('X', ['Alex', 'Sam'], fixture()));
 
     const [saved] = (await store.loadAll()).records;
-    expect(saved.protocolVersion).toBe(PROTOCOL_VERSION);
+    expect(saved!.protocolVersion).toBe(PROTOCOL_VERSION);
   });
 });

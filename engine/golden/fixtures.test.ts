@@ -10,7 +10,7 @@ describe('buildFixture', () => {
     });
     expect(getStartupSize(state, 'Messla')).toBe(3);
     expect(state.board['B2']).toEqual({ placed: true, startupId: 'Messla' });
-    expect(state.startups['Messla'].isFounded).toBe(true);
+    expect(state.startups['Messla']!.isFounded).toBe(true);
   });
 
   it('places loners as owned by nobody', () => {
@@ -29,8 +29,8 @@ describe('buildFixture', () => {
     });
     expect(state.players.map((p) => p.id)).toEqual(['p1', 'p2']);
     expect(state.players[0]).toMatchObject({ cash: 4200, hand: ['C6'], portfolio: { Messla: 4 } });
-    expect(state.players[1].cash).toBe(6000);
-    expect(state.players[1].emoji.length).toBeGreaterThan(0);
+    expect(state.players[1]!.cash).toBe(6000);
+    expect(state.players[1]!.emoji.length).toBeGreaterThan(0);
   });
 
   it('draws authored shares out of the pool so totals stay consistent', () => {
@@ -41,7 +41,7 @@ describe('buildFixture', () => {
       ],
       chains: [{ id: 'Messla', coords: ['B1', 'B2'] }],
     });
-    expect(state.startups['Messla'].availableShares).toBe(25 - 6);
+    expect(state.startups['Messla']!.availableShares).toBe(25 - 6);
   });
 
   it('defaults to stage play, player 1, and an empty bag unless authored', () => {

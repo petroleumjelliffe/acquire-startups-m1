@@ -55,10 +55,10 @@ function tiedMergeFixture(): GameState {
 describe('applyIntent', () => {
   it('does not mutate the state it is given', () => {
     const state = playing();
-    state.players[0].hand = ['E5'];
+    state.players[0]!.hand = ['E5'];
     const before = JSON.stringify(state);
 
-    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E5' });
+    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'E5' });
 
     expect(JSON.stringify(state)).toBe(before);
     expect(next).not.toBe(state);
@@ -67,38 +67,38 @@ describe('applyIntent', () => {
 
   it('rejects an intent from a player whose turn it is not', () => {
     const state = playing();
-    state.players[1].hand = ['E5'];
+    state.players[1]!.hand = ['E5'];
     expect(codeOf(() =>
-      applyIntent(state, { type: 'placeTile', playerId: state.players[1].id, coord: 'E5' }),
+      applyIntent(state, { type: 'placeTile', playerId: state.players[1]!.id, coord: 'E5' }),
     )).toBe('notYourTurn');
   });
 
   it('rejects an intent in the wrong stage', () => {
     const state = playing();
     state.stage = 'buy';
-    state.players[0].hand = ['E5'];
+    state.players[0]!.hand = ['E5'];
     expect(codeOf(() =>
-      applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E5' }),
+      applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'E5' }),
     )).toBe('wrongStage');
   });
 
   it('rejects a tile that is not in hand', () => {
     const state = playing();
-    state.players[0].hand = ['E5'];
+    state.players[0]!.hand = ['E5'];
     expect(codeOf(() =>
-      applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'H8' }),
+      applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'H8' }),
     )).toBe('tileNotInHand');
   });
 
   it('sends an isolated placement straight to buy and logs it', () => {
     const state = playing();
-    state.players[0].hand = ['E5', 'A1'];
+    state.players[0]!.hand = ['E5', 'A1'];
 
-    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E5' });
+    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'E5' });
 
     expect(next.stage).toBe('buy');
-    expect(next.players[0].hand).toEqual(['A1']);
-    expect(next.log.at(-1)).toMatchObject({ phase: 'Placed a tile', playerId: state.players[0].id });
+    expect(next.players[0]!.hand).toEqual(['A1']);
+    expect(next.log.at(-1)).toMatchObject({ phase: 'Placed a tile', playerId: state.players[0]!.id });
   });
 
   describe('the founding step and the placement that led to it', () => {
@@ -106,7 +106,7 @@ describe('applyIntent', () => {
     function aboutToFound() {
       const state = playing();
       state.board['E5'] = { placed: true };
-      state.players[0].hand = ['E6'];
+      state.players[0]!.hand = ['E6'];
       return state;
     }
 
@@ -154,9 +154,9 @@ describe('applyIntent', () => {
     // branch of this log says what the placement *did*, which is the thing
     // worth a sentence.
     const state = playing();
-    state.players[0].hand = ['E5', 'A1'];
+    state.players[0]!.hand = ['E5', 'A1'];
 
-    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E5' });
+    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'E5' });
 
     expect(next.log.at(-1)!.detail).toEqual([{ kind: 'tile', coord: 'E5' }]);
   });
@@ -164,19 +164,19 @@ describe('applyIntent', () => {
   it('opens the founding choice, then founds the brand and grants the free share', () => {
     const state = playing();
     state.board['E5'] = { placed: true };
-    state.players[0].hand = ['E6'];
+    state.players[0]!.hand = ['E6'];
 
-    const placed = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E6' });
+    const placed = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'E6' });
     expect(placed.stage).toBe('foundStartup');
 
     const founded = applyIntent(placed, {
-      type: 'chooseFoundingBrand', playerId: state.players[0].id, startupId: 'Messla',
+      type: 'chooseFoundingBrand', playerId: state.players[0]!.id, startupId: 'Messla',
     });
 
     expect(founded.stage).toBe('buy');
-    expect(founded.startups['Messla'].isFounded).toBe(true);
-    expect(founded.players[0].portfolio['Messla']).toBe(1);
-    expect(founded.startups['Messla'].availableShares).toBe(24);
+    expect(founded.startups['Messla']!.isFounded).toBe(true);
+    expect(founded.players[0]!.portfolio['Messla']).toBe(1);
+    expect(founded.startups['Messla']!.availableShares).toBe(24);
     expect(founded.board['E5'].startupId).toBe('Messla');
     expect(founded.board['E6'].startupId).toBe('Messla');
   });
@@ -186,14 +186,14 @@ describe('applyIntent', () => {
       { id: 'Messla', tiles: ['B1', 'B2', 'B3'], tier: 0 },
     ]));
     state.board['C2'] = { placed: true }; // lone unclaimed tile
-    state.players[0].hand = ['C1'];       // adjacent to B1 (Messla) and to C2
+    state.players[0]!.hand = ['C1'];       // adjacent to B1 (Messla) and to C2
 
-    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'C1' });
+    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'C1' });
 
     expect(next.stage).toBe('buy');
     expect(next.board['C1'].startupId).toBe('Messla');
     expect(next.board['C2'].startupId).toBe('Messla');
-    expect(next.players[0].hand).toEqual([]);
+    expect(next.players[0]!.hand).toEqual([]);
   });
 
   it('rejects founding with a brand already on the board', () => {
@@ -203,13 +203,13 @@ describe('applyIntent', () => {
     state.pendingFoundTile = 'H8';
 
     expect(codeOf(() =>
-      applyIntent(state, { type: 'chooseFoundingBrand', playerId: state.players[0].id, startupId: 'Messla' }),
+      applyIntent(state, { type: 'chooseFoundingBrand', playerId: state.players[0]!.id, startupId: 'Messla' }),
     )).toBe('brandUnavailable');
   });
 
   it('pays merger bonuses on the merge transition without a payout stage', () => {
     const state = mergeFixture();
-    const alex = state.players[0];
+    const alex = state.players[0]!;
     alex.hand = ['C1'];
     alex.cash = 0;
     giveShares(state, alex.id, { ZuckFace: 3 }); // sole holder of the absorbed chain
@@ -223,38 +223,38 @@ describe('applyIntent', () => {
     expect(JSON.stringify(state)).toBe(before);
     expect(next.stage).toBe('mergerLiquidation');
     // ZuckFace at 3 tiles, tier 1 → price 400; sole holder → 400 × 15
-    expect(next.players[0].cash).toBe(6000);
+    expect(next.players[0]!.cash).toBe(6000);
     expect(next.log.some((e) => e.phase === 'Merger payout')).toBe(true);
   });
 
   it('goes straight to buy after a merge nobody held shares in', () => {
     const state = mergeFixture();
-    state.players[0].hand = ['C1'];
+    state.players[0]!.hand = ['C1'];
 
-    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'C1' });
+    const next = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'C1' });
 
     expect(next.stage).toBe('buy');
-    expect(next.startups['ZuckFace'].isFounded).toBe(false);
+    expect(next.startups['ZuckFace']!.isFounded).toBe(false);
   });
 
   it('asks for a survivor when the merge is tied, and rejects a non-tied pick', () => {
     const state = tiedMergeFixture();
-    state.players[0].hand = ['C1'];
+    state.players[0]!.hand = ['C1'];
 
-    const placed = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'C1' });
+    const placed = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'C1' });
     expect(placed.stage).toBe('chooseSurvivor');
     expect(placed.pendingTiedStartups).toEqual(['Messla', 'ZuckFace']);
 
     expect(codeOf(() =>
-      applyIntent(placed, { type: 'chooseSurvivor', playerId: state.players[0].id, startupId: 'Gobble' }),
+      applyIntent(placed, { type: 'chooseSurvivor', playerId: state.players[0]!.id, startupId: 'Gobble' }),
     )).toBe('notATiedSurvivor');
 
     const merged = applyIntent(placed, {
-      type: 'chooseSurvivor', playerId: state.players[0].id, startupId: 'Messla',
+      type: 'chooseSurvivor', playerId: state.players[0]!.id, startupId: 'Messla',
     });
 
     expect(merged.stage).toBe('buy'); // nobody held absorbed shares
-    expect(merged.startups['ZuckFace'].isFounded).toBe(false);
+    expect(merged.startups['ZuckFace']!.isFounded).toBe(false);
     expect(merged.board['D1'].startupId).toBe('Messla');
     // the non-tied smaller chain is absorbed too
     expect(merged.board['C2'].startupId).toBe('Messla');
@@ -266,15 +266,15 @@ describe('applyIntent', () => {
     // them. That must surface as a rejection, never as a no-op "success".
     for (const missing of ['pendingMergerTile', 'pendingMergerStartups'] as const) {
       const state = tiedMergeFixture();
-      state.players[0].hand = ['C1'];
+      state.players[0]!.hand = ['C1'];
       const placed = applyIntent(state, {
-        type: 'placeTile', playerId: state.players[0].id, coord: 'C1',
+        type: 'placeTile', playerId: state.players[0]!.id, coord: 'C1',
       });
       expect(placed.stage).toBe('chooseSurvivor');
       delete placed[missing];
 
       expect(codeOf(() => applyIntent(placed, {
-        type: 'chooseSurvivor', playerId: state.players[0].id, startupId: 'Messla',
+        type: 'chooseSurvivor', playerId: state.players[0]!.id, startupId: 'Messla',
       }))).toBe('illegalPlacement');
     }
   });
@@ -294,7 +294,8 @@ describe('applyIntent — liquidate', () => {
    */
   function merged() {
     const state = mergeFixture();
-    const [alex, sam] = state.players;
+    const alex = state.players[0]!;
+    const sam = state.players[1]!;
     alex.hand = ['C1'];
     alex.cash = 0;
     sam.cash = 0;
@@ -313,14 +314,14 @@ describe('applyIntent — liquidate', () => {
 
   it('sells at the absorbed price, trades two-for-one and keeps the rest', () => {
     const { state, alex } = merged();
-    const cashBefore = state.players[0].cash;
+    const cashBefore = state.players[0]!.cash;
     // ZuckFace 3 tiles, tier 1 → $400
     const next = applyIntent(state, {
       type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 1, trade: 2, keep: 1,
     });
-    expect(next.players[0].cash).toBe(cashBefore + 400);
-    expect(next.players[0].portfolio['ZuckFace']).toBe(1);
-    expect(next.players[0].portfolio['Messla']).toBe(1); // 2 traded → 1 survivor share
+    expect(next.players[0]!.cash).toBe(cashBefore + 400);
+    expect(next.players[0]!.portfolio['ZuckFace']).toBe(1);
+    expect(next.players[0]!.portfolio['Messla']).toBe(1); // 2 traded → 1 survivor share
     expect(next.mergerContext!.currentShareholderIndex).toBe(1);
     expect(next.stage).toBe('mergerLiquidation');
   });
@@ -352,7 +353,7 @@ describe('applyIntent — liquidate', () => {
 
   it('rejects a trade the survivor pool cannot cover', () => {
     const { state, alex } = merged();
-    state.startups['Messla'].availableShares = 1;
+    state.startups['Messla']!.availableShares = 1;
     expect(codeOf(() => applyIntent(state, {
       type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 0, trade: 4, keep: 0,
     }))).toBe('notEnoughShares');
@@ -407,11 +408,11 @@ describe('applyIntent — liquidate', () => {
     expect(afterSam.stage).toBe('buy');
     // alex's kept ZuckFace share must still be there — not wiped by the
     // end-of-chain cleanup that fires once sam (the last queued holder) resolves.
-    expect(afterSam.players[0].portfolio['ZuckFace']).toBe(1);
+    expect(afterSam.players[0]!.portfolio['ZuckFace']).toBe(1);
     // ZuckFace's pool reclaims everything except the 1 share still held —
     // NOT a full reset to totalShares (25), which would double-issue it.
-    expect(afterSam.startups['ZuckFace'].availableShares).toBe(
-      afterSam.startups['ZuckFace'].totalShares - 1,
+    expect(afterSam.startups['ZuckFace']!.availableShares).toBe(
+      afterSam.startups['ZuckFace']!.totalShares - 1,
     );
   });
 
@@ -441,7 +442,7 @@ describe('applyIntent — liquidate', () => {
     const totalHeld = afterAlex.players.reduce(
       (sum, p) => sum + (p.portfolio['ZuckFace'] ?? 0), 0,
     );
-    expect(totalHeld + zuckFace.availableShares).toBe(zuckFace.totalShares);
+    expect(totalHeld + zuckFace!.availableShares).toBe(zuckFace!.totalShares);
   });
 
   // Regression coverage for the `trade` unit mismatch between the intent
@@ -450,14 +451,14 @@ describe('applyIntent — liquidate', () => {
   // straight through would debit the survivor pool by 2x too much.
   it('debits the survivor pool by the shares gained, not the shares surrendered', () => {
     const { state, alex } = merged();
-    const survivorBefore = state.startups['Messla'].availableShares;
+    const survivorBefore = state.startups['Messla']!.availableShares;
 
     const next = applyIntent(state, {
       type: 'liquidate', playerId: alex.id, startupId: 'ZuckFace', sell: 1, trade: 2, keep: 1,
     });
 
     // 2 ZuckFace shares traded two-for-one → exactly 1 Messla share gained.
-    expect(next.startups['Messla'].availableShares).toBe(survivorBefore - 1);
+    expect(next.startups['Messla']!.availableShares).toBe(survivorBefore - 1);
   });
 });
 
@@ -475,8 +476,8 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     state.stage = 'buy';
     state.turnIndex = 0;
     state.currentBuyCount = 0;
-    state.players[0].cash = 1000;
-    state.players[0].hand = ['H8'];
+    state.players[0]!.cash = 1000;
+    state.players[0]!.hand = ['H8'];
     return state;
   }
 
@@ -497,10 +498,10 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
 
   it('buys shares, charging cash and drawing down the pool', () => {
     const state = buying();
-    const next = applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] });
-    expect(next.players[0].cash).toBe(1000 - 600);
-    expect(next.players[0].portfolio['Messla']).toBe(2);
-    expect(next.startups['Messla'].availableShares).toBe(23);
+    const next = applyIntent(state, { type: 'buyShares', playerId: state.players[0]!.id, picks: ['Messla', 'Messla'] });
+    expect(next.players[0]!.cash).toBe(1000 - 600);
+    expect(next.players[0]!.portfolio['Messla']).toBe(2);
+    expect(next.startups['Messla']!.availableShares).toBe(23);
     expect(next.currentBuyCount).toBe(2);
     expect(next.stage).toBe('buy');
     expect(next.log.at(-1)).toMatchObject({ phase: 'Bought shares' });
@@ -509,15 +510,15 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
   it('buys a basket spanning two different startups in one call', () => {
     const state = buying();
     const next = applyIntent(state, {
-      type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'ZuckFace'],
+      type: 'buyShares', playerId: state.players[0]!.id, picks: ['Messla', 'ZuckFace'],
     });
     // Messla 3 tiles tier 0, ZuckFace 2 tiles tier 1 — see `buying()`'s own
     // comment for the $300 + $300 derivation via getSharePrice.
-    expect(next.players[0].cash).toBe(1000 - 600);
-    expect(next.players[0].portfolio['Messla']).toBe(1);
-    expect(next.players[0].portfolio['ZuckFace']).toBe(1);
-    expect(next.startups['Messla'].availableShares).toBe(24);
-    expect(next.startups['ZuckFace'].availableShares).toBe(24);
+    expect(next.players[0]!.cash).toBe(1000 - 600);
+    expect(next.players[0]!.portfolio['Messla']).toBe(1);
+    expect(next.players[0]!.portfolio['ZuckFace']).toBe(1);
+    expect(next.startups['Messla']!.availableShares).toBe(24);
+    expect(next.startups['ZuckFace']!.availableShares).toBe(24);
     expect(next.currentBuyCount).toBe(2);
   });
 
@@ -534,7 +535,7 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     const before = JSON.stringify(state);
     expect(codeOf(() => applyIntent(state, {
       type: 'buyShares',
-      playerId: state.players[0].id,
+      playerId: state.players[0]!.id,
       // The malformed element (a number where a StartupId belongs) is the
       // point of the test, hence the cast.
       picks: [-1] as unknown as StartupId[],
@@ -544,12 +545,12 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
 
   it('caps the turn at three shares across calls', () => {
     const state = buying();
-    const one = applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] });
+    const one = applyIntent(state, { type: 'buyShares', playerId: state.players[0]!.id, picks: ['Messla', 'Messla'] });
     expect(() =>
-      applyIntent(one, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] }),
+      applyIntent(one, { type: 'buyShares', playerId: state.players[0]!.id, picks: ['Messla', 'Messla'] }),
     ).toThrow(IllegalIntentError);
     try {
-      applyIntent(one, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'Messla'] });
+      applyIntent(one, { type: 'buyShares', playerId: state.players[0]!.id, picks: ['Messla', 'Messla'] });
     } catch (e) {
       expect((e as IllegalIntentError).code).toBe('tooManyPicks');
     }
@@ -557,29 +558,29 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
 
   it('rejects a basket the player cannot afford, buying nothing', () => {
     const state = buying();
-    state.players[0].cash = 500;
+    state.players[0]!.cash = 500;
     try {
-      applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla', 'ZuckFace'] });
+      applyIntent(state, { type: 'buyShares', playerId: state.players[0]!.id, picks: ['Messla', 'ZuckFace'] });
       throw new Error('should have thrown');
     } catch (e) {
       expect((e as IllegalIntentError).code).toBe('notEnoughCash');
     }
     // nothing charged
-    expect(state.players[0].cash).toBe(500);
+    expect(state.players[0]!.cash).toBe(500);
   });
 
   it('rejects buying an unfounded brand or one with an empty pool', () => {
     const state = buying();
     try {
-      applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Gobble'] });
+      applyIntent(state, { type: 'buyShares', playerId: state.players[0]!.id, picks: ['Gobble'] });
       throw new Error('should have thrown');
     } catch (e) {
       expect((e as IllegalIntentError).code).toBe('brandUnavailable');
     }
 
-    state.startups['Messla'].availableShares = 0;
+    state.startups['Messla']!.availableShares = 0;
     try {
-      applyIntent(state, { type: 'buyShares', playerId: state.players[0].id, picks: ['Messla'] });
+      applyIntent(state, { type: 'buyShares', playerId: state.players[0]!.id, picks: ['Messla'] });
       throw new Error('should have thrown');
     } catch (e) {
       expect((e as IllegalIntentError).code).toBe('notEnoughShares');
@@ -589,9 +590,9 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
   it('ends the turn: refills the hand, resets the buy count, advances the player', () => {
     const state = buying();
     state.bag = ['A9', 'A10', 'A11', 'A12', 'B9', 'B10'];
-    state.players[0].hand = ['H8'];
-    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0].id });
-    expect(next.players[0].hand).toHaveLength(6);
+    state.players[0]!.hand = ['H8'];
+    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0]!.id });
+    expect(next.players[0]!.hand).toHaveLength(6);
     expect(next.currentBuyCount).toBe(0);
     expect(next.turnIndex).toBe(1);
     expect(next.stage).toBe('play');
@@ -601,9 +602,9 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
   it('does not refill past what the bag holds', () => {
     const state = buying();
     state.bag = ['A9'];
-    state.players[0].hand = ['H8'];
-    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0].id });
-    expect(next.players[0].hand).toHaveLength(2);
+    state.players[0]!.hand = ['H8'];
+    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0]!.id });
+    expect(next.players[0]!.hand).toHaveLength(2);
     expect(next.bag).toEqual([]);
   });
 
@@ -611,17 +612,17 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     const state = deadTileFixture();
     state.stage = 'play';
     state.turnIndex = 0;
-    state.players[0].hand = ['C1']; // the only tile, and it is dead
+    state.players[0]!.hand = ['C1']; // the only tile, and it is dead
     state.bag = [];
-    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0].id });
+    const next = applyIntent(state, { type: 'endTurn', playerId: state.players[0]!.id });
     expect(next.turnIndex).toBe(1);
 
     const playable = setupGameWithStartups([{ id: 'Messla', tiles: 3, tier: 0 }]);
     playable.stage = 'play';
     playable.turnIndex = 0;
-    playable.players[0].hand = ['H8']; // far from the auto-assigned Messla tiles — isolated, legal
+    playable.players[0]!.hand = ['H8']; // far from the auto-assigned Messla tiles — isolated, legal
     try {
-      applyIntent(playable, { type: 'endTurn', playerId: playable.players[0].id });
+      applyIntent(playable, { type: 'endTurn', playerId: playable.players[0]!.id });
       throw new Error('should have thrown');
     } catch (e) {
       expect((e as IllegalIntentError).code).toBe('wrongStage');
@@ -632,11 +633,11 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     const state = deadTileFixture();
     state.stage = 'play';
     state.turnIndex = 0;
-    state.players[0].hand = ['C1', 'G6'];
+    state.players[0]!.hand = ['C1', 'G6'];
     state.bag = ['I12'];
-    const next = applyIntent(state, { type: 'tradeInDeadTiles', playerId: state.players[0].id, coords: ['C1'] });
+    const next = applyIntent(state, { type: 'tradeInDeadTiles', playerId: state.players[0]!.id, coords: ['C1'] });
     expect(next.stage).toBe('play');
-    expect(next.players[0].hand).toEqual(['G6', 'I12']);
+    expect(next.players[0]!.hand).toEqual(['G6', 'I12']);
     expect(next.bag).toEqual([]);
     expect(next.log.at(-1)).toMatchObject({ phase: 'Traded a tile' });
   });
@@ -645,15 +646,15 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     const state = deadTileFixture();
     state.stage = 'play';
     state.turnIndex = 0;
-    state.players[0].hand = ['C1', 'G6'];
+    state.players[0]!.hand = ['C1', 'G6'];
     state.bag = ['I12', 'H1'];
     const next = applyIntent(state, {
       type: 'tradeInDeadTiles',
-      playerId: state.players[0].id,
+      playerId: state.players[0]!.id,
       coords: ['C1', 'C1'],
     });
     // Exactly one tile surrendered from the hand, exactly one replacement drawn.
-    expect(next.players[0].hand).toEqual(['G6', 'I12']);
+    expect(next.players[0]!.hand).toEqual(['G6', 'I12']);
     // The bag drops by exactly one.
     expect(next.bag).toEqual(['H1']);
     // Exactly one 'Traded a tile' log entry pushed.
@@ -664,9 +665,9 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     const state = setupGameWithStartups([{ id: 'Messla', tiles: 3, tier: 0 }]);
     state.stage = 'play';
     state.turnIndex = 0;
-    state.players[0].hand = ['H8'];
+    state.players[0]!.hand = ['H8'];
     try {
-      applyIntent(state, { type: 'tradeInDeadTiles', playerId: state.players[0].id, coords: ['H8'] });
+      applyIntent(state, { type: 'tradeInDeadTiles', playerId: state.players[0]!.id, coords: ['H8'] });
       throw new Error('should have thrown');
     } catch (e) {
       expect((e as IllegalIntentError).code).toBe('notADeadTile');
@@ -676,7 +677,7 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
   it('declares the end only when the condition is met', () => {
     const notYet = buying();
     try {
-      applyIntent(notYet, { type: 'declareEnd', playerId: notYet.players[0].id });
+      applyIntent(notYet, { type: 'declareEnd', playerId: notYet.players[0]!.id });
       throw new Error('should have thrown');
     } catch (e) {
       expect((e as IllegalIntentError).code).toBe('endNotAvailable');
@@ -685,7 +686,7 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     const over = setupGameWithStartups([{ id: 'Gobble', tiles: 41, tier: 2 }]);
     over.stage = 'buy';
     over.turnIndex = 0;
-    const ended = applyIntent(over, { type: 'declareEnd', playerId: over.players[0].id });
+    const ended = applyIntent(over, { type: 'declareEnd', playerId: over.players[0]!.id });
     expect(ended.stage).toBe('end');
     expect(ended.log.at(-1)).toMatchObject({ phase: 'Game over' });
   });
@@ -702,36 +703,36 @@ describe('applyIntent — buy, end turn, trade-in, declare end', () => {
     const state = setupGameWithStartups([{ id: 'Gobble', tiles: 3, tier: 0 }]);
     state.stage = 'play';
     state.turnIndex = 0;
-    state.players[0].hand = ['E5'];
-    state.players[1].hand = ['H6'];
+    state.players[0]!.hand = ['E5'];
+    state.players[1]!.hand = ['H6'];
     state.board['H5'] = { placed: true }; // lone unclaimed tile for player 2 to found against
 
-    const placed1 = applyIntent(state, { type: 'placeTile', playerId: state.players[0].id, coord: 'E5' });
+    const placed1 = applyIntent(state, { type: 'placeTile', playerId: state.players[0]!.id, coord: 'E5' });
     expect(placed1.stage).toBe('buy');
 
     const bought1 = applyIntent(placed1, {
-      type: 'buyShares', playerId: state.players[0].id, picks: ['Gobble', 'Gobble'],
+      type: 'buyShares', playerId: state.players[0]!.id, picks: ['Gobble', 'Gobble'],
     });
     expect(bought1.currentBuyCount).toBe(2);
 
-    const ended1 = applyIntent(bought1, { type: 'endTurn', playerId: state.players[0].id });
+    const ended1 = applyIntent(bought1, { type: 'endTurn', playerId: state.players[0]!.id });
     expect(ended1.turnIndex).toBe(1);
     expect(ended1.stage).toBe('play');
 
-    const placed2 = applyIntent(ended1, { type: 'placeTile', playerId: state.players[1].id, coord: 'H6' });
+    const placed2 = applyIntent(ended1, { type: 'placeTile', playerId: state.players[1]!.id, coord: 'H6' });
     expect(placed2.stage).toBe('foundStartup');
 
     const founded2 = applyIntent(placed2, {
-      type: 'chooseFoundingBrand', playerId: state.players[1].id, startupId: 'Messla',
+      type: 'chooseFoundingBrand', playerId: state.players[1]!.id, startupId: 'Messla',
     });
     expect(founded2.stage).toBe('buy');
     expect(founded2.currentBuyCount).toBe(0); // must not carry over player 1's count
 
     const bought2 = applyIntent(founded2, {
-      type: 'buyShares', playerId: state.players[1].id, picks: ['Messla', 'Messla', 'Messla'],
+      type: 'buyShares', playerId: state.players[1]!.id, picks: ['Messla', 'Messla', 'Messla'],
     });
     expect(bought2.currentBuyCount).toBe(3);
-    expect(bought2.players[1].portfolio['Messla']).toBe(4); // 1 founding share + 3 bought
+    expect(bought2.players[1]!.portfolio['Messla']).toBe(4); // 1 founding share + 3 bought
   });
 });
 
@@ -831,7 +832,7 @@ describe('drawTurnOrderTile', () => {
     // at bag[3], one tile per seat per round — consecutive positions go to
     // different players, which is what keeps the odds even across the table.
     for (let i = 0; i < 3; i++) {
-      expect(next.players[i].hand).toEqual(
+      expect(next.players[i]!.hand).toEqual(
         [0, 1, 2, 3, 4, 5].map((round) => bag[3 + i + round * 3]),
       );
     }
@@ -884,7 +885,7 @@ describe('drawTurnOrderTile', () => {
     // And the record agrees with the outcome: the winner is the seat whose own
     // recorded draw is the highest tile.
     const winner = [...next.turnOrderDraws!].sort((a, b) => compareTiles(a.tile, b.tile)).at(-1)!;
-    expect(next.players[next.turnIndex].id).toBe(winner.playerId);
+    expect(next.players[next.turnIndex]!.id).toBe(winner.playerId);
   });
 
   it('narrates each draw as its own step, and announces the winner at the end', () => {
@@ -909,7 +910,7 @@ describe('drawTurnOrderTile', () => {
     // anyone made, so the winner is named in the detail instead.
     expect(next.log.at(-1)!.playerId).toBeUndefined();
     const detail = next.log.at(-1)!.detail.map((t) => ('text' in t ? t.text : '')).join('');
-    expect(detail).toContain(next.players[next.turnIndex].name);
+    expect(detail).toContain(next.players[next.turnIndex]!.name);
     expect(detail).toContain('plays first');
   });
 
@@ -942,7 +943,7 @@ describe('merger payout payload', () => {
     const entries = withPayout.log.filter((e) => e.phase === 'Merger payout');
     expect(entries).toHaveLength(1);
 
-    const payload = entries[0].payload;
+    const payload = entries[0]!.payload;
     expect(payload?.kind).toBe('payout');
     if (payload?.kind !== 'payout') throw new Error('expected a payout payload');
     expect(payload.bonuses.length).toBeGreaterThan(1);

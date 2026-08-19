@@ -5,8 +5,18 @@ import { GameState } from './gameTypes';
 
 export type Row = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I";
 export const ROWS: Row[] = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
-export const COLS = Array.from({ length: 12 }, (_, i) => i + 1);
-export type Coord = `${Row}${number}`;
+export type Col = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+export const COLS: Col[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+/**
+ * The 108 board squares, spelled out rather than left as `` `${Row}${number}` ``.
+ *
+ * A finite union makes `Record<Coord, TileCell>` a record with 108 known keys
+ * instead of an index signature, so `board[coord]` is a `TileCell` under
+ * `noUncheckedIndexedAccess` — which is the truth: the board is dense from
+ * `createEmptyBoard` onward, and `getAdjacentCoords` is bounds-checked, so no
+ * caller can reach a square that does not exist.
+ */
+export type Coord = `${Row}${Col}`;
 
 //----------------------------------------------------
 // Coordinate helpers
@@ -50,7 +60,7 @@ export function shuffleSeeded<T>(array: T[], seed: string): T[] {
   const copy = [...array];
   for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
+    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
   }
   return copy;
 }
@@ -63,8 +73,8 @@ export function getAdjacentCoords(c: Coord): Coord[] {
   const [r, col] = parseCoord(c);
   const rIndex = ROWS.indexOf(r);
   const adj: Coord[] = [];
-  if (rIndex > 0) adj.push(coord(ROWS[rIndex - 1], col)); // north
-  if (rIndex < ROWS.length - 1) adj.push(coord(ROWS[rIndex + 1], col)); // south
+  if (rIndex > 0) adj.push(coord(ROWS[rIndex - 1]!, col)); // north
+  if (rIndex < ROWS.length - 1) adj.push(coord(ROWS[rIndex + 1]!, col)); // south
   if (col > 1) adj.push(coord(r, col - 1)); // west
   if (col < 12) adj.push(coord(r, col + 1)); // east
   return adj;
@@ -108,3 +118,19 @@ export function getStartupSize(state:GameState, id: string): number {
 }
 
 
+
+/**
+ * The seat whose turn it is.
+ *
+ * `turnIndex` is only ever set from `players.length` arithmetic, so the seat
+ * always exists; this exists so that fact is stated once rather than asserted
+ * at every call site. Throwing beats the `undefined.hand` TypeError the same
+ * corruption used to produce.
+ */
+export function turnPlayer(state: GameState): GameState["players"][number] {
+  const player = state.players[state.turnIndex];
+  if (!player) {
+    throw new Error(`turnIndex ${state.turnIndex} is not a seat (${state.players.length} players)`);
+  }
+  return player;
+}

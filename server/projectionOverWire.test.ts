@@ -156,12 +156,12 @@ describe('a resume, as a projection', () => {
     const room = openSegment('resume-projection');
     const [alex, sam] = room.players;
 
-    const a = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
+    const a = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
     await a.send({ type: 'placeTile', coord: 'E6' });
 
     // Sam arrives mid-segment — a rejoin, a refresh, or a first connection
     // after someone else has already started their turn.
-    const s = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const s = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
     await settleSocket(s.socket);
     const resumed = s.latest()!;
 
@@ -174,7 +174,7 @@ describe('a resume, as a projection', () => {
     // consistency check — `clientOverWire` compares both sides through the
     // same `project` and would not notice `project` itself leaking. Matches
     // this file's own established shape above: `seed: ''`, not `undefined`.
-    expect(resumed.state.players.find((p) => p.id === alex.id)!.hand).toEqual([]);
+    expect(resumed.state.players.find((p) => p.id === alex!.id)!.hand).toEqual([]);
     expect(resumed.state.bag).toEqual([]);
     expect(resumed.state.seed).toBe('');
 
@@ -187,8 +187,8 @@ describe('what a client receives', () => {
   it('carries no seed, no bag, and no hand but its own', async () => {
     const room = twoSeats('wire-projection');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       await p1.send({ type: 'endTurn' });
@@ -223,8 +223,8 @@ describe('an open segment is private', () => {
   it('sends the actor nothing and the table nothing while the draft advances', async () => {
     const room = openSegment('wire-draft');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       // Joining an already-playing room sends the joiner their own commit
@@ -259,8 +259,8 @@ describe('an open segment is private', () => {
   it('sends a genuine mid-segment correction to the actor only', async () => {
     const room = deadTileSegment('wire-correction-privacy');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       await settleSocket(p2.socket);
@@ -291,14 +291,14 @@ describe('identity is the socket, not the payload', () => {
   it('rejects an intent from the player who is not being waited on', async () => {
     const room = openSegment('wire-turn');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       await p2.send({ type: 'placeTile', coord: 'A1' });
 
       expect(p2.rejections).toHaveLength(1);
-      expect(p2.rejections[0].code).toBe('notYourTurn');
+      expect(p2.rejections[0]!.code).toBe('notYourTurn');
       expect(room.draft().board['A1'].placed).toBe(false);
     } finally {
       p1.close();
@@ -309,8 +309,8 @@ describe('identity is the socket, not the payload', () => {
   it('ignores a playerId smuggled into the payload', async () => {
     const room = openSegment('wire-spoof');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       // The wire type has no `playerId`, so this does not typecheck as a
@@ -332,7 +332,7 @@ describe('undo over the wire', () => {
   it('lets the actor rewind its own open segment', async () => {
     const room = openSegment('wire-undo');
     const [alex] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
 
     try {
       const opened = room.segmentStart();
@@ -351,8 +351,8 @@ describe('undo over the wire', () => {
   it('refuses an undo from a player who is not the actor', async () => {
     const room = openSegment('wire-undo-foreign');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       const opened = room.segmentStart();
@@ -371,7 +371,7 @@ describe('undo over the wire', () => {
   it('refuses a step below the open segment', async () => {
     const room = openSegment('wire-undo-old');
     const [alex] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
 
     try {
       await p1.send({ type: 'placeTile', coord: 'E6' });
@@ -399,11 +399,11 @@ describe('an intent or undo sent before the game has begun', () => {
     try {
       await p1.send({ type: 'endTurn' });
       expect(p1.rejections).toHaveLength(1);
-      expect(p1.rejections[0].code).toBe('wrongStage');
+      expect(p1.rejections[0]!.code).toBe('wrongStage');
 
       await p1.undo(0);
       expect(p1.rejections).toHaveLength(2);
-      expect(p1.rejections[1].code).toBe('wrongStage');
+      expect(p1.rejections[1]!.code).toBe('wrongStage');
 
       // Not merely "our script didn't throw" — the process is still
       // actually serving requests.
@@ -432,7 +432,7 @@ describe('a malformed or absent payload', () => {
       socket.emit(LOBBY_CLIENT_EVENTS.createRoom, undefined);
       await settleSocket(socket);
       expect(rejections).toHaveLength(1);
-      expect(rejections[0].code).toBe('versionMismatch');
+      expect(rejections[0]!.code).toBe('versionMismatch');
 
       // Carries the right version, so it reaches the shape guard this case
       // is actually about. Without the version it would never get past the
@@ -440,7 +440,7 @@ describe('a malformed or absent payload', () => {
       socket.emit(LOBBY_CLIENT_EVENTS.createRoom, { name: 42, protocolVersion: PROTOCOL_VERSION });
       await settleSocket(socket);
       expect(rejections).toHaveLength(2);
-      expect(rejections[1].code).toBe('unknownIntent');
+      expect(rejections[1]!.code).toBe('unknownIntent');
 
       // The server is still serving: a well-formed createRoom on the very
       // same socket, right after two malformed ones, still works.
@@ -469,7 +469,7 @@ describe('a malformed or absent payload', () => {
       socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, undefined);
       await settleSocket(socket);
       expect(rejections).toHaveLength(1);
-      expect(rejections[0].code).toBe('versionMismatch');
+      expect(rejections[0]!.code).toBe('versionMismatch');
 
       // Versioned, so this genuinely reaches the shape guard. A name of the
       // wrong *type*, not an absent one: absence is legal as of the Lobby Flow
@@ -482,7 +482,7 @@ describe('a malformed or absent payload', () => {
       });
       await settleSocket(socket);
       expect(rejections).toHaveLength(2);
-      expect(rejections[1].code).toBe('unknownIntent');
+      expect(rejections[1]!.code).toBe('unknownIntent');
 
       const joined = await new Promise<JoinedMessage>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('never joined')), 4000);
@@ -500,18 +500,18 @@ describe('a malformed or absent payload', () => {
   it('undo rejects a non-numeric stepId instead of crashing the server', async () => {
     const room = openSegment('wire-undo-malformed');
     const [alex] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
 
     try {
       p1.socket.emit(GAME_CLIENT_EVENTS.undo, {});
       await settleSocket(p1.socket);
       expect(p1.rejections).toHaveLength(1);
-      expect(p1.rejections[0].code).toBe('undoOutOfSegment');
+      expect(p1.rejections[0]!.code).toBe('undoOutOfSegment');
 
       p1.socket.emit(GAME_CLIENT_EVENTS.undo, undefined);
       await settleSocket(p1.socket);
       expect(p1.rejections).toHaveLength(2);
-      expect(p1.rejections[1].code).toBe('undoOutOfSegment');
+      expect(p1.rejections[1]!.code).toBe('undoOutOfSegment');
 
       // The server is still serving: a real intent on the same connection
       // still works.
@@ -528,11 +528,11 @@ describe('a malformed or absent payload', () => {
     // `doTradeInDeadTiles` requires `play` (`openSegment`'s stage).
     const buyRoom = buyStage('wire-intent-malformed-buy');
     const [buyAlex] = buyRoom.players;
-    const buyer = await connectPlayer(server.port, buyRoom.id, buyAlex.name, buyAlex.id, buyAlex.token);
+    const buyer = await connectPlayer(server.port, buyRoom.id, buyAlex!.name, buyAlex!.id, buyAlex!.token);
 
     const tradeRoom = openSegment('wire-intent-malformed-trade');
     const [tradeAlex] = tradeRoom.players;
-    const trader = await connectPlayer(server.port, tradeRoom.id, tradeAlex.name, tradeAlex.id, tradeAlex.token);
+    const trader = await connectPlayer(server.port, tradeRoom.id, tradeAlex!.name, tradeAlex!.id, tradeAlex!.token);
 
     try {
       // Each of these has a *valid* `type` and a malformed field — the case
@@ -550,13 +550,13 @@ describe('a malformed or absent payload', () => {
         await settleSocket(buyer.socket);
         expect(buyer.rejections, `buyShares payload ${i} (${JSON.stringify(payload)})`)
           .toHaveLength(i + 1);
-        expect(buyer.rejections[i].code).toBe('unknownIntent');
+        expect(buyer.rejections[i]!.code).toBe('unknownIntent');
       }
 
       trader.socket.emit(GAME_CLIENT_EVENTS.intent, { type: 'tradeInDeadTiles', coords: 5 });
       await settleSocket(trader.socket);
       expect(trader.rejections).toHaveLength(1);
-      expect(trader.rejections[0].code).toBe('unknownIntent');
+      expect(trader.rejections[0]!.code).toBe('unknownIntent');
 
       // The server stayed up: a well-formed intent on each connection, right
       // after the malformed ones, still works — and so does an unrelated
@@ -583,8 +583,8 @@ describe('a rejection is addressed to a non-actor', () => {
   it('carries the committed state, never the actor draft — and the actor still gets their own draft back', async () => {
     const room = openSegment('wire-reject-draft-leak');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       await p1.send({ type: 'placeTile', coord: 'E6' });
@@ -635,7 +635,7 @@ describe('a player id that was never seated', () => {
     expect(undone).toMatchObject({ kind: 'rejected', code: 'notYourTurn' });
 
     // The server this room lives in is still serving real players.
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
     try {
       await p1.send({ type: 'placeTile', coord: 'E6' });
       expect(room.draft().board['E6'].placed).toBe(true);
@@ -649,8 +649,8 @@ describe('a rejected intent leaves the draft unchanged', () => {
   it('is byte-for-byte identical, asserted over the wire', async () => {
     const room = openSegment('wire-unchanged-draft');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       const before = JSON.stringify(room.draft());
@@ -670,8 +670,8 @@ describe('the log never leaks a hand through project()', () => {
   it('names no tile coordinate that sits in another player\'s actual hand', async () => {
     const room = deadReplacementSegment('wire-log-leak');
     const [alex, sam] = room.players;
-    const p1 = await connectPlayer(server.port, room.id, alex.name, alex.id, alex.token);
-    const p2 = await connectPlayer(server.port, room.id, sam.name, sam.id, sam.token);
+    const p1 = await connectPlayer(server.port, room.id, alex!.name, alex!.id, alex!.token);
+    const p2 = await connectPlayer(server.port, room.id, sam!.name, sam!.id, sam!.token);
 
     try {
       await p1.send({ type: 'tradeInDeadTiles', coords: ['C6'] });

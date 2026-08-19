@@ -85,10 +85,15 @@ export function previewPlacement(state: GameState, coord: Coord, playerId?: stri
   // this is a preview, so nothing is mutated).
   const absorbedLoners = floodFillUnclaimed(loneAdj, state.board).length;
 
+  const [largest] = sized;
+  // Unreachable: `touchingIds.length === 0` returned above and `sized` is a
+  // map over it, so this only tells the compiler what the early return proved.
+  if (!largest) return preview;
+
   if (sized.length === 1) {
     preview.kind = 'grow';
     // +1 for the placed tile itself, which isn't on the board to be counted.
-    preview.prices[sized[0].id] = change(state, sized[0].id, sized[0].size + 1 + absorbedLoners);
+    preview.prices[largest.id] = change(state, largest.id, largest.size + 1 + absorbedLoners);
     return preview;
   }
 
@@ -100,7 +105,7 @@ export function previewPlacement(state: GameState, coord: Coord, playerId?: stri
     return preview;
   }
 
-  const top = sized[0].size;
+  const top = largest.size;
   const tied = sized.filter((s) => s.size === top);
   const total = sized.reduce((n, s) => n + s.size, 0) + 1 + absorbedLoners;
 
@@ -112,9 +117,9 @@ export function previewPlacement(state: GameState, coord: Coord, playerId?: stri
     preview.tiedSurvivorIds = tied.map((s) => s.id);
     for (const s of tied) preview.prices[s.id] = change(state, s.id, total);
   } else {
-    preview.survivorId = sized[0].id;
+    preview.survivorId = largest.id;
     preview.absorbedIds = sized.slice(1).map((s) => s.id);
-    preview.prices[sized[0].id] = change(state, sized[0].id, total);
+    preview.prices[largest.id] = change(state, largest.id, total);
     for (const s of sized.slice(1)) preview.prices[s.id] = change(state, s.id, 0);
   }
   return preview;

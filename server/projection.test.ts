@@ -33,7 +33,7 @@ describe('project', () => {
 
     expect(state.seed).toBe('golden-fixture');
     expect(state.bag).toEqual(['I11', 'I12']);
-    expect(state.players[1].hand).toEqual(['A1', 'B2']);
+    expect(state.players[1]!.hand).toEqual(['A1', 'B2']);
   });
 
   it('keeps what is public', () => {
@@ -49,8 +49,8 @@ describe('project', () => {
 
   it('carries no socketId to anyone', () => {
     const state = twoHands();
-    state.players[0].socketId = 'sock-1';
-    state.players[1].socketId = 'sock-2';
+    state.players[0]!.socketId = 'sock-1';
+    state.players[1]!.socketId = 'sock-2';
 
     for (const p of project(state, 'p1').players) {
       expect(p.socketId).toBeUndefined();

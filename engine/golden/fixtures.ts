@@ -45,7 +45,7 @@ export function buildFixture(spec: FixtureSpec): GameState {
     if (!startup) throw new Error(`fixture references unknown startup ${chain.id}`);
     for (const c of chain.coords) claim(c, chain.id);
     startup.isFounded = true;
-    startup.foundingTile = chain.coords[0];
+    startup.foundingTile = chain.coords[0]!; // non-empty, checked above
   }
 
   for (const c of spec.loners ?? []) claim(c);
@@ -53,14 +53,14 @@ export function buildFixture(spec: FixtureSpec): GameState {
   const players: Player[] = spec.players.map((p, i) => ({
     id: `p${i + 1}`,
     name: p.name,
-    emoji: PLAYER_EMOJI[i % PLAYER_EMOJI.length],
+    emoji: PLAYER_EMOJI[i % PLAYER_EMOJI.length]!, // wrapped index into a non-empty list
     cash: p.cash ?? 6000,
     hand: [...(p.hand ?? [])],
     portfolio: {},
   }));
 
   spec.players.forEach((p, i) => {
-    const player = players[i];
+    const player = players[i]!; // `players` was mapped from `spec.players`
     for (const [startupId, qty] of Object.entries(p.shares ?? {})) {
       const startup = startups[startupId];
       if (!startup) throw new Error(`fixture gives shares in unknown startup ${startupId}`);

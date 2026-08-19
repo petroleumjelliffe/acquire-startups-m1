@@ -22,7 +22,7 @@ import { authored, fromGolden, goldenState, type CatalogFixture } from './fixtur
 
 import { AVAILABLE_STARTUPS, TRADE_RATIO, isStartupId } from '../../../engine/startups';
 import { getSharePrice } from '../../../engine/gameLogic';
-import { floodFillUnclaimed } from '../../../engine/gameHelpers';
+import { floodFillUnclaimed, turnPlayer } from '../../../engine/gameHelpers';
 import { getDeadTilesInHand } from '../../../engine/placement';
 import { finalScore } from '../../../engine/endGame';
 import type { Coord, GameState, StartupId } from '../../../engine/gameTypes';
@@ -38,7 +38,7 @@ import type { SessionView } from '../../../session/GameSession';
 
 const noop = () => {};
 
-const active = (s: GameState) => s.players[s.turnIndex];
+const active = (s: GameState) => turnPlayer(s);
 
 const foundedIds = (s: GameState): StartupId[] =>
   Object.values(s.startups)
@@ -55,12 +55,12 @@ const hqTilesOf = (s: GameState): Coord[] =>
     .map((x) => x.foundingTile as Coord);
 
 /** Coord → the placing player's initial, for the last tile each player placed. */
-const ownersOf = (s: GameState): Record<Coord, string> => {
+const ownersOf = (s: GameState): Partial<Record<Coord, string>> => {
   const out: Record<string, string> = {};
   for (const p of s.players) {
     if (p.lastPlacedTile) out[p.lastPlacedTile] = p.name.slice(0, 1);
   }
-  return out as Record<Coord, string>;
+  return out;
 };
 
 const stepsOf = (s: GameState) =>
@@ -96,6 +96,7 @@ function liqHoldersOf(s: GameState): LiqHolder[] {
   const ctx = s.mergerContext;
   if (!ctx) return [];
   const absorbedId = ctx.absorbedIds[0];
+  if (absorbedId === undefined) return [];
   return ctx.shareholderQueue.map((pid, i) => {
     const p = s.players.find((x) => x.id === pid);
     return {

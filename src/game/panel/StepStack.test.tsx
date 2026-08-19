@@ -57,7 +57,7 @@ describe('StepStack', () => {
     const onUndo = vi.fn();
     const { container } = render(<StepStack entries={ENTRIES} onUndo={onUndo} />);
     const second = container.querySelectorAll('[data-step-undo]')[1];
-    fireEvent.click(second);
+    fireEvent.click(second!);
     expect(onUndo).toHaveBeenCalledWith(2);
   });
 });

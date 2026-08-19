@@ -21,7 +21,7 @@ describe('ScenarioPage', () => {
     const first = ALL_GOLDEN_GAMES[0];
     // States, not steps: the replay yields the fixture plus one state per step.
     expect(screen.getByText(/0\. opening position/)).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(`^${first.steps.length}\\.`))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp(`^${first!.steps.length}\\.`))).toBeInTheDocument();
   });
 
   it('drops into a playable game at the chosen state', () => {
@@ -38,7 +38,7 @@ describe('ScenarioPage', () => {
     render(<ScenarioPage />);
     const seats = screen.getByRole('group', { name: /whose screen/i });
     const asPlayer = within(seats).getAllByRole('radio')[1];
-    fireEvent.click(asPlayer);
+    fireEvent.click(asPlayer!);
     fireEvent.click(screen.getByText(/0\. opening position/));
 
     expect(screen.getByText(/as p1/)).toBeInTheDocument();

@@ -39,11 +39,14 @@ export function computeChainBonuses(
   });
 
   // Sole holder takes both bonuses as one combined figure.
+  const [topHolder, runnerUpHolder] = holders;
+  if (!topHolder) return []; // unreachable: the length check above returned
+
   if (holders.length === 1) {
-    return [make(holders[0], majorityPot + minorityPot, 'both')];
+    return [make(topHolder, majorityPot + minorityPot, 'both')];
   }
 
-  const topShares = holders[0].shares;
+  const topShares = topHolder.shares;
   const topHolders = holders.filter((h) => h.shares === topShares);
 
   // Tied majority: the two pots are combined and split between the tied
@@ -53,12 +56,12 @@ export function computeChainBonuses(
     return topHolders.map((h) => make(h, each, 'majority'));
   }
 
-  const runnerUpShares = holders[1].shares;
+  const runnerUpShares = runnerUpHolder!.shares; // length > 1 here
   const runnersUp = holders.filter((h) => h.shares === runnerUpShares);
   const eachMinority = runnersUp.length > 1 ? roundBonus(minorityPot / runnersUp.length) : minorityPot;
 
   return [
-    make(holders[0], majorityPot, 'majority'),
+    make(topHolder, majorityPot, 'majority'),
     ...runnersUp.map((h) => make(h, eachMinority, 'minority')),
   ];
 }

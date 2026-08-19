@@ -82,7 +82,7 @@ describe('createGameSession', () => {
 
     session.undoTo(stepId);
     expect(session.getView().state.stage).toBe('play');
-    expect(session.getView().state.players[0].hand).toContain('E6');
+    expect(session.getView().state.players[0]!.hand).toContain('E6');
   });
 
   it('returns a new view object per change so useSyncExternalStore sees it', () => {
@@ -195,7 +195,7 @@ describe('segments', () => {
     const before = states.findIndex((s) => s.stage === 'play');
     if (before < 0) throw new Error('G2 no longer passes through a placeable state');
 
-    const session = createGameSession({ state: states[before] });
+    const session = createGameSession({ state: states[before]! });
     const view = session.getView();
     const step = merging.steps[before];
     if (step?.intent.type !== 'placeTile') throw new Error('G2 step order changed');

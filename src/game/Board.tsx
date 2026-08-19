@@ -19,7 +19,8 @@ export interface BoardProps {
   /** The tile placed this turn — the one still undoable. */
   placed?: Coord | null;
   /** Coord → the owning player's initial, badged on the tile. */
-  owners?: Record<Coord, string>;
+  /** Sparse: only the tiles that carry a badge. */
+  owners?: Partial<Record<Coord, string>>;
   /** Hand tiles whose placement would illegally merge two safe chains. */
   blocked?: Coord[];
   /** The one labelled cell per chain, showing the ticker. */

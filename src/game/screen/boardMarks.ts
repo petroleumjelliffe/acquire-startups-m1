@@ -25,7 +25,7 @@ const FOUNDED = 'Founded a startup';
  * playerId of whoever pressed the button, which would badge the whole opening
  * board with seat one's emoji.
  */
-export function ownerBadges(state: GameState): Record<Coord, string> {
+export function ownerBadges(state: GameState): Partial<Record<Coord, string>> {
   const lastPlayed: Record<string, Coord> = {};
 
   for (const entry of state.log) {
@@ -57,7 +57,7 @@ export function ownerBadges(state: GameState): Record<Coord, string> {
  */
 export function lastPlacedTile(state: GameState): Coord | null {
   for (let i = state.log.length - 1; i >= 0; i -= 1) {
-    const entry = state.log[i];
+    const entry = state.log[i]!;
     if (entry.phase !== PLACED) continue;
     const tile = entry.detail.find((token) => token.kind === 'tile');
     if (tile?.kind === 'tile') return tile.coord;
@@ -96,7 +96,7 @@ export function foundingTiles(state: GameState): Coord[] {
  */
 export function foundedThisTurn(state: GameState, segmentStart: number): StartupId | null {
   for (let i = state.log.length - 1; i >= 0; i--) {
-    const entry = state.log[i];
+    const entry = state.log[i]!;
     if (entry.stepId < segmentStart) break;
     if (entry.phase !== FOUNDED) continue;
     // From the payload, which is where the founding step keeps its startup now

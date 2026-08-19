@@ -96,7 +96,7 @@ async function seat(action: 'create' | { join: string }, name?: string): Promise
 describe('a seat taken without a name', () => {
   it('is named by its seat number rather than refused', async () => {
     const host = await seat('create');
-    const roomId = host.rosters[0].roomId;
+    const roomId = host.rosters[0]!.roomId;
     const guest = await seat({ join: roomId });
 
     try {
@@ -146,7 +146,7 @@ describe('a seat taken without a name', () => {
 describe('renamePlayer', () => {
   it('renames your own seat and tells the whole room', async () => {
     const host = await seat('create', 'Alex');
-    const roomId = host.rosters[0].roomId;
+    const roomId = host.rosters[0]!.roomId;
     const guest = await seat({ join: roomId }, 'Player 2');
 
     try {
@@ -174,7 +174,7 @@ describe('renamePlayer', () => {
       await settleSocket(host.socket);
 
       expect(host.rejections.map((r) => r.code)).toEqual(['unknownIntent']);
-      expect(server.rooms.get(host.rosters[0].roomId)!.players[0].name).toBe('Alex');
+      expect(server.rooms.get(host.rosters[0]!.roomId)!.players[0]!.name).toBe('Alex');
     } finally {
       host.close();
     }
@@ -189,7 +189,7 @@ describe('renamePlayer', () => {
       bag: ['I11'],
     }));
     const alex = await connectPlayer(
-      server.port, room.id, 'Alex', room.players[0].id, room.players[0].token,
+      server.port, room.id, 'Alex', room.players[0]!.id, room.players[0]!.token,
     );
 
     try {
@@ -197,7 +197,7 @@ describe('renamePlayer', () => {
       await settleSocket(alex.socket);
 
       expect(alex.rejections.map((r) => r.code)).toEqual(['wrongStage']);
-      expect(room.players[0].name).toBe('Alex');
+      expect(room.players[0]!.name).toBe('Alex');
     } finally {
       alex.close();
     }
@@ -222,7 +222,7 @@ describe('renamePlayer', () => {
 describe('leaveSeat', () => {
   it('vacates the seat and the roster stops listing it', async () => {
     const host = await seat('create', 'Alex');
-    const roomId = host.rosters[0].roomId;
+    const roomId = host.rosters[0]!.roomId;
     const guest = await seat({ join: roomId }, 'Sam');
 
     try {
@@ -242,7 +242,7 @@ describe('leaveSeat', () => {
 
   it('hands the host flag to the next seat when the host leaves', async () => {
     const host = await seat('create', 'Alex');
-    const roomId = host.rosters[0].roomId;
+    const roomId = host.rosters[0]!.roomId;
     const guest = await seat({ join: roomId }, 'Sam');
 
     try {
@@ -253,8 +253,8 @@ describe('leaveSeat', () => {
       // A lobby with no host is a lobby nobody can ever start.
       const remaining = guest.rosters.at(-1)!.players;
       expect(remaining).toHaveLength(1);
-      expect(remaining[0].name).toBe('Sam');
-      expect(remaining[0].isHost).toBe(true);
+      expect(remaining[0]!.name).toBe('Sam');
+      expect(remaining[0]!.isHost).toBe(true);
     } finally {
       host.close();
       guest.close();
@@ -270,7 +270,7 @@ describe('leaveSeat', () => {
       bag: ['I11'],
     }));
     const alex = await connectPlayer(
-      server.port, room.id, 'Alex', room.players[0].id, room.players[0].token,
+      server.port, room.id, 'Alex', room.players[0]!.id, room.players[0]!.token,
     );
 
     try {

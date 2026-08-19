@@ -62,10 +62,10 @@ describe('the file store', () => {
     const { records: loaded } = await store.loadAll();
 
     expect(loaded).toHaveLength(1);
-    expect(loaded[0].roomId).toBe('ABC123');
+    expect(loaded[0]!.roomId).toBe('ABC123');
     // The whole point of version 4: a restored room is one people can rejoin.
-    expect(loaded[0].players.map((p) => p.token)).toEqual(['tok-1', 'tok-2']);
-    expect(loaded[0].state.board).toEqual(saved.state.board);
+    expect(loaded[0]!.players.map((p) => p.token)).toEqual(['tok-1', 'tok-2']);
+    expect(loaded[0]!.state.board).toEqual(saved.state.board);
   });
 
   it('ignores a record from an older save version rather than coercing it', async () => {
@@ -151,7 +151,7 @@ describe('two saves for the same room, in flight at once', () => {
     await Promise.all([a, b]);
 
     const { records: loaded } = await store.loadAll();
-    expect(loaded[0].savedAt).toBe(2);
+    expect(loaded[0]!.savedAt).toBe(2);
   });
 });
 
@@ -171,11 +171,11 @@ describe('the record carries what a resumed room needs', () => {
 
     const [loaded] = (await store.loadAll()).records;
 
-    expect(loaded.protocolVersion).toBe(PROTOCOL_VERSION);
+    expect(loaded!.protocolVersion).toBe(PROTOCOL_VERSION);
     // Without this the step stack's "previous turn" is blank after a restart —
     // the exact gap the field was added to close, left open for the restart
     // case until now.
-    expect(loaded.previousSegmentStart).toBe(7);
+    expect(loaded!.previousSegmentStart).toBe(7);
   });
 
   it('accepts a record from before any segment had closed', async () => {
@@ -187,8 +187,8 @@ describe('the record carries what a resumed room needs', () => {
 
     const [loaded] = (await store.loadAll()).records;
 
-    expect(loaded.previousSegmentStart).toBeUndefined();
-    expect(loaded.roomId).toBe('ABC123');
+    expect(loaded!.previousSegmentStart).toBeUndefined();
+    expect(loaded!.roomId).toBe('ABC123');
   });
 
   it('refuses a record with no protocol version at all', async () => {
