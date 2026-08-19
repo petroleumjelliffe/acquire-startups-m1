@@ -1,6 +1,6 @@
 import type { GameState, Player, Stage, StartupId } from './gameTypes';
 import type { Coord } from './gameHelpers';
-import { compareTiles } from './gameHelpers';
+import { compareTiles, turnPlayer } from './gameHelpers';
 import { previewPlacement, isDeadTile } from './placement';
 import { getEndCondition } from './endGame';
 import { tok, pushLog } from './log';
@@ -58,7 +58,7 @@ function requireStage(state: GameState, ...stages: Stage[]): void {
 }
 
 function requireCurrentPlayer(state: GameState, playerId: string): Player {
-  const player = state.players[state.turnIndex];
+  const player = turnPlayer(state);
   if (!player || player.id !== playerId) reject('notYourTurn');
   return player;
 }
@@ -180,6 +180,7 @@ function doLiquidate(state: GameState, intent: Extract<Intent, { type: 'liquidat
   if (trade % TRADE_RATIO !== 0) reject('oddTradeCount');
 
   const survivor = state.startups[ctx.survivorId];
+  if (!survivor) reject('notEnoughShares', `unknown survivor ${ctx.survivorId}`);
   const gained = trade / TRADE_RATIO;
   if (gained > survivor.availableShares) reject('notEnoughShares');
 
@@ -369,7 +370,8 @@ function doDeclareEnd(state: GameState, intent: Extract<Intent, { type: 'declare
   const condition = getEndCondition(state);
   if (!condition.met) reject('endNotAvailable');
 
-  const reason = condition.reasons[0];
+  // `met` is `reasons.length > 0`, so the first reason always exists.
+  const reason = condition.reasons[0]!;
   pushLog(state, 'Game over', reason.kind === 'size41'
     ? [tok.brand(reason.startupId), tok.text(` reached ${reason.size} tiles`)]
     : [tok.text('every founded chain is safe')], intent.playerId);
@@ -448,7 +450,8 @@ function doDrawTurnOrderTile(
   const nameOf = (playerId: string) =>
     state.players.find((p) => p.id === playerId)?.name ?? playerId;
   const sorted = [...draws].sort((a, b) => compareTiles(b.tile, a.tile));
-  const winner = sorted[0];
+  // Every seat has drawn by the time this runs, so there is always a winner.
+  const winner = sorted[0]!;
   state.turnIndex = state.players.findIndex((p) => p.id === winner.playerId);
 
   // The winner is named rather than merely arrived at, as its own step. With a

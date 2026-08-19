@@ -17,7 +17,8 @@ export const MAX_BUYS_PER_TURN = 3;
 export const HAND_SIZE = 6;
 /** Absorbed shares handed in per survivor share gained in a merger trade. */
 export const TRADE_RATIO = 2;
-export const SIZE_THRESHOLDS: readonly number[] = [2, 3, 4, 5, 6, 11, 21, 31, 41];
+/** Non-empty by construction, and typed that way so `[0]` needs no assertion. */
+export const SIZE_THRESHOLDS: readonly [number, ...number[]] = [2, 3, 4, 5, 6, 11, 21, 31, 41];
 /**
  * Acquire seats 2–6. A game rule, so it lives with the rules — and
  * deliberately *not* `PLAYER_EMOJI.length`, which is a decoration list meant
@@ -57,14 +58,16 @@ export function isStartupId(id: string): id is StartupId {
 
 /** Base prices at each entry in SIZE_THRESHOLDS, for tier 0. Tier n adds n × 100. */
 const TIER0_PRICES: readonly number[] = [200, 300, 400, 500, 600, 700, 800, 900, 1000];
+// Parallel to SIZE_THRESHOLDS — same length, band-for-band — which is what
+// makes the indexed reads below safe without a bounds check.
 
 export function getSharePriceAtSize(tier: 0 | 1 | 2, size: number): number {
   if (size < SIZE_THRESHOLDS[0]) return 0;
   let band = 0;
   for (let i = 0; i < SIZE_THRESHOLDS.length; i++) {
-    if (size >= SIZE_THRESHOLDS[i]) band = i;
+    if (size >= SIZE_THRESHOLDS[i]!) band = i;
   }
-  return TIER0_PRICES[band] + tier * 100;
+  return TIER0_PRICES[band]! + tier * 100;
 }
 
 export function getNextSharePrice(state: GameState, startupId: StartupId): number | null {

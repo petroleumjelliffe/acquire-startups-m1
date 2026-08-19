@@ -20,7 +20,7 @@ export interface PlayerRosterProps {
 
 /** Seat avatars come from the engine's fixed six, by index. */
 export function avatarFor(index: number): string {
-  return PLAYER_EMOJI[index % PLAYER_EMOJI.length];
+  return PLAYER_EMOJI[index % PLAYER_EMOJI.length]!; // wrapped index into a non-empty list
 }
 
 export function PlayerRoster({

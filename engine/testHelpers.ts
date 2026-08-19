@@ -69,7 +69,7 @@ export function setupGameWithStartups(
         ? tiles
         : autoCoords.slice(autoCursor, (autoCursor += tiles));
 
-      startup.foundingTile = coords[0];
+      startup.foundingTile = coords[0] ?? null;
 
       // Place tiles on board
       coords.forEach((coord) => {

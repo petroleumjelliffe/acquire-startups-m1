@@ -5,6 +5,7 @@ import { Coord,
   floodFillUnclaimed,
   getTilesForStartup,
   getStartupSize,
+  turnPlayer,
 } from "./gameHelpers";
 import { tok, pushLog } from "./log";
 import {
@@ -73,7 +74,7 @@ export function resolveInitialDraw(state: GameState) {
   // double-counts its tiles a few lines below; that is a separate, documented
   // defect this path takes to the grave in Phase 3.)
   const sorted = [...drawn].sort((a, b) => compareTiles(b.tile, a.tile));
-  const firstName = sorted[0].name;
+  const firstName = sorted[0]!.name;
   const firstIndex = state.players.findIndex((p) => p.name === firstName);
 
   // return tiles to bag end
@@ -83,7 +84,7 @@ export function resolveInitialDraw(state: GameState) {
     tok.text(i === 0 ? `${d.name}→` : `, ${d.name}→`),
     tok.tile(d.tile),
   ]));
-  pushLog(state, 'Drew tiles', [tok.text('will go first')], state.players[firstIndex].id);
+  pushLog(state, 'Drew tiles', [tok.text('will go first')], state.players[firstIndex]!.id);
 
   return { drawn: sorted, firstIndex };
 }
@@ -105,7 +106,7 @@ export function allHandsFull(state: GameState) {
 //----------------------------------------------------
 
 export function handleTilePlacement(state: GameState, coord: Coord): GameState {
-  const player = state.players[state.turnIndex];
+  const player = turnPlayer(state);
   const cell = state.board[coord];
   if (!player.hand.includes(coord) || cell.placed) return state;
 
@@ -167,7 +168,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
     }
   } else if (adjStartups.size === 1) {
     // Expand existing startup
-    const [id] = [...adjStartups];
+    const id = [...adjStartups][0]!; // size === 1, checked above
     const group = floodFillUnclaimed([coord, ...adjUnclaimed], state.board);
     for (const g of group) state.board[g].startupId = id;
     pushLog(state, 'Placed a tile', [
@@ -189,7 +190,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
       }))
       .sort((a, b) => b.size - a.size);
 
-    const top = sizes[0];
+    const top = sizes[0]!; // two or more touching startups, checked above
     const next = sizes[1];
 
     // Check if there's a tie - if so, show modal to choose survivor
@@ -261,7 +262,7 @@ export function handleTilePlacement(state: GameState, coord: Coord): GameState {
 export function completeTileTransaction(state: GameState) {
   if (!state.pendingTileToRemove) return;
 
-  const player = state.players[state.turnIndex];
+  const player = turnPlayer(state);
   const coord = state.pendingTileToRemove;
 
   // Remove the played tile from hand
@@ -283,7 +284,7 @@ export function cancelTilePlacement(state: GameState) {
   if (!state.pendingTileToRemove) return state;
 
   const coord = state.pendingTileToRemove;
-  const player = state.players[state.turnIndex];
+  const player = turnPlayer(state);
 
   // Unplace the tile
   const cell = state.board[coord];
@@ -348,8 +349,10 @@ export function assignTilesToStartup(state: GameState, id: string) {
 export function returnBrandToAvailable(state: GameState, id: string) {
   // Only return if not already available and not active
   // if (state.startups[id]) return; // still active
-  state.startups[id].isFounded = false;
-  state.startups[id].foundingTile = null;
+  const startup = state.startups[id];
+  if (!startup) return;
+  startup.isFounded = false;
+  startup.foundingTile = null;
 }
 
 /**
@@ -365,7 +368,7 @@ export function completeSurvivorSelection(state: GameState, survivorId: string) 
     return;
   }
 
-  const player = state.players[state.turnIndex];
+  const player = turnPlayer(state);
 
   // Get adjacent coords for unclaimed tiles
   const adj = getAdjacentCoords(coord);
@@ -498,7 +501,7 @@ export function foundStartup(
     placement.detail = [tok.tile(foundingTile), tok.text(' founded '), tok.brand(id)];
   }
 
-  grantFoundingShare(state, state.players[state.turnIndex].id, id);
+  grantFoundingShare(state, turnPlayer(state).id, id);
   // What this step uniquely records: the share the founder is awarded, carried
   // as a payload so the panel can render the certificate itself rather than a
   // sentence about it. The tile and the startup are on the placement above.
@@ -506,7 +509,7 @@ export function foundStartup(
     state,
     'Founded a startup',
     [],
-    state.players[state.turnIndex].id,
+    turnPlayer(state).id,
     { kind: 'founding', startupId: id, shares: 1 },
   );
 
@@ -655,7 +658,9 @@ export function prepareMergerPayout(
 
   for (const absorbedId of absorbedIds) {
     // ✅ FIX: Use pre-merger price from passed-in prices
-    const price = absorbedPrices[absorbedId];
+    // Every caller fills `absorbedPrices` from `absorbedIds`, so the lookup
+    // always hits; asserting keeps the arithmetic identical either way.
+    const price = absorbedPrices[absorbedId]!;
 
     const holdings = state.players.map((p) => ({
       playerId: p.id,
@@ -692,7 +697,7 @@ function buildShareholderQueue(state: GameState, startupId: string): string[] {
   // Start from current turn player and wrap around
   for (let i = 0; i < numPlayers; i++) {
     const playerIndex = (state.turnIndex + i) % numPlayers;
-    const player = state.players[playerIndex];
+    const player = state.players[playerIndex]!;
     if ((player.portfolio[startupId] || 0) > 0) {
       shareholders.push(player.id);
     }
@@ -738,6 +743,9 @@ export function finalizeMergerPayout(state: GameState) {
   // Start processing first absorbed startup
   ctx.currentLiquidationIndex = 0;
   const firstAbsorbed = ctx.absorbedIds[0];
+  if (firstAbsorbed === undefined) {
+    throw new Error('a merger reached liquidation with no absorbed startups');
+  }
 
   // Build shareholder queue starting from current player
   const shareholders = buildShareholderQueue(state, firstAbsorbed);
@@ -764,7 +772,13 @@ export function advanceToNextAbsorbedStartup(state: GameState) {
 
   // Clean up current absorbed startup
   const currentAbsorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
+  if (currentAbsorbed === undefined) {
+    throw new Error(
+      `merger liquidation index ${ctx.currentLiquidationIndex} is past its ${ctx.absorbedIds.length} absorbed startups`
+    );
+  }
   const s = state.startups[currentAbsorbed];
+  if (!s) throw new Error(`merger absorbed an unknown startup: ${currentAbsorbed}`);
   s.isFounded = false;
   s.foundingTile = null;
 
@@ -788,7 +802,7 @@ export function advanceToNextAbsorbedStartup(state: GameState) {
 
   if (ctx.currentLiquidationIndex < ctx.absorbedIds.length) {
     // Process next absorbed startup
-    const nextAbsorbed = ctx.absorbedIds[ctx.currentLiquidationIndex];
+    const nextAbsorbed = ctx.absorbedIds[ctx.currentLiquidationIndex]!; // in range, checked above
     // Build shareholder queue starting from current player
     const shareholders = buildShareholderQueue(state, nextAbsorbed);
 
@@ -830,6 +844,8 @@ export function completePlayerMergerLiquidation(
   const player = state.players.find((p) => p.id === playerId)!;
   const survivor = state.startups[ctx.survivorId];
   const absorbed = state.startups[absorbedId];
+  if (!survivor) throw new Error(`merger survivor is an unknown startup: ${ctx.survivorId}`);
+  if (!absorbed) throw new Error(`merger absorbed an unknown startup: ${absorbedId}`);
   // ✅ FIX: Use pre-merger price from merger context
   const sharePrice = ctx.absorbedPrices[absorbedId] || 0;
 
@@ -838,9 +854,9 @@ export function completePlayerMergerLiquidation(
   const beforeHolding = player.portfolio[absorbedId] || 0;
   const hold = beforeHolding - tradeCost - sell;
 
-  // Deduct absorbed shares
-  player.portfolio[absorbedId] -= tradeCost + sell;
-  if (player.portfolio[absorbedId] < 0) player.portfolio[absorbedId] = 0;
+  // Deduct absorbed shares, clamped at zero — the same two steps as before,
+  // said once now that the pre-deduction holding is already in `beforeHolding`.
+  player.portfolio[absorbedId] = Math.max(0, beforeHolding - tradeCost - sell);
 
   // Conservation: credit the bank with exactly what left the portfolio above
   // (`beforeHolding - portfolio[absorbedId]`), not the requested `tradeCost +
@@ -851,7 +867,7 @@ export function completePlayerMergerLiquidation(
   // only once `advanceToNextAbsorbedStartup`'s end-of-chain reconciliation
   // runs; that reconciliation stays in place as a backstop and is now
   // idempotent given this line already keeps the pool correct.
-  absorbed.availableShares += beforeHolding - player.portfolio[absorbedId];
+  absorbed.availableShares += beforeHolding - player.portfolio[absorbedId]!;
 
   // Add survivor shares if traded
   if (trade > 0) {
@@ -941,7 +957,7 @@ export function nextLiquidation(state: GameState) {
   // Initialize shareholder queue
   state.mergerContext!.shareholderQueue = shareholders.map((p) => p.id);
   state.mergerContext!.currentShareholderIndex = 0;
-  const currentPlayerId = shareholders[0].id;
+  const currentPlayerId = shareholders[0]!.id; // non-empty, checked above
 
   // Move to modal stage
   state.stage = "liquidationPrompt";
@@ -977,6 +993,8 @@ export function handleLiquidationChoice(
   const player = state.players.find((p) => p.id === playerId)!;
   const absorbed = state.startups[absorbedId];
   const survivor = state.startups[survivorId];
+  if (!absorbed) throw new Error(`liquidating an unknown startup: ${absorbedId}`);
+  if (!survivor) throw new Error(`liquidating into an unknown startup: ${survivorId}`);
   const shares = player.portfolio[absorbedId] || 0;
 
   // ✅ FIX: Use pre-merger price from merger context
@@ -998,7 +1016,7 @@ export function handleLiquidationChoice(
       const tradeable = Math.floor(shares / 2);
       const tradeCount = Math.min(tradeable, survivor.availableShares);
       if (tradeCount > 0) {
-        player.portfolio[absorbedId] -= tradeCount * 2;
+        player.portfolio[absorbedId] = (player.portfolio[absorbedId] ?? 0) - tradeCount * 2;
         player.portfolio[survivorId] =
           (player.portfolio[survivorId] || 0) + tradeCount;
         survivor.availableShares -= tradeCount;

@@ -136,7 +136,7 @@ export function GameScreen({ session, viewerId, connected = true, presence, onEn
     ? (coord: Coord) => {
         const intent: Intent = { type: 'placeTile', playerId: actorId, coord };
         if (state.stage !== 'play' && undoableSteps.length === 1) {
-          session.undoThen(undoableSteps[0], intent);
+          session.undoThen(undoableSteps[0]!, intent); // length === 1, checked above
         } else {
           session.dispatch(intent);
         }

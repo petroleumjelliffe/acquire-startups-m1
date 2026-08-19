@@ -183,7 +183,7 @@ function ChainRows({
           stock
         </th>
         {columns.map((c) => {
-          const r = c.rows[index];
+          const r = c.rows[index]!; // every column's rows map the same chain list
           return (
             <td
               key={c.player.id}
@@ -209,7 +209,7 @@ function ChainRows({
           bonus
         </th>
         {columns.map((c) => {
-          const r = c.rows[index];
+          const r = c.rows[index]!; // every column's rows map the same chain list
           const mark = r.bonus ? BONUS_MARK[r.bonus.type] : null;
           return (
             <td

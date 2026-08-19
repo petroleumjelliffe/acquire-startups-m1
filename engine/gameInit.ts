@@ -41,7 +41,7 @@ export function createInitialGame(seed: string, names: string[]): GameState {
   const players: Player[] = names.map((n, i) => ({
     id: `p${i + 1}`,
     name: n,
-    emoji: PLAYER_EMOJI[i % PLAYER_EMOJI.length],
+    emoji: PLAYER_EMOJI[i % PLAYER_EMOJI.length]!, // wrapped index into a non-empty list
     cash: 6000,
     hand: [],
     portfolio: {},
