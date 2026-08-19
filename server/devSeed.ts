@@ -25,6 +25,7 @@ import express, { type Express } from 'express';
 import { ALL_GOLDEN_GAMES } from '../engine/golden/index.js';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import type { RoomRegistry } from './rooms.js';
+import { BASE_PATH } from '../basePath.js';
 
 /**
  * Registers `POST /dev/rooms` unless this is production.
@@ -37,7 +38,7 @@ import type { RoomRegistry } from './rooms.js';
 export function registerDevSeed(app: Express, rooms: RoomRegistry): void {
   // Body parsing is scoped to this route rather than the app, so nothing about
   // production request handling changes by adding a dev tool.
-  app.post('/dev/rooms', express.json(), (req, res) => {
+  app.post(`${BASE_PATH}/dev/rooms`, express.json(), (req, res) => {
     const body: unknown = req.body;
     const { goldenId, roomId } =
       typeof body === 'object' && body !== null

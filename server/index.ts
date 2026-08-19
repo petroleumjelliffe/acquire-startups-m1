@@ -103,10 +103,10 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
   });
   const rooms = createRoomRegistry(options.store ?? createNullStore());
 
-  // Dev only, and absent rather than guarded — see `devSeed.ts`. This is the
-  // only way to put a browser into a mid-game room, which is what the
-  // two-browser merger pass has been waiting on.
-  if (process.env.NODE_ENV !== 'production') registerDevSeed(app, rooms);
+  // Dev only, and absent rather than guarded — see `devSeed.ts`. Fail
+  // closed: an unset NODE_ENV is not "probably dev", it is unknown, and the
+  // route that installs arbitrary game state does not run on unknown.
+  if (process.env.NODE_ENV === 'development') registerDevSeed(app, rooms);
 
   const lobby = createLobbyHandlers<GameRoom>(io, rooms, {
     protocolVersion: PROTOCOL_VERSION,

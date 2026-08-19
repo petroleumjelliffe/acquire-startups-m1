@@ -15,6 +15,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { createServer } from './index.js';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import { ALL_GOLDEN_GAMES } from '../engine/golden/index.js';
+import { BASE_PATH } from '../basePath.js';
 
 interface Running {
   port: number;
@@ -64,7 +65,7 @@ afterEach(async () => {
 });
 
 function seed(port: number, body: unknown): Promise<Response> {
-  return fetch(`http://localhost:${port}/dev/rooms`, {
+  return fetch(`http://localhost:${port}${BASE_PATH}/dev/rooms`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
@@ -138,6 +139,21 @@ describe('POST /dev/rooms', () => {
   it('refuses a body with no goldenId', async () => {
     const { port } = await start('development');
     expect((await seed(port, {})).status).toBe(400);
+  });
+
+  it('does not exist when NODE_ENV is unset, because the guard fails closed', async () => {
+    const previous = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    try {
+      const { port } = await start();
+      // An absent NODE_ENV must not be read as "not production, therefore
+      // dev". Anything that is not explicitly development gets no route.
+      expect((await seed(port, { goldenId: 'G2' })).status).toBe(404);
+      expect((await fetch(`http://localhost:${port}/health`)).status).toBe(200);
+    } finally {
+      if (previous === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previous;
+    }
   });
 
   it('does not exist at all in production', async () => {
