@@ -9,7 +9,10 @@ import { RoomPage } from "./pages/RoomPage";
 
 // Dev surfaces only — not shipped (owner, 2026-08-08: "for testing only,
 // shouldn't be available in the deployed clients"). The client-side twin of
-// the server's /dev/rooms, which registers only outside production.
+// the server's /dev/rooms, which registers only under `npm run dev:server`
+// (NODE_ENV === 'development', checked in server/index.ts) — not merely
+// "outside production": `npm run serve` / `start:server` set no NODE_ENV
+// and don't get the route either.
 //
 // `import.meta.env.DEV` is replaced with a literal at build time, so in a
 // production build the branch below is dead code: the routes vanish AND the

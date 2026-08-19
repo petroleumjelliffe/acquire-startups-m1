@@ -37,7 +37,8 @@ async function start(nodeEnv?: string): Promise<Running> {
   try {
     handle = createServer();
   } finally {
-    process.env.NODE_ENV = previous;
+    if (previous === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previous;
   }
 
   const { httpServer, io, rooms } = handle;

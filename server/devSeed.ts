@@ -28,7 +28,12 @@ import type { RoomRegistry } from './rooms.js';
 import { BASE_PATH } from '../basePath.js';
 
 /**
- * Registers `POST /dev/rooms` unless this is production.
+ * Registers `POST ${BASE_PATH}/dev/rooms`, but only when the caller
+ * (server/index.ts) has confirmed `NODE_ENV === 'development'` — fail
+ * closed, not "unless production": an unset or unexpected NODE_ENV does not
+ * register the route. That means it exists under `npm run dev:server`, and
+ * not under `npm run serve` / `npm run start:server`, neither of which set
+ * NODE_ENV at all.
  *
  * The caller registers conditionally rather than this handler checking on each
  * request: an absent route cannot be reached by a bug in its own guard.

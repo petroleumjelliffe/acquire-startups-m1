@@ -30,7 +30,8 @@ const manifest = {
   background_color: APP_COLORS.background,
   orientation: 'any',
   // Relative to the manifest's own URL, so these resolve under the base path
-  // in prod and under / in dev without either being written down.
+  // in both dev and build — base is uniform now — without it being written
+  // down here.
   icons: [
     { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

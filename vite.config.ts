@@ -25,35 +25,34 @@ export default defineConfig(() => ({
     // being typed by hand. Safe to import here: tokens.ts depends only on
     // engine/, which is Node-clean by construction.
     //
-    // __PWA_BASE__ exists because Vite's own %BASE_URL% inserts the base
-    // *verbatim*: with base '/acquire-startups-m1' it produced
-    // href="/acquire-startups-m1manifest.webmanifest" — no slash. This one is
-    // normalized to always end in exactly one slash, in dev and build alike.
+    // __PWA_BASE__ substitutes to a bare "/", not BASE_PATH. Vite applies
+    // config.base itself to every root-relative attribute URL it finds in
+    // index.html — href="/manifest.webmanifest", rel="icon", apple-touch-icon
+    // — in both dev (via its devHtmlHook) and build (via the equivalent
+    // asset-URL rewrite), and base is now BASE_PATH uniformly in both (it
+    // used to be "/" in dev only). Substituting BASE_PATH here too made Vite
+    // prepend it a *second* time, doubling the path to
+    // "/acquire-startups-m1/acquire-startups-m1/manifest.webmanifest" — which
+    // the SPA fallback answered with a silent 200 text/html instead of a
+    // 404. A bare "/" lets Vite's own base-prefixing run exactly once, so
+    // dev and build both end up at "/acquire-startups-m1/manifest.webmanifest".
     //
     // replaceAll, not replace: the first __THEME_COLOR__ in the file is in
     // the comment explaining it, and .replace() substituted the comment and
     // left the actual meta tag carrying the placeholder. Caught by grepping
     // dist, which is why the verification step exists.
     //
-    // order: 'pre' (Vite 7 regression fix, 2026-08-09): Vite's own dev-only
-    // devHtmlHook runs before any transformIndexHtml hook that doesn't
-    // declare 'pre', and it treats an unsubstituted href like
-    // "__PWA_BASE__manifest.webmanifest" as a *bare relative* specifier
-    // (isBareRelative: starts with a word character, no ':') whenever the
-    // request's originalUrl isn't exactly "/" — true for every client route
-    // (/online, /room/:id, …) and even "/" with a query string. It then
-    // prepends config.base ("/" in dev) to that raw placeholder text,
-    // producing "/__PWA_BASE__manifest.webmanifest" *before* this plugin
-    // ever runs — so the later replaceAll below turns that leading "/" +
-    // the substituted "/" into "//manifest.webmanifest", a protocol-relative
-    // URL the browser resolves as host "manifest.webmanifest" (DNS failure).
-    // 'pre' makes this plugin's substitution happen first, so devHtmlHook
-    // only ever sees the real, already-absolute path — which its own
-    // same-branch path.posix.join collapses back to a single leading slash,
-    // same as it always did before Vite 7. Root ("/") never hit this because
-    // its originalUrl is literally "/", the one value that heuristic skips —
-    // which is why the bug looked route-dependent. Build is unaffected
-    // either way: it never runs devHtmlHook.
+    // order: 'pre' (Vite 7 regression fix, 2026-08-09; still required):
+    // Vite's own dev-only devHtmlHook runs before any transformIndexHtml
+    // hook that doesn't declare 'pre', and it treats an unsubstituted href
+    // like "__PWA_BASE__manifest.webmanifest" as a *bare relative* specifier
+    // (isBareRelative: starts with a word character, no ':') rather than a
+    // root-relative one — a different, import-resolution code path, not a
+    // simple base-prepend. 'pre' makes this plugin's substitution run first,
+    // so devHtmlHook only ever sees the real root-relative
+    // "/manifest.webmanifest" and applies its ordinary base-prefixing to it,
+    // same as build. Build is unaffected either way: it never runs
+    // devHtmlHook.
     {
       name: "pwa-placeholders-from-tokens",
       transformIndexHtml: {
@@ -61,7 +60,7 @@ export default defineConfig(() => ({
         handler: (html) =>
           html
             .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
-            .replaceAll("__PWA_BASE__", `${BASE_PATH}/`),
+            .replaceAll("__PWA_BASE__", "/"),
       },
     },
     // Writes dist/sw.js after the build, from scripts/sw.template.js.
