@@ -42,7 +42,7 @@ describe('computeChainBonuses', () => {
     const out = computeChainBonuses('ZuckFace', price, [h('p3', 3)]);
 
     expect(out).toHaveLength(1);
-    expect(out[0].type).toBe('both');
+    expect(out[0]!.type).toBe('both');
     expect(out).toEqual([
       {
         playerId: 'p3', playerName: 'P3', startupId: 'ZuckFace', shares: 3,

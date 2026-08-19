@@ -212,7 +212,7 @@ describe('the Join Room card', () => {
     expect(rows).toHaveLength(1);
     expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
     for (const face of ['🦊', '🐢', '🦁', '🐙', '🦉', '🐝']) {
-      expect(rows[0].textContent).not.toContain(face);
+      expect(rows[0]!.textContent).not.toContain(face);
     }
     // And no presence dot either, for the same reason: presence belongs to a
     // socket bound to a seat, and this row has neither. Seen in a browser —

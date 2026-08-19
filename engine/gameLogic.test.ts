@@ -26,10 +26,10 @@ function setupThreePlayerGameWithStartups(
 ): GameState {
   const state = createInitialGame('test-seed', ['Alice', 'Bob', 'Cara']);
   startups.forEach(({ id, tiles, tier = 1 }) => {
-    const startup = state.startups[id];
+    const startup = state.startups[id]!;
     startup.isFounded = true;
     startup.tier = tier;
-    startup.foundingTile = tiles[0];
+    startup.foundingTile = tiles[0]!;
     tiles.forEach((coord) => {
       state.board[coord] = { placed: true, startupId: id };
     });
@@ -55,8 +55,8 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       ]);
 
       // Give shares to players
-      giveShares(state, state.players[0].id, { Messla: 5 }); // Majority holder
-      giveShares(state, state.players[1].id, { Messla: 3 }); // Minority holder
+      giveShares(state, state.players[0]!.id, { Messla: 5 }); // Majority holder
+      giveShares(state, state.players[1]!.id, { Messla: 3 }); // Minority holder
 
       // Capture pre-merger price (5 tiles, tier 1)
       const preMergerPrice = getSharePrice(state, 'Messla');
@@ -115,7 +115,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
         { id: 'CamCrooned', tiles: ['B1', 'B2', 'B3', 'B4', 'B5'], tier: 1 },
       ]);
 
-      const player = state.players[0];
+      const player = state.players[0]!;
       const startingCash = 5000;
       player.cash = startingCash;
 
@@ -146,7 +146,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
         { id: 'CamCrooned', tiles: ['B1', 'B2'], tier: 0 }, // 2 tiles, tier 0
       ]);
 
-      const player = state.players[0];
+      const player = state.players[0]!;
       player.cash = 1000;
       giveShares(state, player.id, { Messla: 3 });
 
@@ -184,7 +184,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
         { id: 'CamCrooned', tiles: ['B1', 'B2', 'B3', 'B4'], tier: 1 },
       ]);
 
-      const player = state.players[0];
+      const player = state.players[0]!;
       giveShares(state, player.id, { Messla: 5 });
 
       const preMergerPrice = getSharePrice(state, 'Messla');
@@ -208,8 +208,8 @@ describe('Merger Logic - Critical Bug Fixes', () => {
         { id: 'CamCrooned', tiles: ['B1', 'B2'], tier: 0 },
       ]);
 
-      const player1 = state.players[0];
-      const player2 = state.players[1];
+      const player1 = state.players[0]!;
+      const player2 = state.players[1]!;
 
       giveShares(state, player1.id, { Messla: 3 });
       giveShares(state, player2.id, { Messla: 2 });
@@ -223,7 +223,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       handleLiquidationChoice(state, player1.id, 'Messla', 'CamCrooned', 'hold');
       handleLiquidationChoice(state, player2.id, 'Messla', 'CamCrooned', 'hold');
 
-      const startup = state.startups['Messla'];
+      const startup = state.startups['Messla']!;
       const initialAvailable = startup.availableShares;
 
       completeLiquidation(state, 'Messla');
@@ -244,7 +244,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
         { id: 'CamCrooned', tiles: ['B1', 'B2'], tier: 0 },
       ]);
 
-      const player = state.players[0];
+      const player = state.players[0]!;
 
       // Player has shares in multiple startups
       giveShares(state, player.id, {
@@ -277,8 +277,8 @@ describe('Merger Logic - Critical Bug Fixes', () => {
         { id: 'CamCrooned', tiles: ['B1', 'B2', 'B3', 'B4', 'B5'], tier: 1 },
       ]);
 
-      const player1 = state.players[0];
-      const player2 = state.players[1];
+      const player1 = state.players[0]!;
+      const player2 = state.players[1]!;
 
       player1.cash = 5000;
       player2.cash = 3000;
@@ -326,7 +326,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       expect(player2.cash).toBe(3000); // Didn't sell, cash unchanged
 
       // Verify Messla state
-      const techCo = state.startups['Messla'];
+      const techCo = state.startups['Messla']!;
       expect(techCo.isFounded).toBe(false);
       expect(techCo.availableShares).toBe(techCo.totalShares - 4); // 4 shares held by player2
     });
@@ -345,7 +345,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       ]);
 
       const soleHolder = state.players[0];
-      giveShares(state, soleHolder.id, { Messla: 5 }); // only shareholder of Messla
+      giveShares(state, soleHolder!.id, { Messla: 5 }); // only shareholder of Messla
 
       const preMergerPrice = getSharePrice(state, 'Messla');
       const absorbedPrices = { Messla: preMergerPrice };
@@ -355,7 +355,7 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       const bonuses = state.pendingBonuses ?? [];
       expect(bonuses).toHaveLength(1);
       expect(bonuses[0]).toMatchObject({
-        playerId: soleHolder.id,
+        playerId: soleHolder!.id,
         type: 'both',
         amount: preMergerPrice * 15,
       });
@@ -368,9 +368,9 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       ]);
 
       const [p1, p2, p3] = state.players;
-      giveShares(state, p1.id, { Messla: 7 }); // clear majority
-      giveShares(state, p2.id, { Messla: 4 }); // tied minority
-      giveShares(state, p3.id, { Messla: 4 }); // tied minority
+      giveShares(state, p1!.id, { Messla: 7 }); // clear majority
+      giveShares(state, p2!.id, { Messla: 4 }); // tied minority
+      giveShares(state, p3!.id, { Messla: 4 }); // tied minority
 
       const preMergerPrice = getSharePrice(state, 'Messla');
       const absorbedPrices = { Messla: preMergerPrice };
@@ -378,9 +378,9 @@ describe('Merger Logic - Critical Bug Fixes', () => {
       prepareMergerPayout(state, 'CamCrooned', ['Messla'], absorbedPrices);
 
       const bonuses = state.pendingBonuses ?? [];
-      const majorityBonus = bonuses.find((b) => b.playerId === p1.id);
-      const p2Bonus = bonuses.find((b) => b.playerId === p2.id);
-      const p3Bonus = bonuses.find((b) => b.playerId === p3.id);
+      const majorityBonus = bonuses.find((b) => b.playerId === p1!.id);
+      const p2Bonus = bonuses.find((b) => b.playerId === p2!.id);
+      const p3Bonus = bonuses.find((b) => b.playerId === p3!.id);
 
       expect(majorityBonus).toMatchObject({
         type: 'majority',

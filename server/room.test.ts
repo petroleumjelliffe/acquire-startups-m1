@@ -299,16 +299,16 @@ describe('a payout precedes its commit by a bounded number of intents', () => {
       const steps = game.steps;
 
       for (let i = 0; i < steps.length; i++) {
-        if (steps[i].expectError) {
-          try { applyIntent(state, steps[i].intent); } catch { /* expected */ }
+        if (steps[i]!.expectError) {
+          try { applyIntent(state, steps[i]!.intent); } catch { /* expected */ }
           continue;
         }
         const before = state;
-        state = applyIntent(state, steps[i].intent);
+        state = applyIntent(state, steps[i]!.intent);
 
         const movedOthers = state.players.some((p) => {
           const was = before.players.find((q) => q.id === p.id)!;
-          return p.id !== steps[i].intent.playerId && p.cash !== was.cash;
+          return p.id !== steps[i]!.intent.playerId && p.cash !== was.cash;
         });
         if (!movedOthers) continue;
 
@@ -316,8 +316,8 @@ describe('a payout precedes its commit by a bounded number of intents', () => {
         const actorAt = getCurrentActor(state);
         let lag = 0;
         for (let j = i + 1; j < steps.length && getCurrentActor(probe) === actorAt; j++) {
-          if (steps[j].expectError) continue;
-          probe = applyIntent(probe, steps[j].intent);
+          if (steps[j]!.expectError) continue;
+          probe = applyIntent(probe, steps[j]!.intent);
           lag++;
         }
         worst = Math.max(worst, lag);

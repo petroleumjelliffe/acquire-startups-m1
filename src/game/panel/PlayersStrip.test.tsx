@@ -8,8 +8,8 @@ const NAMES = ['Ada', 'Blaise', 'Curie', 'Dijkstra', 'Euler', 'Fermat'];
 function table(size: number, activeIndex: number | null = 0) {
   return Array.from({ length: size }, (_, i) => ({
     id: `p${i + 1}`,
-    emoji: PLAYER_EMOJI[i],
-    name: NAMES[i],
+    emoji: PLAYER_EMOJI[i]!,
+    name: NAMES[i]!,
     cash: 6000,
     active: i === activeIndex,
   }));
@@ -67,8 +67,8 @@ describe('PlayersStrip', () => {
   it('holds the active seat at its natural width while the others give way', () => {
     const { container } = render(<PlayersStrip players={table(6, 2)} />);
     const seats = [...container.querySelectorAll('[data-seat]')];
-    expect(seats[0].className).toMatch(/flex-none/);
-    expect(seats[0].className).not.toMatch(/flex-1/);
+    expect(seats[0]!.className).toMatch(/flex-none/);
+    expect(seats[0]!.className).not.toMatch(/flex-1/);
     for (const other of seats.slice(1)) {
       expect(other.className).toMatch(/min-w-0/);
       expect(other.className).toMatch(/flex-1/);

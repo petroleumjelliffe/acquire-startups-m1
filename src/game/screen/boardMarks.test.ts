@@ -21,25 +21,25 @@ describe('ownerBadges', () => {
     let state = twoHands();
     const [alex, sam] = state.players;
 
-    state = applyIntent(state, { type: 'placeTile', playerId: alex.id, coord: 'E6' });
-    state = applyIntent(state, { type: 'endTurn', playerId: alex.id });
-    state = applyIntent(state, { type: 'placeTile', playerId: sam.id, coord: 'A1' });
+    state = applyIntent(state, { type: 'placeTile', playerId: alex!.id, coord: 'E6' });
+    state = applyIntent(state, { type: 'endTurn', playerId: alex!.id });
+    state = applyIntent(state, { type: 'placeTile', playerId: sam!.id, coord: 'A1' });
 
-    expect(ownerBadges(state)).toEqual({ E6: alex.emoji, A1: sam.emoji });
+    expect(ownerBadges(state)).toEqual({ E6: alex!.emoji, A1: sam!.emoji });
   });
 
   it('follows a player forward rather than accumulating their whole history', () => {
     let state = twoHands();
     const [alex, sam] = state.players;
 
-    state = applyIntent(state, { type: 'placeTile', playerId: alex.id, coord: 'E6' });
-    state = applyIntent(state, { type: 'endTurn', playerId: alex.id });
-    state = applyIntent(state, { type: 'placeTile', playerId: sam.id, coord: 'A1' });
-    state = applyIntent(state, { type: 'endTurn', playerId: sam.id });
-    state = applyIntent(state, { type: 'placeTile', playerId: alex.id, coord: 'H8' });
+    state = applyIntent(state, { type: 'placeTile', playerId: alex!.id, coord: 'E6' });
+    state = applyIntent(state, { type: 'endTurn', playerId: alex!.id });
+    state = applyIntent(state, { type: 'placeTile', playerId: sam!.id, coord: 'A1' });
+    state = applyIntent(state, { type: 'endTurn', playerId: sam!.id });
+    state = applyIntent(state, { type: 'placeTile', playerId: alex!.id, coord: 'H8' });
 
     // One badge each: where they are now, not everywhere they have been.
-    expect(ownerBadges(state)).toEqual({ H8: alex.emoji, A1: sam.emoji });
+    expect(ownerBadges(state)).toEqual({ H8: alex!.emoji, A1: sam!.emoji });
   });
 
   it('takes the badge back when the placement is taken back', () => {

@@ -83,8 +83,8 @@ describe('a server restarted with a game in progress', () => {
     const room = first.rooms.fromState('KEEP01', ['Alex', 'Sam'], fixture());
     const [alex, sam] = room.players;
 
-    const a = await connectPlayer(first.port, 'KEEP01', 'Alex', alex.id, alex.token);
-    const s = await connectPlayer(first.port, 'KEEP01', 'Sam', sam.id, sam.token);
+    const a = await connectPlayer(first.port, 'KEEP01', 'Alex', alex!.id, alex!.token);
+    const s = await connectPlayer(first.port, 'KEEP01', 'Sam', sam!.id, sam!.token);
 
     // A whole turn, so what survives is a real commit rather than the seeded
     // fixture: place, then end. `endTurn` draws from the bag, so the state
@@ -113,8 +113,8 @@ describe('a server restarted with a game in progress', () => {
 
     // Both clients reconnect on the tokens they were holding — no form, no
     // new seat, nothing re-entered.
-    const a2 = await connectPlayer(second.port, 'KEEP01', 'Alex', alex.id, alex.token);
-    const s2 = await connectPlayer(second.port, 'KEEP01', 'Sam', sam.id, sam.token);
+    const a2 = await connectPlayer(second.port, 'KEEP01', 'Alex', alex!.id, alex!.token);
+    const s2 = await connectPlayer(second.port, 'KEEP01', 'Sam', sam!.id, sam!.token);
     // `connectPlayer` only awaits the `joined` round trip, not the `resume`
     // state message the join handler sends right after it — the same gap
     // Task 5 found and fixed the same way (see its report). Without this,
@@ -131,7 +131,7 @@ describe('a server restarted with a game in progress', () => {
     expect(second.rooms.get('KEEP01')!.players.map((p) => p.id)).toEqual(['p1', 'p2']);
     // Each sees only their own hand, because a restored room is projected
     // like any other.
-    expect(a2.latest()!.state.players.find((p) => p.id === sam.id)!.hand).toEqual([]);
+    expect(a2.latest()!.state.players.find((p) => p.id === sam!.id)!.hand).toEqual([]);
 
     // And play continues.
     await s2.send({ type: 'placeTile', coord: 'A1' });
@@ -161,7 +161,7 @@ describe('a server restarted with a game in progress', () => {
     await new Promise<void>((r) => socket.on('connect', () => r()));
 
     socket.emit(LOBBY_CLIENT_EVENTS.joinRoom, {
-      roomId: 'LOST01', name: 'Alex', playerId: alex.id, token: alex.token,
+      roomId: 'LOST01', name: 'Alex', playerId: alex!.id, token: alex!.token,
       protocolVersion: PROTOCOL_VERSION,
     });
     await settleSocket(socket);

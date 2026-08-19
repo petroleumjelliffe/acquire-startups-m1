@@ -81,22 +81,22 @@ describe('finalScore', () => {
     state.players.push({
       id: 'p3',
       name: 'Jordan',
-      emoji: PLAYER_EMOJI[2],
+      emoji: PLAYER_EMOJI[2]!,
       cash: 6000,
       hand: [],
       portfolio: {},
     });
     const [alex, sam, jordan] = state.players;
-    alex.cash = 8600;
-    sam.cash = 12000;
-    jordan.cash = 3100;
-    giveShares(state, alex.id, { Gobble: 6 });
-    giveShares(state, sam.id, { Gobble: 3 });
-    giveShares(state, jordan.id, { Gobble: 1 });
-    giveShares(state, alex.id, { Messla: 4 });
-    giveShares(state, sam.id, { Messla: 7 });
-    giveShares(state, jordan.id, { Messla: 4 });
-    giveShares(state, jordan.id, { ZuckFace: 3 });
+    alex!.cash = 8600;
+    sam!.cash = 12000;
+    jordan!.cash = 3100;
+    giveShares(state, alex!.id, { Gobble: 6 });
+    giveShares(state, sam!.id, { Gobble: 3 });
+    giveShares(state, jordan!.id, { Gobble: 1 });
+    giveShares(state, alex!.id, { Messla: 4 });
+    giveShares(state, sam!.id, { Messla: 7 });
+    giveShares(state, jordan!.id, { Messla: 4 });
+    giveShares(state, jordan!.id, { ZuckFace: 3 });
     return state;
   }
 
@@ -119,18 +119,18 @@ describe('finalScore', () => {
       report.bonuses.find((b) => b.chainId === chainId && b.playerId === playerId);
 
     // Gobble: price $1,200 -> majority $12,000 / minority $6,000
-    expect(at('Gobble', alex.id)).toMatchObject({ type: 'majority', amount: 12000 });
-    expect(at('Gobble', sam.id)).toMatchObject({ type: 'minority', amount: 6000 });
-    expect(at('Gobble', jordan.id)).toBeUndefined();
+    expect(at('Gobble', alex!.id)).toMatchObject({ type: 'majority', amount: 12000 });
+    expect(at('Gobble', sam!.id)).toMatchObject({ type: 'minority', amount: 6000 });
+    expect(at('Gobble', jordan!.id)).toBeUndefined();
 
     // Messla: price $600, tied minority (alex/jordan @ 4 shares each) ->
     // majority $6,000, minority pot $3,000 split two ways -> $1,500 each
-    expect(at('Messla', sam.id)).toMatchObject({ type: 'majority', amount: 6000 });
-    expect(at('Messla', alex.id)).toMatchObject({ type: 'minority', amount: 1500 });
-    expect(at('Messla', jordan.id)).toMatchObject({ type: 'minority', amount: 1500 });
+    expect(at('Messla', sam!.id)).toMatchObject({ type: 'majority', amount: 6000 });
+    expect(at('Messla', alex!.id)).toMatchObject({ type: 'minority', amount: 1500 });
+    expect(at('Messla', jordan!.id)).toMatchObject({ type: 'minority', amount: 1500 });
 
     // ZuckFace: price $600, sole holder -> combined bonus $9,000
-    expect(at('ZuckFace', jordan.id)).toMatchObject({ type: 'both', amount: 9000 });
+    expect(at('ZuckFace', jordan!.id)).toMatchObject({ type: 'both', amount: 9000 });
   });
 
   it('does not bank bonuses into cash', () => {

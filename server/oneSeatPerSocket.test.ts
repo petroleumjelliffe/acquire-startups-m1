@@ -64,14 +64,14 @@ describe('one socket holds one seat per room', () => {
     host.emit(LOBBY_CLIENT_EVENTS.createRoom, { name: 'Alex', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(host);
 
-    const roomId = hostSaw.joined[0].roomId;
+    const roomId = hostSaw.joined[0]!.roomId;
 
     const guest = await raw(server.port);
     const guestSaw = collect(guest);
     guest.emit(LOBBY_CLIENT_EVENTS.joinRoom, { roomId, name: 'Sam', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(guest);
 
-    const firstSeat = guestSaw.joined[0].playerId;
+    const firstSeat = guestSaw.joined[0]!.playerId;
 
     // The second join. A client that never heard its own `joined` has no token
     // to send, so this is byte-for-byte the message it sent the first time.
@@ -98,7 +98,7 @@ describe('one socket holds one seat per room', () => {
     const hostSaw = collect(host);
     host.emit(LOBBY_CLIENT_EVENTS.createRoom, { name: 'Alex', protocolVersion: PROTOCOL_VERSION });
     await settleSocket(host);
-    const roomId = hostSaw.joined[0].roomId;
+    const roomId = hostSaw.joined[0]!.roomId;
 
     const one = await raw(server.port);
     const two = await raw(server.port);

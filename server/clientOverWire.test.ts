@@ -74,11 +74,11 @@ describe('two networked clients reach the same state the server holds', () => {
       // likely: socket.io delivers one connection's messages in order, so an
       // acknowledged round trip lands behind everything sent before it.
       for (const seat of room.players) {
-        await settleSocket(clients[seat.id].socket);
-        const initial = clients[seat.id].latest();
+        await settleSocket(clients[seat.id]!.socket);
+        const initial = clients[seat.id]!.latest();
         expect(initial, `${game.id} — ${seat.id} never received an opening state`).toBeDefined();
         sessions[seat.id] = createNetworkSession({
-          transport: createSocketTransport(clients[seat.id].socket),
+          transport: createSocketTransport(clients[seat.id]!.socket),
           playerId: seat.id,
           initial: initial!,
         });
@@ -87,7 +87,7 @@ describe('two networked clients reach the same state the server holds', () => {
       try {
         for (const step of game.steps) {
           const actor = step.intent.playerId;
-          const session = sessions[actor];
+          const session = sessions[actor]!;
           const where = `${game.id} / ${step.name}`;
           const wire = toWire(step.intent);
           const predictable = !DRAWS.has(wire.type) && !step.expectError;
@@ -117,7 +117,7 @@ describe('two networked clients reach the same state the server holds', () => {
             deferred++;
           }
 
-          for (const seat of room.players) await settleSocket(clients[seat.id].socket);
+          for (const seat of room.players) await settleSocket(clients[seat.id]!.socket);
 
           if (step.expectError) {
             // The client refuses most illegal intents itself, on the same
@@ -143,14 +143,14 @@ describe('two networked clients reach the same state the server holds', () => {
           // this cannot claim — so it is asserted for every other seat.
           for (const seat of room.players) {
             if (seat.id === room.actorId()) continue;
-            expect(sessions[seat.id].getView().state, `${where} — ${seat.id} is out of step`)
+            expect(sessions[seat.id]!.getView().state, `${where} — ${seat.id} is out of step`)
               .toEqual(project(room.committed(), seat.id));
           }
         }
       } finally {
         for (const seat of room.players) {
-          sessions[seat.id].dispose();
-          clients[seat.id].close();
+          sessions[seat.id]!.dispose();
+          clients[seat.id]!.close();
         }
       }
     });
@@ -244,13 +244,13 @@ describe('a socket that drops mid-segment and comes back', () => {
     // happens below, and the new assertion on it would pass trivially with
     // both sides `undefined` — exactly the hollow gate this task exists to
     // close.
-    const preClose = room.dispatch(sam.id, { type: 'endTurn' });
+    const preClose = room.dispatch(sam!.id, { type: 'endTurn' });
     expect(preClose).toEqual({ kind: 'commit' });
-    expect(room.actorId()).toBe(alex.id);
+    expect(room.actorId()).toBe(alex!.id);
     expect(room.previousSegmentStart()).toBeDefined();
 
-    const a = await connectPlayer(server.port, 'DROP01', 'Alex', alex.id, alex.token);
-    const s = await connectPlayer(server.port, 'DROP01', 'Sam', sam.id, sam.token);
+    const a = await connectPlayer(server.port, 'DROP01', 'Alex', alex!.id, alex!.token);
+    const s = await connectPlayer(server.port, 'DROP01', 'Sam', sam!.id, sam!.token);
     // Both sockets are joining a room already `playing`, so each gets an
     // immediate 'resume' send from the join handler — asynchronously, over
     // the wire, the same hazard `projectionOverWire.test.ts`'s `openSegment`
@@ -276,14 +276,14 @@ describe('a socket that drops mid-segment and comes back', () => {
     // substitute; see `waitFor`'s own comment.
     a.socket.disconnect();
     await waitFor(
-      () => room.players.find((p) => p.id === alex.id)!.connected === false,
+      () => room.players.find((p) => p.id === alex!.id)!.connected === false,
       `Alex marked disconnected in room ${room.id}`,
     );
-    expect(room.players.find((p) => p.id === alex.id)!.connected).toBe(false);
+    expect(room.players.find((p) => p.id === alex!.id)!.connected).toBe(false);
 
     // The return: a new socket presenting the same token, which is exactly
     // what `useRoom` sends when the transport comes back.
-    const again = await connectPlayer(server.port, 'DROP01', 'Alex', alex.id, alex.token);
+    const again = await connectPlayer(server.port, 'DROP01', 'Alex', alex!.id, alex!.token);
     // `connectPlayer` only waits for `joined`, not for the 'resume' send that
     // follows it in the same handler — settle Alex's own new channel before
     // reading it, the same ordering primitive used everywhere else in this
@@ -297,7 +297,7 @@ describe('a socket that drops mid-segment and comes back', () => {
     // while the server still held the placement.
     expect(resumed.state.board).toEqual(draftedBoard);
     expect(resumed.segmentStart).toBe(room.segmentStart());
-    expect(room.players.find((p) => p.id === alex.id)!.connected).toBe(true);
+    expect(room.players.find((p) => p.id === alex!.id)!.connected).toBe(true);
 
     // Task 5's coverage-gap requirement: Task 3 put `previousSegmentStart`
     // on the wire but nothing ever asserted it on a real message. The
@@ -322,7 +322,7 @@ describe('a socket that drops mid-segment and comes back', () => {
     expect(again.rejections).toEqual([]);
     await again.send({ type: 'endTurn' });
     expect(again.rejections).toEqual([]);
-    expect(room.actorId()).toBe(sam.id);
+    expect(room.actorId()).toBe(sam!.id);
 
     // Sam never received any of it. The draft is one player's, and a
     // reconnection is not an excuse to broadcast one — Sam does get the

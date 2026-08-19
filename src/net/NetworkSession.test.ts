@@ -86,7 +86,7 @@ function findPredictableActorHandoff(): PredictableHandoff | null {
     const states = replayGoldenGame(game);
     let i = 0;
     while (i < game.steps.length) {
-      const step = game.steps[i];
+      const step = game.steps[i]!;
       if (step.expectError || DRAWS.has(step.intent.type)) {
         i++;
         continue;
@@ -95,13 +95,13 @@ function findPredictableActorHandoff(): PredictableHandoff | null {
       let j = i;
       while (
         j + 1 < game.steps.length &&
-        !game.steps[j + 1].expectError &&
-        !DRAWS.has(game.steps[j + 1].intent.type) &&
-        game.steps[j + 1].intent.playerId === playerId
+        !game.steps[j + 1]!.expectError &&
+        !DRAWS.has(game.steps[j + 1]!.intent.type) &&
+        game.steps[j + 1]!.intent.playerId === playerId
       ) {
         j++;
       }
-      if (j > i && getCurrentActor(states[j + 1]) !== playerId) {
+      if (j > i && getCurrentActor(states[j + 1]!) !== playerId) {
         return { states, steps: game.steps, startIndex: i, endIndex: j, playerId };
       }
       i = j + 1;
@@ -292,7 +292,7 @@ describe('undo is the servers to grant', () => {
     const session = h.session();
     session.dispatch({ type: 'placeTile', playerId: 'p1', coord: 'E6' });
 
-    session.undoTo(session.getView().undoableSteps[0]);
+    session.undoTo(session.getView().undoableSteps[0]!);
 
     expect(h.undos).toHaveLength(1);
     expect(session.getView().state.board['E6'].placed).toBe(true);
@@ -330,12 +330,12 @@ describe('undoableSteps covers my own open segment and nobody elses', () => {
     const h = harness(states[startIndex]);
     const session = h.session(playerId);
 
-    session.dispatch(steps[startIndex].intent);
+    session.dispatch(steps[startIndex]!.intent);
     // The segment is still mine after one step of the run: it has moved, and
     // I am still the actor.
     expect(session.getView().undoableSteps.length).toBeGreaterThan(0);
 
-    for (let k = startIndex + 1; k <= endIndex; k++) session.dispatch(steps[k].intent);
+    for (let k = startIndex + 1; k <= endIndex; k++) session.dispatch(steps[k]!.intent);
     // The run's last step is exactly the one that hands the actor away.
     expect(session.getView().actorId).not.toBe(playerId);
     expect(session.getView().undoableSteps).toEqual([]);

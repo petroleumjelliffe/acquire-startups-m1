@@ -36,7 +36,7 @@ describe('golden games reach their declared states through the socket layer', ()
 
       try {
         for (const step of game.steps) {
-          const client = clients[step.intent.playerId];
+          const client = clients[step.intent.playerId]!;
           const { playerId, ...wire } = step.intent;
           const before = client.rejections.length;
           // `logPhases` assertions only see log entries appended by this
@@ -49,7 +49,7 @@ describe('golden games reach their declared states through the socket layer', ()
           if (step.expectError) {
             expect(client.rejections.length, `${game.id} / ${step.name} — expected a rejection`)
               .toBe(before + 1);
-            expect(client.rejections[before].code, `${game.id} / ${step.name}`)
+            expect(client.rejections[before]!.code, `${game.id} / ${step.name}`)
               .toBe(step.expectError);
           } else {
             expect(client.rejections.length, `${game.id} / ${step.name} — unexpected rejection: ${JSON.stringify(client.rejections[before])}`)

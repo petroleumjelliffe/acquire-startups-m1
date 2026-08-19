@@ -17,7 +17,7 @@ describe('stepsOf — this turn and the one before it', () => {
     const states = replayGoldenGame(g('G1'));
     const state = states[states.length - 1];
 
-    const whole = stepsOf(state, []);
+    const whole = stepsOf(state!, []);
     // The stack really did accumulate: without a floor, a finished game's
     // panel carries every step of it. If this ever stops holding, the test
     // below is comparing nothing against nothing.
@@ -25,8 +25,8 @@ describe('stepsOf — this turn and the one before it', () => {
 
     // A cut taken from the log itself rather than a written-down number, so a
     // change to G1 moves the boundary rather than breaking the test.
-    const cut = state.log[Math.floor(state.log.length / 2)].stepId;
-    const scoped = stepsOf(state, [], cut);
+    const cut = state!.log[Math.floor(state!.log.length / 2)]!.stepId;
+    const scoped = stepsOf(state!, [], cut);
 
     expect(scoped.length).toBeLessThan(whole.length);
     expect(scoped.map((e) => e.stepId)).toEqual(
@@ -48,11 +48,11 @@ describe('the draw is hidden, not deleted', () => {
     const state = states[states.length - 1];
 
     expect(
-      state.log.some((e) => e.phase === 'Drew tiles'),
+      state!.log.some((e) => e.phase === 'Drew tiles'),
       'G1 no longer draws — this test is guarding nothing',
     ).toBe(true);
 
-    expect(stepsOf(state, []).some((s) => s.phase === 'Drew tiles')).toBe(false);
+    expect(stepsOf(state!, []).some((s) => s.phase === 'Drew tiles')).toBe(false);
   });
 
   /**
@@ -112,22 +112,22 @@ describe('stepsOf', () => {
   it('turns log entries into step stack entries', () => {
     const states = replayGoldenGame(g('G1'));
     const state = states[states.length - 1];
-    const shown = state.log.filter((e) => e.phase !== 'Drew tiles');
-    const steps = stepsOf(state, []);
+    const shown = state!.log.filter((e) => e.phase !== 'Drew tiles');
+    const steps = stepsOf(state!, []);
 
     expect(steps.length).toBe(shown.length);
     expect(steps.map((s) => s.stepId)).toEqual(shown.map((e) => e.stepId));
-    expect(steps[0].phase).toBe(shown[0].phase);
+    expect(steps[0]!.phase).toBe(shown[0]!.phase);
   });
 
   it('marks only the steps that have a snapshot as undoable', () => {
     const states = replayGoldenGame(g('G1'));
     const state = states[states.length - 1];
-    const undoable = [state.log[1].stepId];
-    const steps = stepsOf(state, undoable);
+    const undoable = [state!.log[1]!.stepId];
+    const steps = stepsOf(state!, undoable);
 
-    expect(steps.find((s) => s.stepId === state.log[1].stepId)?.undoable).toBe(true);
-    expect(steps.find((s) => s.stepId === state.log[0].stepId)?.undoable).toBe(false);
+    expect(steps.find((s) => s.stepId === state!.log[1]!.stepId)?.undoable).toBe(true);
+    expect(steps.find((s) => s.stepId === state!.log[0]!.stepId)?.undoable).toBe(false);
   });
 
   it('renders a payout step through PayoutLines rather than as a sentence', () => {
@@ -242,11 +242,11 @@ describe('whose step it was', () => {
     for (const game of ALL_GOLDEN_GAMES) {
       const states = replayGoldenGame(game);
       const state = states[states.length - 1];
-      const turnActor = state.players[state.turnIndex]?.id;
+      const turnActor = state!.players[state!.turnIndex]?.id;
 
-      for (const entry of stepsOf(state, [])) {
-        const logged = state.log.find((e) => e.stepId === entry.stepId)!;
-        const expected = state.players.find((p) => p.id === logged.playerId)?.name;
+      for (const entry of stepsOf(state!, [])) {
+        const logged = state!.log.find((e) => e.stepId === entry.stepId)!;
+        const expected = state!.players.find((p) => p.id === logged.playerId)?.name;
         expect(entry.actor, `${game.id} step ${entry.stepId} (${entry.phase})`).toBe(expected);
         if (logged.playerId !== undefined && logged.playerId !== turnActor) sawNonActor = true;
       }
