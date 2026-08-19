@@ -33,6 +33,17 @@ export interface ServerHandle {
   httpServer: HttpServer;
   io: SocketServer;
   rooms: RoomRegistry;
+  /**
+   * Whether the dev seed route was registered, reported rather than inferred.
+   *
+   * `tsx watch` reloads code but never the environment it was launched with,
+   * so a dev server can outlive the meaning of its own NODE_ENV: a process
+   * started before the guard was inverted keeps running, picks up the new
+   * code on its next reload, and quietly stops registering the route. That
+   * happened on 2026-08-19 and cost four days of a 404 nobody was looking
+   * for. The boot banner prints this, so every reload restates it.
+   */
+  devSeed: boolean;
 }
 
 export interface ServerOptions {
@@ -95,18 +106,28 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
   // Mounted under the base path so sockets ride the same front-door route as
   // pages and assets. Overridden via the boot block's SOCKET_PATH (the
   // options seam): Render sets /socket.io because its Pages client keeps
-  // socket.io's default path (see src/net/connection.ts), and dev uses the
-  // same knob (see the dev:server script).
+  // socket.io's default path when talking to a separate origin (see
+  // src/net/connection.ts). dev:server leaves SOCKET_PATH unset, so it falls
+  // through to the prefixed default below — which is what the dev client
+  // expects too, now that base is uniform and it requests the same
+  // BASE_URL-prefixed path in dev as in a build.
   const io = new SocketServer(httpServer, {
     cors: { origin: '*' },
     path: options.socketPath ?? `${BASE_PATH}/socket.io`,
   });
   const rooms = createRoomRegistry(options.store ?? createNullStore());
 
-  // Dev only, and absent rather than guarded — see `devSeed.ts`. This is the
-  // only way to put a browser into a mid-game room, which is what the
-  // two-browser merger pass has been waiting on.
-  if (process.env.NODE_ENV !== 'production') registerDevSeed(app, rooms);
+  // Dev only, and absent rather than guarded — see `devSeed.ts`. Fail
+  // closed: an unset NODE_ENV is not "probably dev", it is unknown, and the
+  // route that installs arbitrary game state does not run on unknown.
+  //
+  // Read here rather than at the boot seam, unlike PORT/GAMES_DIR/SOCKET_PATH:
+  // ambient env is the actual input to this decision, and `devSeed.test.ts`
+  // exercises it by setting NODE_ENV around this constructor. Hoisting the
+  // read to the boot block would move the real decision somewhere no test can
+  // reach.
+  const devSeed = process.env.NODE_ENV === 'development';
+  if (devSeed) registerDevSeed(app, rooms);
 
   const lobby = createLobbyHandlers<GameRoom>(io, rooms, {
     protocolVersion: PROTOCOL_VERSION,
@@ -250,7 +271,7 @@ export function createServer(options: ServerOptions = {}): ServerHandle {
     });
   });
 
-  return { app, httpServer, io, rooms };
+  return { app, httpServer, io, rooms, devSeed };
 }
 
 function randomSeed(): string {
@@ -286,8 +307,10 @@ if (process.argv[1]?.endsWith('index.ts')) {
   const store = createFileStore(gamesDir());
   // SOCKET_PATH is read here, not inside createServer, so a test server's
   // mount can never be moved by ambient env — same seam as PORT below and
-  // GAMES_DIR above. Render and the dev:server script both set /socket.io.
-  const { httpServer, io, rooms } = createServer({ store, socketPath: process.env.SOCKET_PATH });
+  // GAMES_DIR above. Only Render sets it (to /socket.io); the dev:server
+  // script leaves it unset, so local runs fall through to createServer's
+  // prefixed default.
+  const { httpServer, io, rooms, devSeed } = createServer({ store, socketPath: process.env.SOCKET_PATH });
   // 4002 is Acquire's slot in the cross-game port registry (the game-host
   // repo's PORTS.md). Render injects PORT, so this default is local-only.
   // Must agree with vite.config.ts's dev proxy target.
@@ -324,9 +347,16 @@ if (process.argv[1]?.endsWith('index.ts')) {
       console.warn('! Restore failed, starting with no rooms:', e);
     })
     .finally(() => {
-      // The socket path is in the banner because a bare `tsx server/index.ts`
-      // mounts the prefixed default — a dev client asking for '/socket.io'
-      // never connects, and this line is where that mismatch shows itself.
-      httpServer.listen(port, () => console.log(`✓ Server listening on ${port}, sockets at ${io.path()}`));
+      // The socket path is in the banner because a misconfigured SOCKET_PATH
+      // — most concretely, a Render deploy that fails to set it to
+      // /socket.io — leaves clients unable to connect with no other visible
+      // symptom, and this line is where that mismatch would show itself.
+      // `devSeed` joins the socket path here for the same reason it is: a
+      // process whose environment no longer matches its code has no other
+      // visible symptom, and this line reprints on every watch reload.
+      httpServer.listen(port, () =>
+        console.log(
+          `✓ Server listening on ${port}, sockets at ${io.path()}, dev seed ${devSeed ? 'on' : 'off'}`
+        ));
     });
 }

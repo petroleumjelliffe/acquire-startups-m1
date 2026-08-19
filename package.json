@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
-    "dev:server": "SOCKET_PATH=/socket.io tsx watch server/index.ts",
+    "predev:server": "node scripts/check-port.mjs 4002",
+    "dev:server": "NODE_ENV=development tsx watch server/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "prebuild": "tsx scripts/generate-manifest.ts",
     "build": "vite build",

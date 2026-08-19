@@ -16,6 +16,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
 
+// Derived, not hardcoded: the dev server now serves under BASE_PATH (base is
+// uniform across dev and build), so bare paths like `/pass-and-play` 404
+// with "The server is configured with a public base URL of ...". Reading it
+// out of basePath.ts keeps this the *second* copy, not a fourth hand-typed
+// one — see the comment on BASE_PATH itself for why that matters.
+const BASE_PATH = readFileSync(join(import.meta.dirname, '..', 'basePath.ts'), 'utf8')
+  .match(/BASE_PATH = '(.+?)'/)[1];
+
 const CHROME = process.env.CHROME_PATH
   ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const VIEWPORTS = [768, 1440];
@@ -637,7 +645,7 @@ async function main() {
     await send('Emulation.setDeviceMetricsOverride', {
       width, height: 900, deviceScaleFactor: 1, mobile: false,
     });
-    await send('Page.navigate', { url: `http://localhost:${vitePort}/pass-and-play` });
+    await send('Page.navigate', { url: `http://localhost:${vitePort}${BASE_PATH}/pass-and-play` });
     await sleep(2000);
 
     // Pass-and-play persists to localStorage as of Stage 2, and this
@@ -663,7 +671,7 @@ async function main() {
     // longer gets there — the game the curtain check just started is *saved*
     // now, and the lobby would offer Continue — so the save is cleared first.
     await evaluate('localStorage.clear()');
-    await send('Page.navigate', { url: `http://localhost:${vitePort}/pass-and-play` });
+    await send('Page.navigate', { url: `http://localhost:${vitePort}${BASE_PATH}/pass-and-play` });
     await sleep(1500);
 
     const m = await evaluate(MEASURE);
@@ -866,7 +874,7 @@ async function main() {
 
     // The not-my-turn waiting panel — see `WAITING_PANEL`, above, for why
     // this is a catalog page rather than a second `/pass-and-play` walk.
-    await send('Page.navigate', { url: `http://localhost:${vitePort}/catalog` });
+    await send('Page.navigate', { url: `http://localhost:${vitePort}${BASE_PATH}/catalog` });
     await sleep(1500);
     const wp = await evaluate(WAITING_PANEL);
 

@@ -14,7 +14,7 @@ function walk(dir: string, root = dir): string[] {
   });
 }
 
-export default defineConfig(({ command, isPreview }) => ({
+export default defineConfig(() => ({
   plugins: [
     react(),
     // Substitutes the PWA placeholders in index.html.
@@ -25,35 +25,34 @@ export default defineConfig(({ command, isPreview }) => ({
     // being typed by hand. Safe to import here: tokens.ts depends only on
     // engine/, which is Node-clean by construction.
     //
-    // __PWA_BASE__ exists because Vite's own %BASE_URL% inserts the base
-    // *verbatim*: with base '/acquire-startups-m1' it produced
-    // href="/acquire-startups-m1manifest.webmanifest" — no slash. This one is
-    // normalized to always end in exactly one slash, in dev and build alike.
+    // __PWA_BASE__ substitutes to a bare "/", not BASE_PATH. Vite applies
+    // config.base itself to every root-relative attribute URL it finds in
+    // index.html — href="/manifest.webmanifest", rel="icon", apple-touch-icon
+    // — in both dev (via its devHtmlHook) and build (via the equivalent
+    // asset-URL rewrite), and base is now BASE_PATH uniformly in both (it
+    // used to be "/" in dev only). Substituting BASE_PATH here too made Vite
+    // prepend it a *second* time, doubling the path to
+    // "/acquire-startups-m1/acquire-startups-m1/manifest.webmanifest" — which
+    // the SPA fallback answered with a silent 200 text/html instead of a
+    // 404. A bare "/" lets Vite's own base-prefixing run exactly once, so
+    // dev and build both end up at "/acquire-startups-m1/manifest.webmanifest".
     //
     // replaceAll, not replace: the first __THEME_COLOR__ in the file is in
     // the comment explaining it, and .replace() substituted the comment and
     // left the actual meta tag carrying the placeholder. Caught by grepping
     // dist, which is why the verification step exists.
     //
-    // order: 'pre' (Vite 7 regression fix, 2026-08-09): Vite's own dev-only
-    // devHtmlHook runs before any transformIndexHtml hook that doesn't
-    // declare 'pre', and it treats an unsubstituted href like
-    // "__PWA_BASE__manifest.webmanifest" as a *bare relative* specifier
-    // (isBareRelative: starts with a word character, no ':') whenever the
-    // request's originalUrl isn't exactly "/" — true for every client route
-    // (/online, /room/:id, …) and even "/" with a query string. It then
-    // prepends config.base ("/" in dev) to that raw placeholder text,
-    // producing "/__PWA_BASE__manifest.webmanifest" *before* this plugin
-    // ever runs — so the later replaceAll below turns that leading "/" +
-    // the substituted "/" into "//manifest.webmanifest", a protocol-relative
-    // URL the browser resolves as host "manifest.webmanifest" (DNS failure).
-    // 'pre' makes this plugin's substitution happen first, so devHtmlHook
-    // only ever sees the real, already-absolute path — which its own
-    // same-branch path.posix.join collapses back to a single leading slash,
-    // same as it always did before Vite 7. Root ("/") never hit this because
-    // its originalUrl is literally "/", the one value that heuristic skips —
-    // which is why the bug looked route-dependent. Build is unaffected
-    // either way: it never runs devHtmlHook.
+    // order: 'pre' (Vite 7 regression fix, 2026-08-09; still required):
+    // Vite's own dev-only devHtmlHook runs before any transformIndexHtml
+    // hook that doesn't declare 'pre', and it treats an unsubstituted href
+    // like "__PWA_BASE__manifest.webmanifest" as a *bare relative* specifier
+    // (isBareRelative: starts with a word character, no ':') rather than a
+    // root-relative one — a different, import-resolution code path, not a
+    // simple base-prepend. 'pre' makes this plugin's substitution run first,
+    // so devHtmlHook only ever sees the real root-relative
+    // "/manifest.webmanifest" and applies its ordinary base-prefixing to it,
+    // same as build. Build is unaffected either way: it never runs
+    // devHtmlHook.
     {
       name: "pwa-placeholders-from-tokens",
       transformIndexHtml: {
@@ -61,24 +60,7 @@ export default defineConfig(({ command, isPreview }) => ({
         handler: (html) =>
           html
             .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
-            .replaceAll("__PWA_BASE__", `${command === "build" ? BASE_PATH : ""}/`),
-      },
-      // The generated manifest carries the *prod* start_url and scope, but
-      // the dev server serves the app at '/'. Installing from a dev LAN URL
-      // — which the owner did, first thing — produced an app that opened
-      // /acquire-startups-m1/ against a router with no route there: a white
-      // screen as the install's first impression. Dev rewrites the manifest
-      // to its own origin's shape; the built file is untouched.
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          if (req.url?.split("?")[0] !== "/manifest.webmanifest") return next();
-          const raw = readFileSync(join(__dirname, "public", "manifest.webmanifest"), "utf8");
-          const manifest = JSON.parse(raw) as { start_url: string; scope: string };
-          manifest.start_url = "/";
-          manifest.scope = "/";
-          res.setHeader("Content-Type", "application/manifest+json");
-          res.end(JSON.stringify(manifest, null, 2));
-        });
+            .replaceAll("__PWA_BASE__", "/"),
       },
     },
     // Writes dist/sw.js after the build, from scripts/sw.template.js.
@@ -127,26 +109,16 @@ export default defineConfig(({ command, isPreview }) => ({
     // and this proxy carries its socket path to the game server. 4002 per
     // game-host PORTS.md — build tooling, not shipped code.
     //
-    // Two keys because the client's path follows its base: dev serves at '/'
-    // so it asks for '/socket.io' — the target must run with
-    // SOCKET_PATH=/socket.io, which the dev:server script does — while
-    // preview serves the built client at BASE_PATH, so it asks for the
-    // prefixed path, which a bare `tsx server/index.ts` mounts by default.
+    // One key: the client's path follows its base, and base is now BASE_PATH
+    // in dev and build alike, so there is only one path it ever asks for.
     proxy: {
-      '/socket.io': { target: 'http://localhost:4002', ws: true },
       [`${BASE_PATH}/socket.io`]: { target: 'http://localhost:4002', ws: true },
     },
   },
-  // `isPreview` matters as much as `command` here. Preview runs as `serve`,
-  // so without it preview hosted `dist/` at "/" while the built index.html
-  // asked for `${BASE_PATH}/assets/…`. Every asset missed and the SPA
-  // fallback answered with index.html and a **200**, so the page rendered
-  // blank and a status-code check read as success. Dev still wants "/".
-  //
-  // Note this stays derived from BASE_PATH rather than repeating the path in
-  // the preview script — the whole point of basePath.ts is that there is one
-  // copy, and it has already been three.
-  base: command === 'build' || isPreview ? BASE_PATH : "/",
+  // One base, dev and build alike. The asymmetry this replaces was the sole
+  // reason dev needed its own socket path, its own manifest rewrite and a
+  // differently-substituted __PWA_BASE__ — see the deletions below.
+  base: BASE_PATH,
   test: {
     globals: true,
     environment: 'jsdom',

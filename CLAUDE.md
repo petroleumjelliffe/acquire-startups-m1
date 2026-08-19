@@ -56,7 +56,8 @@ verify-merge-deploy steps for the pending branch, the machine-setup gotchas, and
 
 **The next round is sequenced in `specs/2026-08-07-next-round-sequencing.md`.** **Stages 0–2 are
 built and deployed** (2026-08-07): the two-browser full game was driven by hand (a dev-only
-seeding route, `POST /dev/rooms`, makes any golden-game state two clicks away in a browser); the
+seeding route, `POST /dev/rooms` — registered only under `npm run dev:server`, absent from
+`npm run serve` / `start:server` — makes any golden-game state two clicks away in a browser); the
 wire and the save record carry versions (`PROTOCOL_VERSION` in `session/protocol.ts`,
 `SAVE_VERSION` 5, skew refused with its own `versionMismatch` code and screen, `/health` reports
 both); and **pass-and-play persists** — one game per device in `localStorage`
@@ -139,7 +140,7 @@ golden-game state and plays on from it, which is how to reach a merger in two cl
 several minutes. **Neither exists in a production build** (owner ruling, 2026-08-08):
 `import.meta.env.DEV` guards in `src/App.tsx` mean the routes and their golden-data chunks are
 never emitted, and `check:bundle` greps `dist/` for golden title strings to hold it there. The
-client-side twin of the server's `/dev/rooms`.
+client-side twin of the server's `/dev/rooms`, which itself exists only under `npm run dev:server`.
 
 Design specs and implementation plans live in `docs/superpowers/{specs,plans}/`. Each phase ends
 with a carry-forward doc in `specs/` recording what it hands to the next one — read the newest
@@ -169,9 +170,11 @@ before starting work.
 ## Commands
 
 ```bash
-npm run dev            # Vite dev server (7932). Pass-and-play, /catalog and /scenarios only
-npm run dev:server     # Socket.io server (4002), with SOCKET_PATH=/socket.io — dev's base is
-                       # "/", so the client asks at the bare path and Vite proxies it. Needed
+npm run dev            # Vite dev server (7932), serving under BASE_PATH like build does —
+                       # base is uniform now. Pass-and-play, /catalog and /scenarios only
+npm run dev:server     # Socket.io server (4002). Sets NODE_ENV=development (registers
+                       # POST /dev/rooms) but no SOCKET_PATH — it falls through to the
+                       # prefixed default, which is what the dev client asks for. Needed
                        # for anything under /online or /room
 npm run dev:all        # both, concurrently — what an online by-hand pass needs
 npx vitest run         # full suite

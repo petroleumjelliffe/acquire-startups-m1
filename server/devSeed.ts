@@ -25,9 +25,15 @@ import express, { type Express } from 'express';
 import { ALL_GOLDEN_GAMES } from '../engine/golden/index.js';
 import { buildFixture } from '../engine/golden/fixtures.js';
 import type { RoomRegistry } from './rooms.js';
+import { BASE_PATH } from '../basePath.js';
 
 /**
- * Registers `POST /dev/rooms` unless this is production.
+ * Registers `POST ${BASE_PATH}/dev/rooms`, but only when the caller
+ * (server/index.ts) has confirmed `NODE_ENV === 'development'` — fail
+ * closed, not "unless production": an unset or unexpected NODE_ENV does not
+ * register the route. That means it exists under `npm run dev:server`, and
+ * not under `npm run serve` / `npm run start:server`, neither of which set
+ * NODE_ENV at all.
  *
  * The caller registers conditionally rather than this handler checking on each
  * request: an absent route cannot be reached by a bug in its own guard.
@@ -37,7 +43,7 @@ import type { RoomRegistry } from './rooms.js';
 export function registerDevSeed(app: Express, rooms: RoomRegistry): void {
   // Body parsing is scoped to this route rather than the app, so nothing about
   // production request handling changes by adding a dev tool.
-  app.post('/dev/rooms', express.json(), (req, res) => {
+  app.post(`${BASE_PATH}/dev/rooms`, express.json(), (req, res) => {
     const body: unknown = req.body;
     const { goldenId, roomId } =
       typeof body === 'object' && body !== null
@@ -76,7 +82,7 @@ export function registerDevSeed(app: Express, rooms: RoomRegistry): void {
         // Origin-free on purpose: the server does not know where the client is
         // being served from, and during this work it is often somewhere else.
         path:
-          `/room/${room.id}?devSeat=${p.id}&devToken=${p.token}` +
+          `${BASE_PATH}/room/${room.id}?devSeat=${p.id}&devToken=${p.token}` +
           `&devName=${encodeURIComponent(p.name)}`,
       })),
     });
