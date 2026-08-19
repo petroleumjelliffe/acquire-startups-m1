@@ -90,7 +90,7 @@ describe('POST /dev/rooms', () => {
     for (const player of body.players) {
       expect(player.token, `${player.name} has no token`).toBeTruthy();
       expect(player.path).toBe(
-        `/room/${body.roomId}?devSeat=${player.id}&devToken=${player.token}` +
+        `${BASE_PATH}/room/${body.roomId}?devSeat=${player.id}&devToken=${player.token}` +
           `&devName=${encodeURIComponent(player.name)}`,
       );
     }

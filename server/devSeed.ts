@@ -77,7 +77,7 @@ export function registerDevSeed(app: Express, rooms: RoomRegistry): void {
         // Origin-free on purpose: the server does not know where the client is
         // being served from, and during this work it is often somewhere else.
         path:
-          `/room/${room.id}?devSeat=${p.id}&devToken=${p.token}` +
+          `${BASE_PATH}/room/${room.id}?devSeat=${p.id}&devToken=${p.token}` +
           `&devName=${encodeURIComponent(p.name)}`,
       })),
     });

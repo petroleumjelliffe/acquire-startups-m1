@@ -14,7 +14,7 @@ function walk(dir: string, root = dir): string[] {
   });
 }
 
-export default defineConfig(({ command, isPreview }) => ({
+export default defineConfig(() => ({
   plugins: [
     react(),
     // Substitutes the PWA placeholders in index.html.
@@ -61,24 +61,7 @@ export default defineConfig(({ command, isPreview }) => ({
         handler: (html) =>
           html
             .replaceAll("__THEME_COLOR__", APP_COLORS.theme)
-            .replaceAll("__PWA_BASE__", `${command === "build" ? BASE_PATH : ""}/`),
-      },
-      // The generated manifest carries the *prod* start_url and scope, but
-      // the dev server serves the app at '/'. Installing from a dev LAN URL
-      // — which the owner did, first thing — produced an app that opened
-      // /acquire-startups-m1/ against a router with no route there: a white
-      // screen as the install's first impression. Dev rewrites the manifest
-      // to its own origin's shape; the built file is untouched.
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          if (req.url?.split("?")[0] !== "/manifest.webmanifest") return next();
-          const raw = readFileSync(join(__dirname, "public", "manifest.webmanifest"), "utf8");
-          const manifest = JSON.parse(raw) as { start_url: string; scope: string };
-          manifest.start_url = "/";
-          manifest.scope = "/";
-          res.setHeader("Content-Type", "application/manifest+json");
-          res.end(JSON.stringify(manifest, null, 2));
-        });
+            .replaceAll("__PWA_BASE__", `${BASE_PATH}/`),
       },
     },
     // Writes dist/sw.js after the build, from scripts/sw.template.js.
@@ -127,26 +110,16 @@ export default defineConfig(({ command, isPreview }) => ({
     // and this proxy carries its socket path to the game server. 4002 per
     // game-host PORTS.md — build tooling, not shipped code.
     //
-    // Two keys because the client's path follows its base: dev serves at '/'
-    // so it asks for '/socket.io' — the target must run with
-    // SOCKET_PATH=/socket.io, which the dev:server script does — while
-    // preview serves the built client at BASE_PATH, so it asks for the
-    // prefixed path, which a bare `tsx server/index.ts` mounts by default.
+    // One key: the client's path follows its base, and base is now BASE_PATH
+    // in dev and build alike, so there is only one path it ever asks for.
     proxy: {
-      '/socket.io': { target: 'http://localhost:4002', ws: true },
       [`${BASE_PATH}/socket.io`]: { target: 'http://localhost:4002', ws: true },
     },
   },
-  // `isPreview` matters as much as `command` here. Preview runs as `serve`,
-  // so without it preview hosted `dist/` at "/" while the built index.html
-  // asked for `${BASE_PATH}/assets/…`. Every asset missed and the SPA
-  // fallback answered with index.html and a **200**, so the page rendered
-  // blank and a status-code check read as success. Dev still wants "/".
-  //
-  // Note this stays derived from BASE_PATH rather than repeating the path in
-  // the preview script — the whole point of basePath.ts is that there is one
-  // copy, and it has already been three.
-  base: command === 'build' || isPreview ? BASE_PATH : "/",
+  // One base, dev and build alike. The asymmetry this replaces was the sole
+  // reason dev needed its own socket path, its own manifest rewrite and a
+  // differently-substituted __PWA_BASE__ — see the deletions below.
+  base: BASE_PATH,
   test: {
     globals: true,
     environment: 'jsdom',
