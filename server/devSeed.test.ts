@@ -20,6 +20,7 @@ import { BASE_PATH } from '../basePath.js';
 interface Running {
   port: number;
   rooms: ReturnType<typeof createServer>['rooms'];
+  devSeed: boolean;
   close(): Promise<void>;
 }
 
@@ -41,7 +42,7 @@ async function start(nodeEnv?: string): Promise<Running> {
     else process.env.NODE_ENV = previous;
   }
 
-  const { httpServer, io, rooms } = handle;
+  const { httpServer, io, rooms, devSeed } = handle;
   await new Promise<void>((resolve) => httpServer.listen(0, resolve));
   const address = httpServer.address();
   if (address === null || typeof address === 'string') {
@@ -51,6 +52,7 @@ async function start(nodeEnv?: string): Promise<Running> {
   running = {
     port: address.port,
     rooms,
+    devSeed,
     close: () =>
       new Promise<void>((resolve) => {
         io.close();
@@ -151,6 +153,32 @@ describe('POST /dev/rooms', () => {
       // dev". Anything that is not explicitly development gets no route.
       expect((await seed(port, { goldenId: 'G2' })).status).toBe(404);
       expect((await fetch(`http://localhost:${port}/health`)).status).toBe(200);
+    } finally {
+      if (previous === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previous;
+    }
+  });
+
+  it('reports whether it registered, so the boot banner cannot lie about it', async () => {
+    // The banner is the only place a stale environment shows itself: `tsx
+    // watch` reloads code and never the env it was launched with, so a server
+    // started before the guard was inverted keeps serving, reloads into the
+    // new code, and stops registering the route with nothing said. That is
+    // worth a line of output only if the line is derived from the same
+    // decision the route is — hence a reported flag rather than a second
+    // reading of NODE_ENV, which could drift from the first.
+    const dev = await start('development');
+    expect(dev.devSeed).toBe(true);
+    expect((await seed(dev.port, { goldenId: 'G2' })).status).toBe(200);
+    await dev.close();
+    running = null;
+
+    const previous = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    try {
+      const off = await start();
+      expect(off.devSeed).toBe(false);
+      expect((await seed(off.port, { goldenId: 'G2' })).status).toBe(404);
     } finally {
       if (previous === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = previous;
